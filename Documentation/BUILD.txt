@@ -1,0 +1,5 @@
+To build the documentation, run the following command:
+
+doxygen documentation.conf
+
+The documentation will be built into the local build/html folder.
