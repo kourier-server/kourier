@@ -13,17 +13,16 @@ my [blog](https://blog.kourier.io). All benchmarks are container-based, allowing
 anyone to validate the results shown here.
 <br />
 ## Benchmarks
-On my [blog](https://blog.kourier.io), I compare Kourier with Rust/Hyper and Go/http, and show 
-that Kourier beats all of them by a large margin regarding performance, memory 
-consumption, and compliance with HTTP syntax. All benchmarks are container-based and can be
+On my [blog](https://blog.kourier.io), I compare Kourier with Rust/Hyper and Go/http and show 
+that Kourier beats them by a large margin in terms of performance, memory 
+consumption, and compliance with HTTP syntax. All benchmarks are container-based and can be 
 [found](Src/Tests/Resources/Benchmarks/README.md) in this repository.
-
 <br />
-
 I summarize the benchmark results shown in my posts below.
 <br />
-### Performance (512 connections - pipelined requests)
-This benchmark is similar to the plaintext test used on TechEmpower benchmarks. Tests were run 
+### Performance Benchmark
+This benchmark is similar to the plaintext test used on TechEmpower benchmarks. In this benchmark,
+512 connections are established, and pipelined HTTP requests are sent to the servers. Tests were run 
 on an AMD Ryzen 5 1600 processor with 32GB of memory, and all frameworks used six threads to 
 process HTTP requests.
 
@@ -37,7 +36,9 @@ process HTTP requests.
 
 <br />
 
-### Memory Consumption (500K connections)
+### Memory Consumption Benchmark
+
+In this benchmark, HTTP requests are sent over 500K connections.
 
 Memory consumption benchmark tests were run on an AMD Ryzen 5 1600 processor with 32GB of memory, 
 and all frameworks used six threads to process HTTP requests.
@@ -56,6 +57,9 @@ and all frameworks used six threads to process HTTP requests.
 ### HTTP Compliance
 HTTP compliance test results were obtained using a Docker image 
 [belonging](Src/Tests/Resources/Benchmarks/HttpCompliance/README.md) to this repository.
+
+This test sends malformed requests to the servers containing invalid URL paths and queries and 
+invalid header field names/values.
 
 | Kourier  | Results |
 | -------------: | :-------- |
