@@ -8,15 +8,17 @@
 [Kourier](https://kourier.io) is the fastest, lightest, and most HTTP syntax-compliant server.
 
 Kourier is truly a wonder of software engineering. It is open source, written in modern C++, 
-and leaves all the alternatives far behind. Below, I summarize the benchmark results that 
-I show on my [blog](https://blog.kourier.io). All benchmarks are container-based, allowing 
+and leaves all the alternatives far behind. Below, I summarize the benchmark results shown on 
+my [blog](https://blog.kourier.io). All benchmarks are container-based, allowing 
 anyone to validate the results shown here.
 <br />
 ## Benchmarks
-On my [blog](https://blog.kourier.io), you can see posts where I compare Kourier with other popular 
-frameworks and show that Kourier beats all of them by a large margin regarding performance, memory 
+On my [blog](https://blog.kourier.io), I compare Kourier with Rust/Hyper and Go/http, and show 
+that Kourier beats all of them by a large margin regarding performance, memory 
 consumption, and compliance with HTTP syntax. All benchmarks are container-based and can be
 [found](Src/Tests/Resources/Benchmarks/README.md) in this repository.
+
+<br />
 
 I summarize the benchmark results shown in my posts below.
 <br />
@@ -24,6 +26,8 @@ I summarize the benchmark results shown in my posts below.
 This benchmark is similar to the plaintext test used on TechEmpower benchmarks. Tests were run 
 on an AMD Ryzen 5 1600 processor with 32GB of memory, and all frameworks used six threads to 
 process HTTP requests.
+
+<br />
 
 | Framework     | RPS       |
 | ------------- | --------: |
@@ -37,6 +41,8 @@ process HTTP requests.
 
 Memory consumption benchmark tests were run on an AMD Ryzen 5 1600 processor with 32GB of memory, 
 and all frameworks used six threads to process HTTP requests.
+
+<br />
 
 | Framework     | Max Used Memory (kB) |
 | ------------- | --------: |
