@@ -118,7 +118,7 @@ The HTTP syntax rules are simple to enforce when the parser is a state machine t
 
 Kourier uses SIMD instructions extensively on its parser while maintaining strict adherence to HTTP syntax rules.
 
-Kourier's parser is a performance powerhouse, capable of processing 12.1 million unencrypted HTTP requests per second on an AMD Ryzen 5 1600, an 8-year-old mid-range processor, using only half of its cores (wrk uses the other half). It sets a new standard for HTTP parsing and leaves the highest-performing enterprise network appliances in the dust.
+Kourier's parser is a performance powerhouse, capable of processing 12.1 million HTTP requests per second on an AMD Ryzen 5 1600, an 8-year-old mid-range processor, using only half of its cores (wrk uses the other half). It sets a new standard for HTTP parsing and leaves the highest-performing enterprise network appliances in the dust.
 
 Kourier is not just the fastest server on Earth; it's also open source, ensuring that all claims about its performance are verifiable.
 
