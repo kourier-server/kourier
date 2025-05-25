@@ -5,26 +5,21 @@
 <br />
 
 # Meet Kourier, The Fastest Server Ever
-[Kourier](https://kourier.io) is the fastest, lightest, and most HTTP syntax-compliant server.
+[Kourier](https://kourier.io) is the fastest, lightest, and 100% HTTP syntax-compliant server.
 
-Kourier is truly a wonder of software engineering. It is open source, written in modern C++, 
-and leaves all the alternatives far behind. Below, I summarize the benchmark results shown on 
-my [blog](https://blog.kourier.io). All benchmarks are container-based, allowing 
-anyone to validate the results shown here.
+Kourier is truly a wonder of software engineering. It is open source, written in modern C++, and leaves all publicly available servers far behind regarding performance, memory consumption, and compliance with the HTTP syntax.
+
+At https://blog.kourier.io, you can see detailed benchmarks created using Docker images available in Kourier's repository that you can easily build and run locally to verify the results.
+
+If high-performance HTTP request processing is part of your core business, Kourier can take it to the next level. I made Kourier open-source. Thus, anyone can study, build, validate, and benchmark Kourier. You can contact me at glauco@kourier.io if your Business is incompatible with the AGPL and you want to license Kourier under alternative terms.
 <br />
 ## Benchmarks
-On my [blog](https://blog.kourier.io), I compare Kourier with Rust/Hyper and Go/http and show 
-that Kourier beats them by a large margin in terms of performance, memory 
-consumption, and compliance with HTTP syntax. All benchmarks are container-based and can be 
-[found](Src/Tests/Resources/Benchmarks/README.md) in this repository.
-<br />
-I summarize the benchmark results shown in my posts below.
+While implementing Kourier and running the first benchmarks comparing Kourier with other publicly available alternatives, I was astonished that, besides being much faster and lighter, Kourier was the only 100% HTTP syntax-compliant server.
+
+Below, I show the results of these benchmarks, which are shown in detail at https://blog.kourier.io.
 <br />
 ### Performance Benchmark
-This benchmark is similar to the plaintext test used on TechEmpower benchmarks. In this benchmark,
-512 connections are established, and pipelined HTTP requests are sent to the servers. Tests were run 
-on an AMD Ryzen 5 1600 processor with 32GB of memory, and all frameworks used six threads to 
-process HTTP requests.
+This benchmark is similar to Techempower's plaintext benchmark. In this benchmark, 512 connections are established, and pipelined HTTP requests are sent to the servers. Tests were run on an AMD Ryzen 5 1600 processor with 32GB of memory, and all frameworks used six threads to process HTTP requests.
 
 <br />
 
@@ -40,8 +35,7 @@ process HTTP requests.
 
 In this benchmark, HTTP requests are sent over 500K connections.
 
-Memory consumption benchmark tests were run on an AMD Ryzen 5 1600 processor with 32GB of memory, 
-and all frameworks used six threads to process HTTP requests.
+Memory consumption benchmark tests were run on an AMD Ryzen 5 1600 processor with 32GB of memory, and all frameworks used six threads to process HTTP requests.
 
 <br />
 
@@ -55,11 +49,10 @@ and all frameworks used six threads to process HTTP requests.
 <br />
 
 ### HTTP Compliance
-HTTP compliance test results were obtained using a Docker image 
-[belonging](Src/Tests/Resources/Benchmarks/HttpCompliance/README.md) to this repository.
+HTTP compliance test results were obtained using a Docker image [from](Src/Tests/Resources/Benchmarks/HttpCompliance/README.md) this repository.
 
-This test sends malformed requests to the servers containing invalid URL paths and queries and 
-invalid header field names/values.
+This test sends malformed requests to the servers containing invalid URL paths and queries and invalid header field names/values.
+
 
 | Kourier  | Results |
 | -------------: | :-------- |
@@ -113,7 +106,7 @@ invalid header field names/values.
 <br />
 
 ## Why No One Did This Before?
-Developing a server that delivers unprecedented performance is a complex and challenging task. Many different aspects must be addressed to achieve stellar performance. Let's explore some key features that help Kourier to provide its never-before-seen performance.
+Developing a server that delivers unprecedented performance is a complex and challenging task. Many different aspects must be addressed to achieve stellar performance. Let's explore some key features that help Kourier to provide its never-before-seen performance:
 
 <br />
 
@@ -129,7 +122,7 @@ Kourier is not just the fastest server on Earth; it's also open source, ensuring
 <br />
 
 ## Unbeatable TLS Performance
-Kourier uses OpenSSL for TLS encryption. Although OpenSSL is battle-tested, it is challenging to integrate it appropriately. Almost all users of OpenSSL do the naive approach of employing file descriptor-based BIOs, which notoriously consume vast amounts of memory, besides being slow.
+Kourier uses OpenSSL for TLS encryption. Although OpenSSL is battle-tested, it is challenging to integrate it appropriately. Almost all users of OpenSSL do the naive approach of employing file descriptor-based BIOs, which notoriously consume vast amounts of memory besides being slow.
 
 Kourier's implementation excels at TLS performance because it provides custom memory BIOs to OpenSSL to restrict it to TLS computations while keeping all other responsibilities under Kourier's control.
 
@@ -167,21 +160,14 @@ Kourier exports TcpSocket and TlsSocket classes, which you can use instead of Qt
 <br />
 
 ## Behaves By The Book
-I developed Kourier with strict and demanding requirements, where all possible behaviours are 
-comprehensively verified in specifications written in the Gherkin style. To this end, I created 
-Spectator, a test framework that I also open-sourced with Kourier and is [included](Src/Tests/Spectator/README.md) in Kourier's
-repository. You can check all files 
-ending in spec.cpp in the Kourier repository to see how meticulously tested Kourier is. It is 
-funny to compare the abysmal difference in testing rigor between Kourier and other frameworks.
+I developed Kourier with strict and demanding requirements, where all possible behaviors are comprehensively verified in specifications written in the Gherkin style. To this end, I created Spectator, a test framework that I also open-sourced with Kourier and is [included](Src/Tests/Spectator/README.md) in Kourier's repository. You can check all files ending in spec.cpp in the Kourier repository to see how meticulously tested Kourier is. It is funny to compare the abysmal difference in testing rigor between Kourier and other frameworks.
 
 <br />
 
 ## AGPL Only? My Business Is Not Compatible With It!
 You can [contact me](mailto:glauco@kourier.io) if your Business wants to use Kourier under an alternative license.
 
-It is not a problem if your network appliances run on a BSD-derived OS. The IO readiness models 
-provided by epoll and kqueue are similar, and it is not too much effort to make Kourier work with 
-both.
+As the IO readiness models provided by epoll and kqueue are similar, I can make Kourier work with both models if your Business runs on BSD-derived OSs and wants to license Kourier under alternative terms.
 
 <br />
 
