@@ -12,7 +12,9 @@ Kourier is truly a wonder of software engineering. It is open source, written in
 At https://blog.kourier.io, you can see detailed benchmarks created using Docker images available in Kourier's repository that you can easily build and run locally to verify the results.
 
 If high-performance HTTP request processing is part of your core business, Kourier can take it to the next level. I made Kourier open-source. Thus, anyone can study, build, validate, and benchmark Kourier. You can contact me at glauco@kourier.io if your Business is incompatible with the AGPL and you want to license Kourier under alternative terms.
+
 <br />
+
 ## Benchmarks
 While implementing Kourier and running the first benchmarks comparing Kourier with other publicly available alternatives, I was astonished that, besides being much faster and lighter, Kourier was the only 100% HTTP syntax-compliant server.
 
