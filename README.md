@@ -52,7 +52,8 @@ Memory consumption benchmark tests were run on an AMD Ryzen 5 1600 processor wit
 
 <br />
 
-### HTTP Compliance
+### HTTP Compliance Benchmark
+
 HTTP compliance test results were obtained using a Docker image [from](Src/Tests/Resources/Benchmarks/HttpCompliance/README.md) this repository.
 
 This test sends malformed requests to the servers containing invalid URL paths and queries and invalid header field names/values.
