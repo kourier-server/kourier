@@ -19,7 +19,9 @@ If high-performance HTTP request processing is part of your core business, Kouri
 While implementing Kourier and running the first benchmarks comparing Kourier with other publicly available alternatives, I was astonished that, besides being much faster and lighter, Kourier was the only 100% HTTP syntax-compliant server.
 
 Below, I show the results of these benchmarks, which are shown in detail at https://blog.kourier.io.
+
 <br />
+
 ### Performance Benchmark
 This benchmark is similar to Techempower's plaintext benchmark. In this benchmark, 512 connections are established, and pipelined HTTP requests are sent to the servers. Tests were run on an AMD Ryzen 5 1600 processor with 32GB of memory, and all frameworks used six threads to process HTTP requests.
 
