@@ -7,16 +7,18 @@
 # Meet Kourier, The Fastest Server Ever
 [Kourier](https://kourier.io) is the fastest, lightest, and 100% HTTP syntax-compliant server.
 
-Kourier is truly a wonder of software engineering. It is open source, written in modern C++, and leaves all publicly available servers far behind regarding performance, memory consumption, and compliance with the HTTP syntax.
+Kourier is truly a wonder of software engineering. Kourier is open-source, written in modern C++, and outperforms all publicly available servers in terms of performance, memory consumption, and compliance with the HTTP syntax.
 
-At https://blog.kourier.io, you can see detailed benchmarks created using Docker images available in Kourier's repository that you can easily build and run locally to verify the results.
+At https://blog.kourier.io, you can see detailed benchmarks created using Docker images available in Kourier's repository that you can easily build and run locally to validate the results.
 
-If high-performance HTTP request processing is part of your core business, Kourier can take it to the next level. I made Kourier open-source. Thus, anyone can study, build, validate, and benchmark Kourier. You can contact me at glauco@kourier.io if your Business is incompatible with the AGPL and you want to license Kourier under alternative terms.
+With Kourier, you can create web services at a fraction of your current infrastructure cost. Besides its ultra-fast HTTP server and parser, Kourier also provides the fastest socket implementation in the form of the TcpSocket and TlsSocket classes that you can use as building blocks for your projects.
+
+If high-performance network communication is part of your core business, Kourier can take it to the next level. I made Kourier open-source. Thus, anyone can study, build, validate, and benchmark Kourier. You can contact me at glauco@kourier.io if your Business is incompatible with the AGPL and you want to license Kourier under alternative terms.
 
 <br />
 
 ## Benchmarks
-While implementing Kourier and running the first benchmarks comparing Kourier with other publicly available alternatives, I was astonished that, besides being much faster and lighter, Kourier was the only 100% HTTP syntax-compliant server.
+While implementing Kourier and running the first benchmarks comparing Kourier with other publicly available alternatives for building web services, I was astonished that, besides being much faster and lighter, Kourier was the only 100% HTTP syntax-compliant server.
 
 Below, I show the results of these benchmarks, which are shown in detail at https://blog.kourier.io.
 
