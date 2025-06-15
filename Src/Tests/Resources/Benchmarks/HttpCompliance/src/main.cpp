@@ -209,7 +209,15 @@ int main(int argc, char ** argv)
             && hexDigitInAbsoluteCurrentIndex == invalidPctEncodedDigits.size()
             && hexDigitInQueryCurrentIndex == invalidPctEncodedDigits.size())
         {
+            const double passedTests = detectedInvalidUrlAbsoluteRequestsCounter
+                                       + detectedInvalidUrlQueryRequestsCounter
+                                       + detectedInvalidFieldNameRequestsCounter
+                                       + detectedInvalidFieldValueRequestsCounter
+                                       + detectedInvalidPctEncodedDigitInUrlAbsoluteRequestsCounter
+                                       + detectedInvalidPctEncodedDigitInUrlQueryRequestsCounter;
+            const double testCount = invalidChars.size() + 2 * invalidPctEncodedDigits.size();
             qInfo("Finished testing HTTP compliance.");
+            qInfo("HTTP compliance score (%% of passed tests): %5.1lf%%", (100.0 * passedTests)/testCount);
             qInfo("%10zu%s", detectedInvalidUrlAbsoluteRequestsCounter, " requests with invalid URL absolute path detected.");
             qInfo("%10zu%s", undetectedInvalidUrlAbsoluteRequestsCounter, " requests with invalid URL absolute path undetected.");
             qInfo("%10zu%s", detectedInvalidUrlQueryRequestsCounter, " requests with invalid URL query detected.");
@@ -219,9 +227,9 @@ int main(int argc, char ** argv)
             qInfo("%10zu%s", detectedInvalidFieldValueRequestsCounter, " requests with invalid header value detected.");
             qInfo("%10zu%s", undetectedInvalidFieldValueRequestsCounter, " requests with invalid header value undetected.");
             qInfo("%10zu%s", detectedInvalidPctEncodedDigitInUrlAbsoluteRequestsCounter, " requests with invalid pct-encoded hex digits in URL absolute path detected.");
-            qInfo("%10zu%s", undetectedInvalidPctEncodedDigitInUrlAbsoluteRequestsCounter, " requests with invalid pct-encoded hex digits URL absolute path undetected.");
-            qInfo("%10zu%s", detectedInvalidPctEncodedDigitInUrlQueryRequestsCounter, " requests with invalid pct-encoded hex digits URL query detected.");
-            qInfo("%10zu%s", undetectedInvalidPctEncodedDigitInUrlQueryRequestsCounter, " requests with invalid pct-encoded hex digits URL query undetected.");
+            qInfo("%10zu%s", undetectedInvalidPctEncodedDigitInUrlAbsoluteRequestsCounter, " requests with invalid pct-encoded hex digits in URL absolute path undetected.");
+            qInfo("%10zu%s", detectedInvalidPctEncodedDigitInUrlQueryRequestsCounter, " requests with invalid pct-encoded hex digits in URL query detected.");
+            qInfo("%10zu%s", undetectedInvalidPctEncodedDigitInUrlQueryRequestsCounter, " requests with invalid pct-encoded hex digits in URL query undetected.");
             QCoreApplication::quit();
         }
     };

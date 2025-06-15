@@ -1,6 +1,6 @@
 Building Docker Container:
 ================================================================================
-docker build --no-cache --build-arg THREAD_COUNT=12 --build-context kourier_src=../../../../.. --build-context certs_root=.. -t kourier-bench:kourier -f kourier.dockerfile .
+docker build --no-cache --build-arg THREAD_COUNT=N --build-context kourier_src=../../../../.. --build-context certs_root=.. -t kourier-bench:kourier -f kourier.dockerfile .
 
 Running Docker Container:
 ================================================================================

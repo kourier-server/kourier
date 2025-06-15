@@ -4095,7 +4095,7 @@ SCENARIO("HttpServer responds with 100-Continue status code when client sends ex
             REQUIRE(ioChannel.writeBuffer().isEmpty());
             const auto parserStatus = parser.parse();
 
-            THEN("parser parses request metadata and writes 'HTTP/1.1 100 Continue\r\n\r\n' to io channel")
+            THEN("parser parses request metadata and writes 'HTTP/1.1 100 Continue\\r\\n\\r\\n' to io channel")
             {
                 REQUIRE(parserStatus == HttpRequestParser::ParserStatus::ParsedRequest);
                 const std::string_view expectedResponse("HTTP/1.1 100 Continue\r\n\r\n");
@@ -4118,7 +4118,7 @@ SCENARIO("HttpServer responds with 100-Continue status code when client sends ex
             ioChannel.readBuffer().write(&request[request.size() - 1], 1);
             const auto parserStatus = parser.parse();
 
-            THEN("parser parses request metadata and writes 'HTTP/1.1 100 Continue\r\n\r\n' to io channel")
+            THEN("parser parses request metadata and writes 'HTTP/1.1 100 Continue\\r\\n\\r\\n' to io channel")
             {
                 REQUIRE(parserStatus == HttpRequestParser::ParserStatus::ParsedRequest);
                 const std::string_view expectedResponse("HTTP/1.1 100 Continue\r\n\r\n");
@@ -4144,7 +4144,7 @@ SCENARIO("HttpServer responds with 100-Continue status code when client sends ex
             REQUIRE(ioChannel.writeBuffer().isEmpty());
             const auto parserStatus = parser.parse();
 
-            THEN("parser parses request metadata and writes 'HTTP/1.1 100 Continue\r\n\r\n' to io channel")
+            THEN("parser parses request metadata and writes 'HTTP/1.1 100 Continue\\r\\n\\r\\n' to io channel")
             {
                 REQUIRE(parserStatus == HttpRequestParser::ParserStatus::ParsedRequest);
                 const std::string_view expectedResponse("HTTP/1.1 100 Continue\r\n\r\n");
@@ -4167,7 +4167,7 @@ SCENARIO("HttpServer responds with 100-Continue status code when client sends ex
             ioChannel.readBuffer().write(&request[request.size() - 1], 1);
             const auto parserStatus = parser.parse();
 
-            THEN("parser parses request metadata and writes 'HTTP/1.1 100 Continue\r\n\r\n' to io channel")
+            THEN("parser parses request metadata and writes 'HTTP/1.1 100 Continue\\r\\n\\r\\n' to io channel")
             {
                 REQUIRE(parserStatus == HttpRequestParser::ParserStatus::ParsedRequest);
                 const std::string_view expectedResponse("HTTP/1.1 100 Continue\r\n\r\n");

@@ -1,6 +1,6 @@
 Building Docker Container:
 ================================================================================
-docker build --no-cache --build-arg THREAD_COUNT=12 -f wrk.dockerfile -t kourier-bench:wrk .
+docker build --no-cache --build-arg THREAD_COUNT=N -f wrk.dockerfile -t kourier-bench:wrk .
 
 Running Docker Container:
 ================================================================================
