@@ -11,6 +11,13 @@ use tokio::runtime;
 use std::time::Duration;
 use hyper_util::service::TowerToHyperService;
 use tower::ServiceBuilder;
+use std::env;
+
+fn help() {
+    panic!("usage:
+hyper-bench -worker_count <int>
+    Use worker_count threads on runtime. Given value must be a positive integer.");
+}
 
 
 async fn hello(
@@ -35,12 +42,38 @@ fn full<T: Into<Bytes>>(chunk: T) -> BoxBody<Bytes, hyper::Error> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
+    let args: Vec<String> = env::args().collect();
+    let mut worker_count: usize = 0;
+    let mut option = "";
 
+    match args.len() {
+        3 => {
+            option = &args[1];
+            let value = &args[2];
+            worker_count = match value.parse() {
+                Ok(n) => {
+                    n
+                },
+                Err(_) => {
+                    help();
+                    0
+                },
+            };
+        },
+        _ => {
+            help();
+        }
+    }
+    if option != "-worker_count" || worker_count == 0 {
+        help();
+    } else {
+        println!("Using {} workers on runtime.", worker_count);
+    }
+    let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
     let listener = TcpListener::bind(addr).await?;
     let rt = runtime::Builder::new_multi_thread()
         .enable_all()
-        .worker_threads(6)
+        .worker_threads(worker_count)
         .build()
         .unwrap();
     println!("Listening on http://{}", addr);

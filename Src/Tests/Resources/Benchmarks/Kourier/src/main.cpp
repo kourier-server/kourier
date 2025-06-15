@@ -68,8 +68,8 @@ int main(int argc, char ** argv)
         qFatal("Failed to set request timeout. %s", !server.errorMessage().empty() ? server.errorMessage().data() : "");
     if (!server.setServerOption(HttpServer::ServerOption::IdleTimeoutInSecs, idleTimeoutInSecs))
         qFatal("Failed to set idle timeout. %s", !server.errorMessage().empty() ? server.errorMessage().data() : "");
-    if (!server.addRoute(HttpRequest::Method::GET, "/hello", [](const HttpRequest &, HttpBroker &broker){broker.writeResponse("Hello World!");}))
-        qFatal("Failed to add /hello route to server. %s", !server.errorMessage().empty() ? server.errorMessage().data() : "");
+    if (!server.addRoute(HttpRequest::Method::GET, "/", [](const HttpRequest &, HttpBroker &broker){broker.writeResponse("Hello World!");}))
+        qFatal("Failed to add default route to server. %s", !server.errorMessage().empty() ? server.errorMessage().data() : "");
     if (enableTls)
     {
         TlsConfiguration tlsConfiguration;
