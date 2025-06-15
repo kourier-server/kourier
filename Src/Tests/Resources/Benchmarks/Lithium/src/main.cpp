@@ -48,9 +48,6 @@ int main(int argc, char ** argv)
   [&](http_request& request, http_response& response) {
     response.write("Hello World!");
   };
-  // 14880 to listen to port 8250 because Lithium does not convert to network byte order (big endian).
-  // see https://github.com/matt-42/lithium/blob/525566ed29e328441f40263aeabd0a8213fd9d54/single_headers/lithium_http_server.hh#L4296
-  // http_serve(httpApi, 14880, s::ip = "127.0.0.1", s::nthreads = 6);
   http_serve(httpApi, 8250, s::nthreads = workerCount);
   return 0;
 }
