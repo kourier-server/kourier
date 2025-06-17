@@ -83,7 +83,7 @@ Kourier implements a modern signals and slots mechanism built upon C++'s powerfu
 ## Lightweight Timers
 Writing a reliable server requires timers. Malicious users intentionally send data slowly on multiple connections to attack a server. Timers help to prevent that abuse from happening. However, userspace timer implementations are generally not designed with the requirements of high-performance servers as a use case.
 
-For example, every time a server starts to process a request, it resets a request timer, and whenever the server responds to a request, it starts an idle timer. Typical timer implementations are not optimized for this use case, which involves multiple resets without timeouts. That's why some frameworks use deadlines instead of real timeout-based timers to achieve better benchmark results.
+For example, every time a server starts to process a request, it resets a request timer, and whenever the server responds to a request, it starts an idle timer. Typical timer implementations are not optimized for this use case, which involves multiple resets without timeouts.
 
 Although deadlines prevent slow senders, they are useless against rogue senders that keep the connection open indefinitely after sending only part of a request.
 
