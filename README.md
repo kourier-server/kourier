@@ -105,7 +105,7 @@ Kourier exports TcpSocket and TlsSocket classes, which you can use instead of Qt
 <br />
 
 ## Behaves By The Book
-Kourier is developed with strict and demanding requirements, where all possible behaviors are comprehensively verified in specifications written in the Gherkin style. Test files use Spectator, a test framework that is part of Kourier and is [included](Src/Tests/Spectator/README.md) in Kourier's repository. You can check all files ending in spec.cpp in the Kourier repository to see how meticulously tested Kourier is. There is a stark difference in testing rigor between Kourier and other publicly available servers.
+Kourier is developed with strict and demanding requirements, where all possible behaviors are comprehensively verified in specifications written in the Gherkin style. Test files use Spectator, a test framework that is part of Kourier and is [included](Src/Tests/Spectator/README.md) in Kourier's repository. You can check all files ending in *.spec.cpp* in the Kourier repository to see how meticulously tested Kourier is. There is a stark difference in testing rigor between Kourier and other publicly available servers.
 
 <br />
 
