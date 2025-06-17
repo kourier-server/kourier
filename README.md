@@ -18,7 +18,7 @@ If high-performance network communication is part of your core business, Kourier
 
 ## Benchmarks
 
-It is common to see high RPS for servers on benchmarks, but how many HTTP-compliance benchmarks have you seen on the Internet? Below, you can see how Kourier compares against well-known alternatives (you can click on the links below to go to the respective post detailing the benchmark from which the compliance score was obtained):
+It is common to see high RPS for servers on benchmarks, but how many HTTP-compliance benchmarks have you seen on the Internet? Below, you can see how Kourier compares against well-known alternatives (you can click on the links below to go to the respective post detailing the benchmark from which the compliance score was obtained):<br />
 
 | Server      | Lan     | HTTP Compliance Score |
 | -------     | :-----: | :------: |
@@ -30,7 +30,7 @@ It is common to see high RPS for servers on benchmarks, but how many HTTP-compli
 
 <br />
 
-Many servers/frameworks deliberately take a lenient approach regarding the HTTP syntax rules to make it easier to implement the HTTP parser. Although it would be expected for the fully-compliant server to be slower than the less-compliant ones, Kourier is truly a wonder of software engineering and outperforms the less-compliant servers by a large margin, as can be seen below (you can click on the links to go to the respective benchmark from which the result was obtained):
+Many servers/frameworks deliberately take a lenient approach regarding the HTTP syntax rules to make it easier to implement the HTTP parser. Although it would be expected for the fully-compliant server to be slower than the less-compliant ones, Kourier is truly a wonder of software engineering and outperforms the less-compliant servers by a large margin, as can be seen below (you can click on the links to go to the respective benchmark from which the result was obtained):<br />
 
 | Framework   | CPU       | Lan     | RPS       |
 | :---------- | :-------: | :-----: | :-------: |
@@ -42,7 +42,7 @@ Many servers/frameworks deliberately take a lenient approach regarding the HTTP 
 
 <br />
 
-Being ultra-fast enables a significant reduction of the computing resources required to run your Business, but this is all lost if the servers require too much memory. Let's see how Kourier compares against popular alternatives (you can click on the links to go to the posts detailing the benchmarks from which the results were taken):
+Being ultra-fast enables a significant reduction of the computing resources required to run your Business, but this is all lost if the servers require too much memory. Let's see how Kourier compares against popular alternatives (you can click on the links to go to the posts detailing the benchmarks from which the results were taken):<br />
 
 | Framework     | Lan | Max Used Memory (kB) |
 | ------------- | :-----: | :--------: |
