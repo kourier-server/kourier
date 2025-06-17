@@ -52,7 +52,7 @@ An ultra-fast server enables a significant reduction of the computing resources 
 
 <br />
 
-## Why No One Did This Before?
+## How Can A Fully-Compliant Server Be So Fast?
 Developing a server that delivers unprecedented performance is a complex and challenging task. Many different aspects must be addressed to achieve stellar performance. Let's explore some key features that help Kourier to provide its unbeatable performance:
 
 <br />
