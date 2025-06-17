@@ -105,17 +105,15 @@ Kourier exports TcpSocket and TlsSocket classes, which you can use instead of Qt
 <br />
 
 ## Behaves By The Book
-I developed Kourier with strict and demanding requirements, where all possible behaviors are comprehensively verified in specifications written in the Gherkin style. To this end, I created Spectator, a test framework that I also open-sourced with Kourier and is [included](Src/Tests/Spectator/README.md) in Kourier's repository. You can check all files ending in spec.cpp in the Kourier repository to see how meticulously tested Kourier is. There is a stark difference in testing rigor between Kourier and other publicly available servers.
+Kourier is developed with strict and demanding requirements, where all possible behaviors are comprehensively verified in specifications written in the Gherkin style. Test files use Spectator, a test framework that is part of Kourier and is [included](Src/Tests/Spectator/README.md) in Kourier's repository. You can check all files ending in spec.cpp in the Kourier repository to see how meticulously tested Kourier is. There is a stark difference in testing rigor between Kourier and other publicly available servers.
 
 <br />
 
 ## AGPL Only? My Business Is Not Compatible With It!
 
-I made Kourier open-source. Thus, anyone can study, build, validate, and benchmark Kourier.
+Kourier is open-source. Thus, anyone can study, build, validate, and benchmark Kourier.
 
 You can contact me at glauco@kourier.io if your Business is incompatible with the AGPL and you want to license Kourier under alternative terms.
-
-As the IO readiness models provided by epoll and kqueue are similar, I can make Kourier work with both models if your Business runs on BSD-derived OSs.
 
 <br />
 
