@@ -94,7 +94,7 @@ Kourier provides a timer implementation that allows timers to be reset millions 
 ## Correct Use Of Epoll
 Kourier also provides one of the best implementations for using epoll, a high-performance Linux IO event notification interface, to monitor file descriptors.
 
-On the Internet, the debate over level-triggered vs. edge-triggered is often limited to the difference in how the state is reset. However, the implications are far more far-reaching than many developers think. As always, the truth lies in the [source code](https://github.com/torvalds/linux/blob/90b83efa6701656e02c86e7df2cb1765ea602d07/fs/eventpoll.c#L1923). With level-triggering, epoll keeps all file descriptors that have become ready on its ready list even after their state is reset.
+On the Internet, the debate over level-triggered vs. edge-triggered is often limited to the difference in how the state is reset. However, the implications are more far-reaching than many developers think. As always, the truth lies in the [source code](https://github.com/torvalds/linux/blob/90b83efa6701656e02c86e7df2cb1765ea602d07/fs/eventpoll.c#L1923). With level-triggering, epoll keeps all file descriptors that have become ready on its ready list even after their state is reset.
 
 Implementing a server with unprecedented performance requires sharp attention to detail. How the system interacts with the low-level IO readiness model provided by the Kernel is crucial for its performance and reliability.
 
