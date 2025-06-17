@@ -76,7 +76,7 @@ Kourier's implementation excels at TLS performance because it provides custom me
 ## Cutting-Edge Signal-Slot Implementation
 Signals and slots promote loosely coupled designs that propagate events through signals. Signals and slots unify frontend and backend programming into a single paradigm, as events can represent either user interaction or asynchronous I/O.
 
-Kourier implements a modern signals and slots mechanism built upon C++'s powerful template metaprogramming capabilities. It is an order of magnitude faster than Qt and consumes 4x less memory.
+Kourier implements a modern signals and slots mechanism built upon C++'s powerful template metaprogramming capabilities. It is an order of magnitude faster than Qt's signals and slots and consumes four times less memory.
 
 <br />
 
