@@ -10,7 +10,7 @@ Kourier is open-source, written in modern C++, and is 100% HTTP syntax-compliant
 
 Below, you can see the results of reproducible, container-based benchmarks shown in detail at https://blog.kourier.io and created using open-source Docker images.
 
-With Kourier, you can create API services at a fraction of your current infrastructure costs. Besides its ultra-fast and fully compliant HTTP server and parser, Kourier also exports many C++ classes it uses for TCP communication, TLS encryption, lightweight timers, and signal-slot communications. At https://docs.kourier.io, you can find detailed documentation about the Kourier server and all C++ classes it exports.
+With Kourier, you can implement backend services at a fraction of your current infrastructure costs. Besides its ultra-fast and fully compliant HTTP server and parser, Kourier also exports many C++ classes it uses for TCP communication, TLS encryption, lightweight timers, and signal-slot communications that you can use as building blocks to implement high-performance networked systems. At https://docs.kourier.io, you can find detailed documentation about the Kourier server and all C++ classes it exports.
 
 If high-performance network communication is part of your core business, Kourier can take it to the next level.
 
