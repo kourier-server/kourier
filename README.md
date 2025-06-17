@@ -6,7 +6,7 @@
 
 # Meet Kourier, The Performance King
 
-Kourier is open-source, written in modern C++, and is 100% HTTP syntax-compliant. Kourier outperforms all publicly available servers in terms of performance and memory consumption.
+Kourier is open-source, written in modern C++, and is 100% HTTP syntax-compliant. Kourier outperforms significantly less-compliant servers in terms of performance and memory consumption.
 
 Below, you can see the results of reproducible, container-based benchmarks shown in detail at https://blog.kourier.io and created using open-source Docker images.
 
