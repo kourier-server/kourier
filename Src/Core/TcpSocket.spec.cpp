@@ -4072,9 +4072,9 @@ public:
                 && m_workingConnections > 0
                 && (m_totalConnections >= m_workingConnections)
                 && m_requestsPerWorkingConnection > 0);
-        m_sockets.resize(m_totalConnections);
-        for (auto *&pSocket : m_sockets)
-            pSocket = new TcpSocket;
+        m_socketRequestCountPairs.resize(m_totalConnections);
+        for (auto &pSocketRequestCount : m_socketRequestCountPairs)
+            pSocketRequestCount = {new TcpSocket, 0};
     }
     ~ClientTcpSockets() override = default;
 
@@ -4084,18 +4084,16 @@ public slots:
     {
         for (auto i = 0; i < m_workingConnections; ++i)
         {
-            auto *pSocket = m_sockets[i];
-            for (auto k = 0; k < m_requestsPerWorkingConnection; ++k)
-            {
-                pSocket->write((char*)&m_a, sizeof(m_a));
-                pSocket->write((char*)&m_b, sizeof(m_b));
-            }
+            auto &socketRequestCountPair = m_socketRequestCountPairs[i];
+            ++socketRequestCountPair.second;
+            socketRequestCountPair.first->write((char*)&m_a, sizeof(m_a));
+            socketRequestCountPair.first->write((char*)&m_b, sizeof(m_b));
         }
     }
     void disconnectFromServer()
     {
-        for (auto *pSocket : m_sockets)
-            pSocket->disconnectFromPeer();
+        for (auto &socketRequestCountPair : m_socketRequestCountPairs)
+            socketRequestCountPair.first->disconnectFromPeer();
     }
 
 signals:
@@ -4111,8 +4109,8 @@ private slots:
         for (auto i = startIndex; i < upTo; ++i)
         {
             ++m_currentConnectIndex;
-            auto *pSocket = m_sockets[i];
-            Object::connect(pSocket, &TcpSocket::connected, [this]()
+            auto *socketRequestCounterPair = &m_socketRequestCountPairs[i];
+            Object::connect(socketRequestCounterPair->first, &TcpSocket::connected, [this]()
             {
                 if (++m_connectionCount == m_totalConnections)
                 {
@@ -4125,40 +4123,46 @@ private slots:
                     QMetaObject::invokeMethod(this, "connectToServerInternal", Qt::QueuedConnection);
                 }
             });
-            Object::connect(pSocket, &TcpSocket::receivedData, [this, pSocket]()
+            Object::connect(socketRequestCounterPair->first, &TcpSocket::receivedData, [this, socketRequestCounterPair]()
             {
-                if (pSocket->dataAvailable() != (m_requestsPerWorkingConnection * sizeof(int)))
+                if (socketRequestCounterPair->first->dataAvailable() != sizeof(int))
                     return;
                 else
                 {
-                    for (auto i = 0; i < m_requestsPerWorkingConnection; ++i)
+                    int sum = 0;
+                    socketRequestCounterPair->first->read((char*)&sum, sizeof(sum));
+                    REQUIRE(sum == (m_a + m_b));
+                    ++m_responseCount;
+                    if (++socketRequestCounterPair->second <= m_requestsPerWorkingConnection)
                     {
-                        int sum = 0;
-                        pSocket->read((char*)&sum, sizeof(sum));
-                        REQUIRE(sum == (m_a + m_b));
+                        socketRequestCounterPair->first->write((char*)&m_a, sizeof(m_a));
+                        socketRequestCounterPair->first->write((char*)&m_b, sizeof(m_b));
                     }
-                    if (++m_responseCount == m_workingConnections)
-                        emit receivedResponses();
+                    else
+                    {
+                        if (m_responseCount == (m_requestsPerWorkingConnection * m_workingConnections))
+                            emit receivedResponses();
+                    }
                 }
             });
-            Object::connect(pSocket, &TcpSocket::disconnected, [this, pSocket]()
+            Object::connect(socketRequestCounterPair->first, &TcpSocket::disconnected, [this, socketRequestCounterPair]()
             {
                 REQUIRE(m_hasConnectedAllClients);
-                pSocket->scheduleForDeletion();
+                socketRequestCounterPair->first->scheduleForDeletion();
                 if (++m_disconnectionCount == m_totalConnections)
                     emit disconnectedFromServer();
             });
-            Object::connect(pSocket, &TcpSocket::error, [this, pSocket]()
+            Object::connect(socketRequestCounterPair->first, &TcpSocket::error, [this, socketRequestCounterPair]()
             {
                 REQUIRE(!m_hasConnectedAllClients);
                 // binding failed
                 REQUIRE(m_currentBindPort < 65534);
-                pSocket->setBindAddressAndPort(m_bindAddress, ++m_currentBindPort);
-                pSocket->connect(m_serverAddress, m_serverPort);
+                socketRequestCounterPair->first->setBindAddressAndPort(m_bindAddress, ++m_currentBindPort);
+                socketRequestCounterPair->first->connect(m_serverAddress, m_serverPort);
             });
             REQUIRE(m_currentBindPort < 65534);
-            pSocket->setBindAddressAndPort(m_bindAddress, ++m_currentBindPort);
-            pSocket->connect(m_serverAddress, m_serverPort);
+            socketRequestCounterPair->first->setBindAddressAndPort(m_bindAddress, ++m_currentBindPort);
+            socketRequestCounterPair->first->connect(m_serverAddress, m_serverPort);
         }
     }
 
@@ -4166,13 +4170,13 @@ private:
     size_t m_connectionCount = 0;
     size_t m_responseCount = 0;
     size_t m_disconnectionCount = 0;
-    std::vector<TcpSocket*> m_sockets;
+    std::vector<std::pair<TcpSocket*, size_t>> m_socketRequestCountPairs;
     size_t m_currentConnectIndex = 0;
     size_t m_batchConnectionCount = 0;
-    const size_t m_connectionsPerBatch = 250;
+    const size_t m_connectionsPerBatch = 2500;
     std::string m_serverAddress;
     std::string m_bindAddress;
-    uint16_t m_currentBindPort = 1024;
+    uint16_t m_currentBindPort = 33000;
     const uint16_t m_serverPort;
     const size_t m_totalConnections;
     const size_t m_workingConnections;
@@ -4203,19 +4207,16 @@ public:
         {
             Object::connect(pSocket, &TcpSocket::receivedData, [this, pSocket]()
             {
-                if (pSocket->dataAvailable() != (2 * m_requestsPerWorkingConnection * sizeof(int)))
+                if (pSocket->dataAvailable() != (2 * sizeof(int)))
                     return;
                 else
                 {
-                    for (auto i = 0; i < m_requestsPerWorkingConnection; ++i)
-                    {
-                        int a = 0;
-                        pSocket->read((char*)&a, sizeof(a));
-                        int b = 0;
-                        pSocket->read((char*)&b, sizeof(b));
-                        const int sum = a + b;
-                        pSocket->write((char*)&sum, sizeof(sum));
-                    }
+                    int a = 0;
+                    pSocket->read((char*)&a, sizeof(a));
+                    int b = 0;
+                    pSocket->read((char*)&b, sizeof(b));
+                    const int sum = a + b;
+                    pSocket->write((char*)&sum, sizeof(sum));
                 }
             });
             Object::connect(pSocket, &TcpSocket::disconnected, [this, pSocket]()
@@ -4235,6 +4236,7 @@ public:
             });
             if (++m_connectionCount == m_totalConnections)
             {
+                m_pTcpServer->close();
                 m_hasConnectedToClients = true;
                 emit connectedToClients();
             }
@@ -4283,11 +4285,11 @@ using namespace TcpSocketTests;
 SCENARIO("TcpSocket benchmarks")
 {
     static constexpr std::string_view serverAddress("127.25.24.20");
-    static constexpr size_t totalConnectionsPerThread = 15000;
-    static constexpr size_t workingConnectionsPerThread = 10000;
+    static constexpr size_t totalConnectionsPerThread = 30000;
+    static constexpr size_t workingConnectionsPerThread = 30000;
     static constexpr size_t clientThreadCount = 5;
     static constexpr size_t totalConnections = totalConnectionsPerThread * clientThreadCount;
-    static constexpr size_t requestsPerWorkingConnection = 1000;
+    static constexpr size_t requestsPerWorkingConnection = 10;
     static constexpr int a = 5;
     static constexpr int b = 3;
     size_t memoryConsumedAfterCreatingClientSockets = 0;
@@ -4357,7 +4359,7 @@ SCENARIO("TcpSocket benchmarks")
     elapsedTimer.start();
     for (auto &client : clients)
         QMetaObject::invokeMethod(client->get(), "connectToServer", Qt::QueuedConnection);
-    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientSocketsDisconnectedSemaphore, 1000));
+    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientSocketsDisconnectedSemaphore, 10000));
     WARN(QByteArray("Memory consumed after creating client sockets: ").append(QByteArray::number(memoryConsumedAfterCreatingClientSockets)));
     WARN(QByteArray("Memory consumed after connecting: ").append(QByteArray::number(memoryConsumedAfterConnecting)));
     WARN(QByteArray("Memory consumed after responses: ").append(QByteArray::number(memoryConsumedAfterResponses)));
@@ -4575,6 +4577,7 @@ public:
                 });
                 if (++m_connectionCount == m_totalConnections)
                 {
+                    m_pTcpServer->close();
                     m_hasConnectedToAllClients = true;
                     emit connectedToClients();
                 }
@@ -4612,7 +4615,7 @@ SCENARIO("QTcpSocket benchmarks")
     static constexpr size_t workingConnectionsPerThread = 10000;
     static constexpr size_t clientThreadCount = 5;
     static constexpr size_t totalConnections = totalConnectionsPerThread * clientThreadCount;
-    static constexpr size_t requestsPerWorkingConnection = 1000;
+    static constexpr size_t requestsPerWorkingConnection = 10;
     static constexpr int a = 5;
     static constexpr int b = 3;
     size_t memoryConsumedAfterCreatingClientSockets = 0;

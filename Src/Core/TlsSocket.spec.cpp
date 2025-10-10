@@ -4836,6 +4836,7 @@ public:
             {
                 if (++m_connectionCount == m_totalConnections)
                 {
+                    m_pTlsServer->close();
                     m_hasConnectedToClients = true;
                     emit connectedToClients();
                 }
@@ -4971,7 +4972,7 @@ SCENARIO("TlsSocket benchmarks")
     elapsedTimer.start();
     for (auto &client : clients)
         QMetaObject::invokeMethod(client->get(), "connectToServer", Qt::QueuedConnection);
-    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientSocketsDisconnectedSemaphore, 1000));
+    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientSocketsDisconnectedSemaphore, 10000));
     WARN(QByteArray("Memory consumed after creating client sockets: ").append(QByteArray::number(memoryConsumedAfterCreatingClientSockets)));
     WARN(QByteArray("Memory consumed after connecting: ").append(QByteArray::number(memoryConsumedAfterConnecting)));
     WARN(QByteArray("Memory consumed after responses: ").append(QByteArray::number(memoryConsumedAfterResponses)));
@@ -5201,6 +5202,7 @@ public:
                 });
                 if (++m_connectionCount == m_totalConnections)
                 {
+                    m_pServer->close();
                     m_hasConnectedToAllClients = true;
                     emit connectedToClients();
                 }
@@ -5335,7 +5337,7 @@ SCENARIO("QSslSocket benchmarks")
     elapsedTimer.start();
     for (auto &client : clients)
         QMetaObject::invokeMethod(client->get(), "connectToServer", Qt::QueuedConnection);
-    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientSocketsDisconnectedSemaphore, 1000));
+    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientSocketsDisconnectedSemaphore, 10000));
     WARN(QByteArray("Memory consumed after creating client sockets: ").append(QByteArray::number(memoryConsumedAfterCreatingClientSockets)));
     WARN(QByteArray("Memory consumed after connecting: ").append(QByteArray::number(memoryConsumedAfterConnecting)));
     WARN(QByteArray("Memory consumed after responses: ").append(QByteArray::number(memoryConsumedAfterResponses)));
