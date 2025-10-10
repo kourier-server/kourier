@@ -553,8 +553,6 @@ void TcpSocketPrivate::onEvent(const uint32_t epollEvents)
     size_t receivedDataSize = 0;
     size_t sentDataSize = 0;
     bool hasDisconnected = false;
-    if ((epollEvents & EPOLLIN) && (m_state == TcpSocket::State::Connected))
-        receivedDataSize = q->readDataFromChannel();
     if (epollEvents & EPOLLOUT)
     {
         if (m_state == TcpSocket::State::Connected)
@@ -598,6 +596,8 @@ void TcpSocketPrivate::onEvent(const uint32_t epollEvents)
             }
         }
     }
+    if ((epollEvents & EPOLLIN) && (m_state == TcpSocket::State::Connected))
+        receivedDataSize = q->readDataFromChannel();
     if ((epollEvents & EPOLLRDHUP)
         || (epollEvents & EPOLLERR)
         || (epollEvents & EPOLLHUP)

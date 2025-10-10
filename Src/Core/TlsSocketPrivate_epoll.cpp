@@ -264,17 +264,6 @@ void TlsSocketPrivate::onEvent(uint32_t epollEvents)
         size_t receivedDataSize = 0;
         size_t sentDataSize = 0;
         bool hasDisconnected = false;
-        if ((epollEvents & EPOLLIN) && (m_state == TcpSocket::State::Connected))
-        {
-            receivedDataSize = q->readDataFromChannel();
-            if (!m_hasCompletedHandshake)
-            {
-                const auto currentContextId = m_contextId;
-                doHandshake();
-                if (currentContextId != m_contextId)
-                    return;
-            }
-        }
         if (epollEvents & EPOLLOUT)
         {
             if (m_state == TcpSocket::State::Connected)
@@ -325,6 +314,17 @@ void TlsSocketPrivate::onEvent(uint32_t epollEvents)
                     connectToHost();
                     return;
                 }
+            }
+        }
+        if ((epollEvents & EPOLLIN) && (m_state == TcpSocket::State::Connected))
+        {
+            receivedDataSize = q->readDataFromChannel();
+            if (!m_hasCompletedHandshake)
+            {
+                const auto currentContextId = m_contextId;
+                doHandshake();
+                if (currentContextId != m_contextId)
+                    return;
             }
         }
         if ((epollEvents & EPOLLRDHUP)
