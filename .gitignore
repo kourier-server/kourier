@@ -3,6 +3,8 @@
 
 .directory
 
+CMakeUserPresets.json
+
 Documentation/build/
 
 # User-specific stuff
