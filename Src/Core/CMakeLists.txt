@@ -45,6 +45,8 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         Timer_epoll.cpp
         TimerPrivate_epoll.cpp
         TimerPrivate_epoll.h
+        TimerWheel.cpp
+        TimerWheel.h
         TlsConfiguration.cpp
         TlsConfiguration.h
         TlsContext.cpp

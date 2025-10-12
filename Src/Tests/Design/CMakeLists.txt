@@ -16,6 +16,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         ../../Core/EpollReadyEventSourceRegistrar.spec.cpp
         ../../Core/TcpSocket.spec.cpp
         ../../Core/Timer.spec.cpp
+        ../../Core/TimerWheel.spec.cpp
         ../../Core/TlsSocket.spec.cpp
         ../../Core/UnixSignalListener.spec.cpp
         ../../Http/HttpBrokerPrivate.spec.cpp

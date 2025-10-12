@@ -74,6 +74,7 @@ private:
     friend class EpollObjectDeleter;
     friend class EpollReadyEventSourceRegistrar;
     friend class EpollTimerRegistrar;
+    friend class TimerWheel;
 };
 
 }

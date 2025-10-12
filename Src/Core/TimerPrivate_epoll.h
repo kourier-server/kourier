@@ -59,6 +59,7 @@ private:
     enum class TimerType : uint8_t {VeryCoarse, Coarse, Precise};
     const TimerType m_timerType = TimerType::VeryCoarse;
     friend class EpollTimerRegistrar;
+    friend class TimerWheel;
 };
 
 }
