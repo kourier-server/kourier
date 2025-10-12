@@ -49,13 +49,12 @@ EpollObjectDeleter::~EpollObjectDeleter()
 
 void EpollObjectDeleter::scheduleForDeletion(Object *pObject)
 {
-    for (auto pObj : m_objectsToDelete)
+    if (pObject && !pObject->m_hasBeenScheduledForDeletion) [[likely]]
     {
-        if (pObj == pObject)
-            return;
+        pObject->m_hasBeenScheduledForDeletion = true;
+        set();
+        m_objectsToDelete.push_back(pObject);
     }
-    set();
-    m_objectsToDelete.push_back(pObject);
 }
 
 void EpollObjectDeleter::set()
@@ -96,11 +95,7 @@ void EpollObjectDeleter::onEvent(uint32_t epollEvents)
 void EpollObjectDeleter::deleteScheduledObjects()
 {
     for (std::vector<Object*>::size_type i = 0; i < m_objectsToDelete.size(); ++i)
-    {
-        auto *pObject = m_objectsToDelete[i];
-        if (pObject != nullptr)
-            delete pObject;
-    }
+        delete m_objectsToDelete[i];
 }
 
 }

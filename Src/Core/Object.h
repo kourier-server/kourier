@@ -223,6 +223,8 @@ private:
     std::forward_list<SignalSlotConnectionData> m_pSignalSlotConnections;
     bool m_isEmitting = false;
     bool m_hasToCleanupConnections = false;
+    bool m_hasBeenScheduledForDeletion = false;
+    friend class EpollObjectDeleter;
 };
 
 }
