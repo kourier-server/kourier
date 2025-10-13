@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2023 Glauco Pacheco <glauco@kourier.io>
+// Copyright (C) 2025 Glauco Pacheco <glauco@kourier.io>
 // SPDX-License-Identifier: AGPL-3.0-only
 //
 // This program is free software: you can redistribute it and/or modify

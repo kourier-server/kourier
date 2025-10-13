@@ -19,6 +19,7 @@
 #define KOURIER_TIMER_PRIVATE_H
 
 #include "Timer.h"
+#include <chrono>
 
 
 namespace Kourier
@@ -27,37 +28,30 @@ namespace Kourier
 class TimerPrivate
 {
 public:
-    TimerPrivate(Timer *pTimer);
+    TimerPrivate();
     ~TimerPrivate() {stop();}
-    inline void start() {activateTimer(m_intervalInMSecs);}
-    inline void start(qint64 intervalInMSecs) {activateTimer(intervalInMSecs);}
+    inline void start() {activateTimer(m_interval);}
+    inline void start(std::chrono::nanoseconds interval) {activateTimer(interval);}
     inline void stop() {deactivateTimer();}
     inline bool isActive() const {return m_state == State::Active;}
     inline bool isSingleShot() const {return m_isSingleShot;}
     inline void setSingleShot(bool singleShot) {m_isSingleShot = singleShot;}
-    inline qint64 interval() const {return m_intervalInMSecs;}
-    void setInterval(qint64 intervalInMSecs);
+    inline std::chrono::nanoseconds interval() const {return m_interval;}
+    void setInterval(std::chrono::nanoseconds interval);
 
 private:
-    void activateTimer(qint64 intervalInMSecs);
+    void activateTimer(std::chrono::nanoseconds interval);
     void deactivateTimer();
     void processTimeout();
-    inline qint64 timeoutInSlices() const {return m_timeoutInSlices;}
-    void setTimeoutInSlices(qint64 timeoutInSlices) {m_timeoutInSlices = timeoutInSlices;}
 
 private:
-    Timer * const q_ptr;
+    Timer *q_ptr = nullptr;
     Q_DECLARE_PUBLIC(Timer)
-    qint64 m_intervalInMSecs = 0;
-    qint64 m_timeoutInSlices = 0;
+    std::chrono::nanoseconds m_interval;
     EpollEventNotifier * const m_pEventNotifier;
-    TimerPrivate *m_pNext = nullptr;
-    TimerPrivate *m_pPrevious = nullptr;
     bool m_isSingleShot = false;
     enum class State : uint8_t {Active, Inactive};
     State m_state = State::Inactive;
-    enum class TimerType : uint8_t {VeryCoarse, Coarse, Precise};
-    const TimerType m_timerType = TimerType::VeryCoarse;
     friend class EpollTimerRegistrar;
     friend class TimerWheel;
 };

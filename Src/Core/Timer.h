@@ -19,6 +19,8 @@
 #define KOURIER_TIMER_H
 
 #include "Object.h"
+#include <chrono>
+#include <memory>
 
 
 namespace Kourier
@@ -32,17 +34,17 @@ public:
     Timer();
     ~Timer() override;
     void start();
-    void start(qint64 intervalInMSecs);
+    void start(std::chrono::milliseconds interval);
     void stop();
     Signal timeout();
     bool isActive() const;
     bool isSingleShot() const;
     void setSingleShot(bool singleShot);
-    qint64 interval() const;
-    void setInterval(qint64 intervalInMSecs);
+    std::chrono::milliseconds interval() const;
+    void setInterval(std::chrono::milliseconds interval);
 
 private:
-    TimerPrivate *d_ptr;
+    std::unique_ptr<TimerPrivate> d_ptr;
     Q_DECLARE_PRIVATE(Timer)
 };
 

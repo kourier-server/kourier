@@ -22,14 +22,14 @@
 namespace Kourier
 {
 
-Timer::Timer()
+Timer::Timer() : d_ptr(new TimerPrivate)
 {
-    d_ptr = new TimerPrivate(this);
+    d_ptr->q_ptr = this;
 }
 
 Timer::~Timer()
 {
-    delete d_ptr;
+
 }
 
 void Timer::start()
@@ -38,10 +38,10 @@ void Timer::start()
     d->start();
 }
 
-void Timer::start(qint64 intervalInMSecs)
+void Timer::start(std::chrono::milliseconds interval)
 {
     Q_D(Timer);
-    d->start(intervalInMSecs);
+    d->start(interval);
 }
 
 void Timer::stop()
@@ -70,16 +70,16 @@ void Timer::setSingleShot(bool singleShot)
     return d->setSingleShot(singleShot);
 }
 
-qint64 Timer::interval() const
+std::chrono::milliseconds Timer::interval() const
 {
     Q_D(const Timer);
-    return d->interval();
+    return std::chrono::duration_cast<std::chrono::milliseconds>(d->interval());
 }
 
-void Timer::setInterval(qint64 intervalInMSecs)
+void Timer::setInterval(std::chrono::milliseconds interval)
 {
     Q_D(Timer);
-    return d->setInterval(intervalInMSecs);
+    return d->setInterval(interval);
 }
 
 }

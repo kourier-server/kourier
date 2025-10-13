@@ -59,8 +59,8 @@ private:
 private:
     Timer m_timer;
     std::unique_ptr<TcpSocket> m_pSocket;
-    const qint64 m_requestTimeoutInMSecs;
-    const qint64 m_idleTimeoutInMSecs;
+    const std::chrono::milliseconds m_requestTimeoutInMSecs;
+    const std::chrono::milliseconds m_idleTimeoutInMSecs;
     HttpRequestParser m_requestParser;
     HttpBrokerPrivate m_brokerPrivate;
     HttpBroker m_broker;

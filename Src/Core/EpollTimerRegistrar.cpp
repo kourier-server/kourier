@@ -58,44 +58,44 @@ void EpollTimerRegistrar::onEvent(const uint32_t epollEvents)
 
 void EpollTimerRegistrar::add(TimerPrivate *pTimer)
 {
-    assert(pTimer);
-    if (m_activeTimersCount == 0)
-        activateInternalTimer();
-    const auto timeoutInSlices = (pTimer->interval() >> 9) + 1 + m_nextTimeoutInSlices;
-    if (pTimer->m_state == TimerPrivate::State::Active)
-    {
-        if (timeoutInSlices == pTimer->timeoutInSlices())
-            return;
-        else
-            remove(pTimer);
-    }
-    ++m_activeTimersCount;
-    pTimer->m_state = TimerPrivate::State::Active;
-    pTimer->setTimeoutInSlices(timeoutInSlices);
-    auto *&pHead = m_activeTimersPerSlot[timeoutInSlices & 127];
-    pTimer->m_pNext = pHead;
-    pTimer->m_pPrevious = nullptr;
-    if (pHead)
-        pHead->m_pPrevious = pTimer;
-    pHead = pTimer;
+    // assert(pTimer);
+    // if (m_activeTimersCount == 0)
+    //     activateInternalTimer();
+    // const auto timeoutInSlices = (pTimer->interval() >> 9) + 1 + m_nextTimeoutInSlices;
+    // if (pTimer->m_state == TimerPrivate::State::Active)
+    // {
+    //     if (timeoutInSlices == pTimer->timeoutInSlices())
+    //         return;
+    //     else
+    //         remove(pTimer);
+    // }
+    // ++m_activeTimersCount;
+    // pTimer->m_state = TimerPrivate::State::Active;
+    // pTimer->setTimeoutInSlices(timeoutInSlices);
+    // auto *&pHead = m_activeTimersPerSlot[timeoutInSlices & 127];
+    // pTimer->m_pNext = pHead;
+    // pTimer->m_pPrevious = nullptr;
+    // if (pHead)
+    //     pHead->m_pPrevious = pTimer;
+    // pHead = pTimer;
 }
 
 void EpollTimerRegistrar::remove(TimerPrivate *pTimer)
 {
-    assert(pTimer);
-    if (pTimer->m_state != TimerPrivate::State::Active)
-        return;
-    --m_activeTimersCount;
-    pTimer->m_state = TimerPrivate::State::Inactive;
-    if (pTimer->m_pPrevious)
-        pTimer->m_pPrevious->m_pNext = pTimer->m_pNext;
-    if (pTimer->m_pNext)
-        pTimer->m_pNext->m_pPrevious = pTimer->m_pPrevious;
-    auto *&pHead = m_activeTimersPerSlot[pTimer->timeoutInSlices() & 127];
-    if (pHead == pTimer)
-        pHead = pHead->m_pNext;
-    if (m_pNextTimerToExpire == pTimer)
-        m_pNextTimerToExpire = m_pNextTimerToExpire->m_pNext;
+    // assert(pTimer);
+    // if (pTimer->m_state != TimerPrivate::State::Active)
+    //     return;
+    // --m_activeTimersCount;
+    // pTimer->m_state = TimerPrivate::State::Inactive;
+    // if (pTimer->m_pPrevious)
+    //     pTimer->m_pPrevious->m_pNext = pTimer->m_pNext;
+    // if (pTimer->m_pNext)
+    //     pTimer->m_pNext->m_pPrevious = pTimer->m_pPrevious;
+    // auto *&pHead = m_activeTimersPerSlot[pTimer->timeoutInSlices() & 127];
+    // if (pHead == pTimer)
+    //     pHead = pHead->m_pNext;
+    // if (m_pNextTimerToExpire == pTimer)
+    //     m_pNextTimerToExpire = m_pNextTimerToExpire->m_pNext;
 }
 
 void EpollTimerRegistrar::activateInternalTimer()
@@ -128,30 +128,30 @@ void EpollTimerRegistrar::deactivateInternalTimer()
 
 void EpollTimerRegistrar::processActiveTimers(uint64_t slicesSinceLastTimeout)
 {
-    const auto lastTimeoutInSlices = m_nextTimeoutInSlices;
-    m_nextTimeoutInSlices += slicesSinceLastTimeout;
-    for (auto timeoutInSlices = lastTimeoutInSlices; timeoutInSlices < m_nextTimeoutInSlices; ++timeoutInSlices)
-    {
-        auto *pTimer = m_activeTimersPerSlot[timeoutInSlices & 127];
-        while (pTimer != nullptr)
-        {
-            if (pTimer->timeoutInSlices() > timeoutInSlices)
-            {
-                pTimer = pTimer->m_pNext;
-                continue;
-            }
-            else
-            {
-                m_pNextTimerToExpire = pTimer;
-                remove(pTimer);
-                pTimer->processTimeout();
-                pTimer = m_pNextTimerToExpire;
-                m_pNextTimerToExpire = nullptr;
-            }
-        }
-    }
-    if (m_activeTimersCount == 0)
-        deactivateInternalTimer();
+    // const auto lastTimeoutInSlices = m_nextTimeoutInSlices;
+    // m_nextTimeoutInSlices += slicesSinceLastTimeout;
+    // for (auto timeoutInSlices = lastTimeoutInSlices; timeoutInSlices < m_nextTimeoutInSlices; ++timeoutInSlices)
+    // {
+    //     auto *pTimer = m_activeTimersPerSlot[timeoutInSlices & 127];
+    //     while (pTimer != nullptr)
+    //     {
+    //         if (pTimer->timeoutInSlices() > timeoutInSlices)
+    //         {
+    //             pTimer = pTimer->m_pNext;
+    //             continue;
+    //         }
+    //         else
+    //         {
+    //             m_pNextTimerToExpire = pTimer;
+    //             remove(pTimer);
+    //             pTimer->processTimeout();
+    //             pTimer = m_pNextTimerToExpire;
+    //             m_pNextTimerToExpire = nullptr;
+    //         }
+    //     }
+    // }
+    // if (m_activeTimersCount == 0)
+    //     deactivateInternalTimer();
 }
 
 }

@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2024 Glauco Pacheco <glauco@kourier.io>
+// Copyright (C) 2025 Glauco Pacheco <glauco@kourier.io>
 // SPDX-License-Identifier: AGPL-3.0-only
 //
 // This program is free software: you can redistribute it and/or modify
@@ -74,6 +74,23 @@ SCENARIO("TimerWheel sets resolution to 1 if given resolution is not positive")
                         REQUIRE(period == std::chrono::nanoseconds(64));
                     }
                 }
+            }
+        }
+    }
+}
+
+
+SCENARIO("TimerWheel informs when timers expire")
+{
+    TimerWheel timerWheel(std::chrono::nanoseconds(10000));
+
+    GIVEN("a timer wheel with three timers on each slot")
+    {
+        WHEN("a slot expires")
+        {
+            THEN("timers from expired slot are given in timersExpired signal")
+            {
+
             }
         }
     }

@@ -28,8 +28,8 @@
 namespace Kourier
 {
 
-static constexpr int64_t connectTimeoutInMSecs = 60000;
-static constexpr int64_t disconnectTimeoutInMSecs = 10000;
+static constexpr std::chrono::milliseconds connectTimeoutInMSecs(60000);
+static constexpr std::chrono::milliseconds disconnectTimeoutInMSecs(10000);
 
 class TcpSocketPrivate : public EpollEventSource
 {

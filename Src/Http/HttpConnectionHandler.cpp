@@ -40,7 +40,7 @@ HttpConnectionHandler::HttpConnectionHandler(TcpSocket &socket,
     m_timer.setSingleShot(true);
     Object::connect(&m_timer, &Timer::timeout, this, &HttpConnectionHandler::onTimeout);
     Object::connect(m_pSocket.get(), &TcpSocket::receivedData, this, &HttpConnectionHandler::onReceivedData);
-    if (m_idleTimeoutInMSecs > 0)
+    if (m_idleTimeoutInMSecs.count() > 0)
     {
         m_isInIdleTimeout = true;
         m_timer.start(m_idleTimeoutInMSecs);
@@ -62,14 +62,14 @@ void HttpConnectionHandler::reset()
     m_brokerPrivate.resetResponseWriting();
     if (m_pSocket->dataAvailable() > 0)
     {
-        if (m_requestTimeoutInMSecs > 0)
+        if (m_requestTimeoutInMSecs.count() > 0)
             m_timer.start(m_requestTimeoutInMSecs);
         else
             m_timer.stop();
     }
     else
     {
-        if (m_idleTimeoutInMSecs > 0)
+        if (m_idleTimeoutInMSecs.count() > 0)
         {
             m_isInIdleTimeout = true;
             m_timer.start(m_idleTimeoutInMSecs);
@@ -91,7 +91,7 @@ void HttpConnectionHandler::onReceivedData()
         m_isInIdleTimeout = false;
         m_timer.stop();
     }
-    if (!m_timer.isActive() && m_requestTimeoutInMSecs > 0)
+    if (!m_timer.isActive() && m_requestTimeoutInMSecs.count() > 0)
         m_timer.start(m_requestTimeoutInMSecs);
     while (true)
     {
@@ -180,7 +180,7 @@ void HttpConnectionHandler::onReceivedData()
             case HttpRequestParser::ParserStatus::NeedsMoreData:
                 if (!m_parsedRequestMetadata && m_pSocket->dataAvailable() == 0)
                 {
-                    if (m_idleTimeoutInMSecs > 0)
+                    if (m_idleTimeoutInMSecs.count() > 0)
                     {
                         m_isInIdleTimeout = true;
                         m_timer.start(m_idleTimeoutInMSecs);

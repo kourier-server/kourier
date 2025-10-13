@@ -23,28 +23,27 @@
 namespace Kourier
 {
 
-TimerPrivate::TimerPrivate(Timer *pTimer) :
-    q_ptr(pTimer),
+TimerPrivate::TimerPrivate() :
     m_pEventNotifier(EpollEventNotifier::current())
 {
 }
 
-void TimerPrivate::setInterval(qint64 intervalInMSecs)
+void TimerPrivate::setInterval(std::chrono::nanoseconds interval)
 {
     switch (m_state)
     {
     case State::Active:
-        activateTimer(intervalInMSecs);
+        activateTimer(interval);
         break;
     case State::Inactive:
-        m_intervalInMSecs = intervalInMSecs;
+        m_interval = interval;
         break;
     }
 }
 
-void TimerPrivate::activateTimer(qint64 intervalInMSecs)
+void TimerPrivate::activateTimer(std::chrono::nanoseconds interval)
 {
-    m_intervalInMSecs = intervalInMSecs;
+    m_interval = interval;
     m_pEventNotifier->registerTimer(this);
 }
 

@@ -208,7 +208,7 @@ void HttpBrokerPrivate::writeDateHeader()
             if (dateTimeUtc() != nullptr)
                 *dateTimeUtc() = getCurrentDate();
         });
-        dateTimeUpdater()->start(1000);
+        dateTimeUpdater()->start(std::chrono::milliseconds(1000));
     }
     if (dateTimeUtc() != nullptr && !dateTimeUtc()->empty())
     {

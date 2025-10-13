@@ -30,7 +30,7 @@
 namespace Kourier
 {
 
-static constexpr int64_t handshakeTimeoutInMSecs = 60000;
+static constexpr std::chrono::milliseconds handshakeTimeoutInMSecs(60000);
 
 class TlsSocketPrivate : public TcpSocketPrivate
 {

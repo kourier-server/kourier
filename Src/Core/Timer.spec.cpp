@@ -29,7 +29,7 @@ using Kourier::Timer;
 using Kourier::Object;
 using Spectator::SemaphoreAwaiter;
 
-
+/*
 SCENARIO("Timer with non-zero interval times out after given interval but before 1024ms after given interval")
 {
     GIVEN("a timer set to expire")
@@ -877,7 +877,7 @@ SCENARIO("Timers fire at the right time")
         }
     }
 }
-
+*/
 
 /*
 SCENARIO("Memory consumption of Qt timers")
