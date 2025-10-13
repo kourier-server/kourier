@@ -18,6 +18,7 @@
 #include "TimerWheel.h"
 #include "TimerPrivate_epoll.h"
 #include "UnixUtils.h"
+#include <bit>
 #include <sys/timerfd.h>
 
 
@@ -27,7 +28,7 @@ namespace Kourier
 TimerWheel::TimerWheel(std::chrono::nanoseconds resolution) :
     EpollEventSource(EPOLLET | EPOLLIN, EpollEventNotifier::current()),
     m_wheelTimerFd(timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK)),
-    m_resolution(resolution > std::chrono::nanoseconds(0) ? resolution : std::chrono::nanoseconds(1))
+    m_resolution(adjustResolution(resolution))
 {
     if (m_wheelTimerFd < 0)
         qFatal("Failed to create a timer object. Exiting.");
@@ -147,6 +148,19 @@ void TimerWheel::processExpiredTimers(uint64_t slicesSinceLastTimeout)
     // }
     // if (m_activeTimersCount == 0)
     //     deactivateInternalTimer();
+}
+
+std::chrono::nanoseconds TimerWheel::adjustResolution(std::chrono::nanoseconds resolution)
+{
+    if (resolution.count() > 0)
+    {
+        const uint64_t resolutionInNSecs = resolution.count();
+        static_assert(std::bit_floor<uint64_t>(std::chrono::nanoseconds::max().count()) == (uint64_t(1) << 62));
+        const int64_t resolutionInNSecsAsNextPowerOfTwo = std::min(uint64_t(1) << 62, std::bit_ceil<uint64_t>(resolutionInNSecs));
+        return std::chrono::nanoseconds(resolutionInNSecsAsNextPowerOfTwo);
+    }
+    else
+        return std::chrono::nanoseconds(1);
 }
 
 }

@@ -48,6 +48,7 @@ private:
     void activateInternalTimer();
     void deactivateInternalTimer();
     void processExpiredTimers(uint64_t slicesSinceLastTimeout);
+    static std::chrono::nanoseconds adjustResolution(std::chrono::nanoseconds resolution);
 
 private:
     const qint64 m_wheelTimerFd = -1;
