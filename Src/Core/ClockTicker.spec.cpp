@@ -30,7 +30,7 @@ SCENARIO("ClockTicker ticks at specified resolution")
 {
     GIVEN("a clock ticker created with a resolution")
     {
-        const auto resolution = GENERATE(AS(std::chrono::milliseconds), 1ms, 4ms);
+        const auto resolution = GENERATE(AS(std::chrono::milliseconds), 1ms, 3ms);
         ClockTicker clockTicker(resolution);
 
         WHEN("clock ticker is enabled")
