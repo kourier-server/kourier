@@ -27,10 +27,7 @@ Timer::Timer() : d_ptr(new TimerPrivate)
     d_ptr->q_ptr = this;
 }
 
-Timer::~Timer()
-{
-
-}
+Timer::~Timer() {}
 
 void Timer::start()
 {
@@ -73,7 +70,7 @@ void Timer::setSingleShot(bool singleShot)
 std::chrono::milliseconds Timer::interval() const
 {
     Q_D(const Timer);
-    return std::chrono::duration_cast<std::chrono::milliseconds>(d->interval());
+    return d->interval();
 }
 
 void Timer::setInterval(std::chrono::milliseconds interval)

@@ -28,7 +28,7 @@ TimerPrivate::TimerPrivate() :
 {
 }
 
-void TimerPrivate::setInterval(std::chrono::nanoseconds interval)
+void TimerPrivate::setInterval(std::chrono::milliseconds interval)
 {
     switch (m_state)
     {
@@ -41,7 +41,7 @@ void TimerPrivate::setInterval(std::chrono::nanoseconds interval)
     }
 }
 
-void TimerPrivate::activateTimer(std::chrono::nanoseconds interval)
+void TimerPrivate::activateTimer(std::chrono::milliseconds interval)
 {
     m_interval = interval;
     m_pEventNotifier->registerTimer(this);

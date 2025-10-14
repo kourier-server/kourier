@@ -54,7 +54,7 @@ private:
     const qint64 m_wheelTimerFd = -1;
     const std::chrono::nanoseconds m_resolution;
     size_t m_activeTimersCount = 0;
-    std::list<TimerPrivate*> m_wheel[64];
+    std::list<TimerPrivate*> m_wheel[65];
     size_t m_idxNextTimersToExpire = 0;
     bool m_isInternalTimerActive = false;
 };
