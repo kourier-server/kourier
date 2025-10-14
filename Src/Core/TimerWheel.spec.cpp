@@ -21,75 +21,75 @@
 using Kourier::TimerWheel;
 
 
-SCENARIO("TimerWheel ajusts given resolution")
-{
-    GIVEN("a timer wheel created with non-positive resolutions")
-    {
-        const auto resolution = GENERATE(AS(std::chrono::nanoseconds),
-                                         std::chrono::nanoseconds(-1),
-                                         std::chrono::nanoseconds(0),
-                                         std::chrono::nanoseconds(-125),
-                                         std::chrono::nanoseconds(std::chrono::nanoseconds::min().count() + 18),
-                                         std::chrono::nanoseconds::min());
-        REQUIRE(resolution.count() <= 0);
-        TimerWheel timerWheel(resolution);
+// SCENARIO("TimerWheel ajusts given resolution")
+// {
+//     GIVEN("a timer wheel created with non-positive resolutions")
+//     {
+//         const auto resolution = GENERATE(AS(std::chrono::nanoseconds),
+//                                          std::chrono::nanoseconds(-1),
+//                                          std::chrono::nanoseconds(0),
+//                                          std::chrono::nanoseconds(-125),
+//                                          std::chrono::nanoseconds(std::chrono::nanoseconds::min().count() + 18),
+//                                          std::chrono::nanoseconds::min());
+//         REQUIRE(resolution.count() <= 0);
+//         TimerWheel timerWheel(resolution);
 
-        WHEN("resolution is fetched from timer wheel")
-        {
-            const auto adjustedResolution = timerWheel.resolution();
+//         WHEN("resolution is fetched from timer wheel")
+//         {
+//             const auto adjustedResolution = timerWheel.resolution();
 
-            THEN("timer wheel adjusts given resolution to 1")
-            {
-                REQUIRE(adjustedResolution.count() == 1);
-            }
-        }
-    }
+//             THEN("timer wheel adjusts given resolution to 1")
+//             {
+//                 REQUIRE(adjustedResolution.count() == 1);
+//             }
+//         }
+//     }
 
-    GIVEN("a timer wheel created with positive resolutions not greater than 2^62")
-    {
-        const auto resolution = GENERATE(AS(std::chrono::nanoseconds),
-                                         std::chrono::nanoseconds(1),
-                                         std::chrono::nanoseconds(125),
-                                         std::chrono::nanoseconds(1024*1024),
-                                         std::chrono::nanoseconds((uint64_t(1) << 62) - 1),
-                                         std::chrono::nanoseconds((uint64_t(1) << 62)));
-        REQUIRE(resolution.count() > 0);
-        TimerWheel timerWheel(resolution);
+//     GIVEN("a timer wheel created with positive resolutions not greater than 2^62")
+//     {
+//         const auto resolution = GENERATE(AS(std::chrono::nanoseconds),
+//                                          std::chrono::nanoseconds(1),
+//                                          std::chrono::nanoseconds(125),
+//                                          std::chrono::nanoseconds(1024*1024),
+//                                          std::chrono::nanoseconds((uint64_t(1) << 62) - 1),
+//                                          std::chrono::nanoseconds((uint64_t(1) << 62)));
+//         REQUIRE(resolution.count() > 0);
+//         TimerWheel timerWheel(resolution);
 
-        WHEN("resolution is fetched from timer wheel")
-        {
-            const auto adjustedResolution = timerWheel.resolution();
+//         WHEN("resolution is fetched from timer wheel")
+//         {
+//             const auto adjustedResolution = timerWheel.resolution();
 
-            THEN("timer wheel adjusts given resolution to the smallest integral power of two that is not smaller than given resolution")
-            {
-                REQUIRE(adjustedResolution >= resolution);
-                REQUIRE(adjustedResolution.count() == std::bit_ceil<uint64_t>(resolution.count()));
-            }
-        }
-    }
+//             THEN("timer wheel adjusts given resolution to the smallest integral power of two that is not smaller than given resolution")
+//             {
+//                 REQUIRE(adjustedResolution >= resolution);
+//                 REQUIRE(adjustedResolution.count() == std::bit_ceil<uint64_t>(resolution.count()));
+//             }
+//         }
+//     }
 
-    GIVEN("a timer wheel created with positive resolutions greater than 2^62")
-    {
-        const auto resolution = GENERATE(AS(std::chrono::nanoseconds),
-                                         std::chrono::nanoseconds((uint64_t(1) << 62) + 1),
-                                         std::chrono::nanoseconds((uint64_t(1) << 62) + 3),
-                                         std::chrono::nanoseconds(std::chrono::nanoseconds::max().count() - 1),
-                                         std::chrono::nanoseconds(std::chrono::nanoseconds::max().count() - 18),
-                                         std::chrono::nanoseconds::max());
-        REQUIRE(resolution.count() > (uint64_t(1) << 62));
-        TimerWheel timerWheel(resolution);
+//     GIVEN("a timer wheel created with positive resolutions greater than 2^62")
+//     {
+//         const auto resolution = GENERATE(AS(std::chrono::nanoseconds),
+//                                          std::chrono::nanoseconds((uint64_t(1) << 62) + 1),
+//                                          std::chrono::nanoseconds((uint64_t(1) << 62) + 3),
+//                                          std::chrono::nanoseconds(std::chrono::nanoseconds::max().count() - 1),
+//                                          std::chrono::nanoseconds(std::chrono::nanoseconds::max().count() - 18),
+//                                          std::chrono::nanoseconds::max());
+//         REQUIRE(resolution.count() > (uint64_t(1) << 62));
+//         TimerWheel timerWheel(resolution);
 
-        WHEN("resolution is fetched from timer wheel")
-        {
-            const auto adjustedResolution = timerWheel.resolution();
+//         WHEN("resolution is fetched from timer wheel")
+//         {
+//             const auto adjustedResolution = timerWheel.resolution();
 
-            THEN("timer wheel adjusts given resolution to 2^62")
-            {
-                REQUIRE(adjustedResolution.count() == (uint64_t(1) << 62));
-            }
-        }
-    }
-}
+//             THEN("timer wheel adjusts given resolution to 2^62")
+//             {
+//                 REQUIRE(adjustedResolution.count() == (uint64_t(1) << 62));
+//             }
+//         }
+//     }
+// }
 
 
 // SCENARIO("TimerWheel has 64 slots with given resolution")

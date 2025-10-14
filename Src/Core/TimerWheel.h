@@ -18,45 +18,26 @@
 #ifndef KOURIER_TIMER_WHEEL_H
 #define KOURIER_TIMER_WHEEL_H
 
-#include "EpollEventSource.h"
-#include <chrono>
-#include <list>
+#include "TimerPrivate_epoll.h"
+#include <cstdint>
 
 
 namespace Kourier
 {
 
-class TimerPrivate;
-
-class TimerWheel : public EpollEventSource
+class TimerWheel
 {
-KOURIER_OBJECT(Kourier::TimerWheel);
 public:
-    TimerWheel(std::chrono::nanoseconds resolution);
-    ~TimerWheel() override;
-    int64_t fileDescriptor() const override {return m_wheelTimerFd;}
-    bool add(TimerPrivate *pTimer);
-    bool remove(TimerPrivate *pTimer);
-    inline std::chrono::nanoseconds resolution() const {return m_resolution;}
-    inline std::chrono::nanoseconds period() const {return std::chrono::nanoseconds(m_resolution.count() << 6);}
-    Signal timersExpired(std::list<TimerPrivate*> expiredTimers);
+    TimerWheel(uint64_t slotInterval);
+    ~TimerWheel() = default;
+    inline void add(TimerPrivate *pTimer) {m_slots[(uint64_t)pTimer->m_timeout.count() & m_slotFinderMask].addTimer(pTimer);}
+    TimerList tick();
 
 private:
-    void onEvent(uint32_t epollEvents) override;
-
-private:
-    void activateInternalTimer();
-    void deactivateInternalTimer();
-    void processExpiredTimers(uint64_t slicesSinceLastTimeout);
-    static std::chrono::nanoseconds adjustResolution(std::chrono::nanoseconds resolution);
-
-private:
-    const qint64 m_wheelTimerFd = -1;
-    const std::chrono::nanoseconds m_resolution;
-    size_t m_activeTimersCount = 0;
-    std::list<TimerPrivate*> m_wheel[65];
-    size_t m_idxNextTimersToExpire = 0;
-    bool m_isInternalTimerActive = false;
+    const uint64_t m_slotInterval;
+    uint64_t m_slotFinderMask = 0;
+    uint64_t m_idxNextTimersToExpire = 0;
+    TimerList m_slots[64];
 };
 
 }

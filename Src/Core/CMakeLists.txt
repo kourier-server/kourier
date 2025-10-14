@@ -12,6 +12,8 @@ qt_add_library(KourierCore STATIC
     SDK.h)
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_sources(KourierCore PRIVATE
+        ClockTicker.cpp
+        ClockTicker.h
         EpollEventNotifier.cpp
         EpollEventNotifier.h
         EpollEventSource.h

@@ -11,6 +11,7 @@ target_sources(DesignTests PRIVATE
     ../../Core/TlsContext.spec.cpp)
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_sources(DesignTests PRIVATE
+        ../../Core/ClockTicker.spec.cpp
         ../../Core/EpollEventSource.spec.cpp
         ../../Core/EpollObjectDeleter.spec.cpp
         ../../Core/EpollReadyEventSourceRegistrar.spec.cpp

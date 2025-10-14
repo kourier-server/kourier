@@ -16,151 +16,25 @@
 //
 
 #include "TimerWheel.h"
-#include "TimerPrivate_epoll.h"
-#include "UnixUtils.h"
-#include <bit>
-#include <sys/timerfd.h>
 
 
 namespace Kourier
 {
 
-TimerWheel::TimerWheel(std::chrono::nanoseconds resolution) :
-    EpollEventSource(EPOLLET | EPOLLIN, EpollEventNotifier::current()),
-    m_wheelTimerFd(timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK)),
-    m_resolution(adjustResolution(resolution))
+TimerWheel::TimerWheel(uint64_t slotInterval) : m_slotInterval(slotInterval)
 {
-    if (m_wheelTimerFd < 0)
-        qFatal("Failed to create a timer object. Exiting.");
+    if (m_slotInterval == 0 || (m_slotInterval & (m_slotInterval - 1)))
+        qFatal("Failed to create timer wheel. Given slot interval is not a power of two");
+    m_slotFinderMask = (m_slotInterval << 6) - 1;
 }
 
-TimerWheel::~TimerWheel()
+TimerList TimerWheel::tick()
 {
-    setEnabled(false);
-    UnixUtils::safeClose(m_wheelTimerFd);
-}
-
-void TimerWheel::onEvent(const uint32_t epollEvents)
-{
-    if (epollEvents & EPOLLIN)
-    {
-        uint64_t slicesSinceLastTimeout = 0;
-        UnixUtils::safeRead(fileDescriptor(), (char*)&slicesSinceLastTimeout, sizeof(slicesSinceLastTimeout));
-        processExpiredTimers(slicesSinceLastTimeout);
-    }
-}
-
-bool TimerWheel::add(TimerPrivate *pTimer)
-{
-    return false;
-    // assert(pTimer);
-    // if (m_activeTimersCount == 0)
-    //     activateInternalTimer();
-    // const auto timeoutInSlices = (pTimer->interval() >> 9) + 1 + m_nextTimeoutInSlices;
-    // if (pTimer->m_state == TimerPrivate::State::Active)
-    // {
-    //     if (timeoutInSlices == pTimer->timeoutInSlices())
-    //         return;
-    //     else
-    //         remove(pTimer);
-    // }
-    // ++m_activeTimersCount;
-    // pTimer->m_state = TimerPrivate::State::Active;
-    // pTimer->setTimeoutInSlices(timeoutInSlices);
-    // auto *&pHead = m_activeTimersPerSlot[timeoutInSlices & 127];
-    // pTimer->m_pNext = pHead;
-    // pTimer->m_pPrevious = nullptr;
-    // if (pHead)
-    //     pHead->m_pPrevious = pTimer;
-    // pHead = pTimer;
-}
-
-bool TimerWheel::remove(TimerPrivate *pTimer)
-{
-    return false;
-    // assert(pTimer);
-    // if (pTimer->m_state != TimerPrivate::State::Active)
-    //     return;
-    // --m_activeTimersCount;
-    // pTimer->m_state = TimerPrivate::State::Inactive;
-    // if (pTimer->m_pPrevious)
-    //     pTimer->m_pPrevious->m_pNext = pTimer->m_pNext;
-    // if (pTimer->m_pNext)
-    //     pTimer->m_pNext->m_pPrevious = pTimer->m_pPrevious;
-    // auto *&pHead = m_activeTimersPerSlot[pTimer->timeoutInSlices() & 127];
-    // if (pHead == pTimer)
-    //     pHead = pHead->m_pNext;
-    // if (m_pNextTimerToExpire == pTimer)
-    //     m_pNextTimerToExpire = m_pNextTimerToExpire->m_pNext;
-}
-
-void TimerWheel::activateInternalTimer()
-{
-    if (m_isInternalTimerActive)
-        return;
-    m_isInternalTimerActive = true;
-    //m_nextTimeoutInSlices = 1;
-    // Setting time
-    struct itimerspec newValue{0,0,0,0};
-    struct itimerspec oldValue{0,0,0,0};
-    newValue.it_value.tv_nsec = 512000000;
-    newValue.it_interval.tv_nsec = 512000000;
-    if (-1 == timerfd_settime(m_wheelTimerFd, 0, &newValue, &oldValue))
-        qFatal("Failed to set timer. Exiting.");
-}
-
-void TimerWheel::deactivateInternalTimer()
-{
-    if (!m_isInternalTimerActive)
-        return;
-    m_isInternalTimerActive = false;
-    uint64_t tmp = 0;
-    UnixUtils::safeRead(fileDescriptor(), (char*)&tmp, sizeof(tmp));
-    struct itimerspec newValue{0,0,0,0};
-    struct itimerspec oldValue{0,0,0,0};
-    if (-1 == timerfd_settime(m_wheelTimerFd, 0, &newValue, &oldValue))
-        qFatal("Failed to set timer. Exiting.");
-}
-
-void TimerWheel::processExpiredTimers(uint64_t slicesSinceLastTimeout)
-{
-    // const auto lastTimeoutInSlices = m_nextTimeoutInSlices;
-    // m_nextTimeoutInSlices += slicesSinceLastTimeout;
-    // for (auto timeoutInSlices = lastTimeoutInSlices; timeoutInSlices < m_nextTimeoutInSlices; ++timeoutInSlices)
-    // {
-    //     auto *pTimer = m_activeTimersPerSlot[timeoutInSlices & 127];
-    //     while (pTimer != nullptr)
-    //     {
-    //         if (pTimer->timeoutInSlices() > timeoutInSlices)
-    //         {
-    //             pTimer = pTimer->m_pNext;
-    //             continue;
-    //         }
-    //         else
-    //         {
-    //             m_pNextTimerToExpire = pTimer;
-    //             remove(pTimer);
-    //             pTimer->processTimeout();
-    //             pTimer = m_pNextTimerToExpire;
-    //             m_pNextTimerToExpire = nullptr;
-    //         }
-    //     }
-    // }
-    // if (m_activeTimersCount == 0)
-    //     deactivateInternalTimer();
-}
-
-std::chrono::nanoseconds TimerWheel::adjustResolution(std::chrono::nanoseconds resolution)
-{
-    if (resolution.count() > 0)
-    {
-        const uint64_t resolutionInNSecs = resolution.count();
-        static_assert(std::bit_floor<uint64_t>(std::chrono::nanoseconds::max().count()) == (uint64_t(1) << 62));
-        const int64_t resolutionInNSecsAsNextPowerOfTwo = std::min(uint64_t(1) << 62, std::bit_ceil<uint64_t>(resolutionInNSecs));
-        return std::chrono::nanoseconds(resolutionInNSecsAsNextPowerOfTwo);
-    }
-    else
-        return std::chrono::nanoseconds(1);
+    TimerList expiredTimers;
+    expiredTimers.swap(m_slots[m_idxNextTimersToExpire++]);
+    if (m_idxNextTimersToExpire == 64) [[unlikely]]
+        m_idxNextTimersToExpire = 0;
+    return expiredTimers;
 }
 
 }
