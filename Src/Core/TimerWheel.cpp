@@ -24,7 +24,7 @@ namespace Kourier
 
 TimerWheel::TimerWheel(std::chrono::milliseconds resolution) :
     m_resolution(adjustResolution(resolution)),
-    m_timeSpan(m_resolution.count() << 6),
+    m_timeSpan((uint64_t)m_resolution.count() << 6),
     m_slotFinderExponent(6 + std::countr_zero<uint64_t>(m_resolution.count()))
 {
 }
@@ -55,6 +55,16 @@ bool TimerWheel::removeTimer(TimerPrivate *pTimer)
     }
     else
         return false;
+}
+
+TimerList TimerWheel::tick()
+{
+    TimerList expiredTimers;
+    expiredTimers.swap(m_slots[m_idxNextTimersToExpire++]);
+    if (m_idxNextTimersToExpire == 64) [[unlikely]]
+        m_idxNextTimersToExpire = 0;
+    m_timerCount -= expiredTimers.size();
+    return expiredTimers;
 }
 
 std::chrono::milliseconds TimerWheel::adjustResolution(std::chrono::milliseconds resolution)

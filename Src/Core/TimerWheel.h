@@ -36,15 +36,7 @@ public:
     inline std::chrono::milliseconds timeSpan() const {return m_timeSpan;}
     bool addTimer(TimerPrivate *pTimer);
     bool removeTimer(TimerPrivate *pTimer);
-    TimerList tick()
-    {
-        TimerList expiredTimers;
-        expiredTimers.swap(m_slots[m_idxNextTimersToExpire++]);
-        if (m_idxNextTimersToExpire == 64) [[unlikely]]
-            m_idxNextTimersToExpire = 0;
-        m_timerCount -= expiredTimers.size();
-        return expiredTimers;
-    }
+    TimerList tick();
     inline bool isEmpty() const {return m_timerCount == 0;}
 
 private:

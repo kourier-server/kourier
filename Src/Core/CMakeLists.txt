@@ -47,6 +47,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         Timer_epoll.cpp
         TimerList.cpp
         TimerList.h
+        TimerListIterator.h
         TimerListNode.h
         TimerPrivate_epoll.cpp
         TimerPrivate_epoll.h
