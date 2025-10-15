@@ -26,6 +26,7 @@ namespace Kourier
 TimerPrivate::TimerPrivate() :
     m_pEventNotifier(EpollEventNotifier::current())
 {
+    m_listNode.pTimer = this;
 }
 
 void TimerPrivate::setInterval(std::chrono::milliseconds interval)

@@ -19,20 +19,14 @@
 #define KOURIER_TIMER_PRIVATE_H
 
 #include "Timer.h"
+#include "TimerListNode.h"
 #include <chrono>
 
 
 namespace Kourier
 {
 
-class TimerPrivate;
-
-struct TimerListNode
-{
-    TimerListNode *pNext = nullptr;
-    TimerListNode *pPrevious = nullptr;
-    TimerPrivate* pTimer = nullptr;
-};
+class TimerWheel;
 
 class TimerPrivate
 {
@@ -58,8 +52,10 @@ private:
     Timer *q_ptr = nullptr;
     Q_DECLARE_PUBLIC(Timer)
     TimerListNode m_listNode;
+    TimerWheel *m_pTimerWheel = nullptr;
     std::chrono::milliseconds m_interval;
     std::chrono::milliseconds m_timeout;
+    std::chrono::milliseconds m_activationTime;
     EpollEventNotifier * const m_pEventNotifier;
     bool m_isSingleShot = false;
     enum class State : uint8_t {Active, Inactive};
@@ -67,57 +63,6 @@ private:
     friend class EpollTimerRegistrar;
     friend class TimerWheel;
     friend class TimerList;
-};
-
-class TimerList
-{
-public:
-    TimerList() = default;
-    ~TimerList()
-    {
-        while (!isEmpty())
-            popFirst();
-    }
-    inline void swap(TimerList &other)
-    {
-        if (this != &other) [[likely]]
-        {
-            TimerList temp = *this;
-            *this = other;
-            other = temp;
-        }
-    }
-    inline void addTimer(TimerPrivate *pTimer)
-    {
-        assert(pTimer);
-        pTimer->m_listNode.pNext = m_head.pNext;
-        m_head.pNext = &pTimer->m_listNode;
-        pTimer->m_listNode.pPrevious = &m_head;
-    }
-    inline static void removeTimer(TimerPrivate *pTimer)
-    {
-        assert(pTimer);
-        if (pTimer->m_listNode.pPrevious)
-            pTimer->m_listNode.pPrevious->pNext = pTimer->m_listNode.pNext;
-        if (pTimer->m_listNode.pNext)
-            pTimer->m_listNode.pNext->pPrevious = pTimer->m_listNode.pPrevious;
-    }
-    inline TimerPrivate *popFirst()
-    {
-        TimerPrivate *pTimer = nullptr;
-        if (m_head.pNext)
-        {
-            pTimer = m_head.pNext->pTimer;
-            m_head.pNext = m_head.pNext->pNext;
-            if (m_head.pNext)
-                m_head.pNext->pPrevious = nullptr;
-        }
-        return pTimer;
-    }
-    inline bool isEmpty() const {return m_head.pNext == nullptr;}
-
-private:
-    TimerListNode m_head;
 };
 
 }

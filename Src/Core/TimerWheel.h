@@ -19,24 +19,43 @@
 #define KOURIER_TIMER_WHEEL_H
 
 #include "TimerPrivate_epoll.h"
-#include <cstdint>
+#include "TimerList.h"
+#include <chrono>
 
 
 namespace Kourier
 {
 
+class TimerPrivate;
+
 class TimerWheel
 {
 public:
-    TimerWheel(uint64_t slotInterval);
+    TimerWheel(std::chrono::milliseconds resolution);
     ~TimerWheel() = default;
-    inline void add(TimerPrivate *pTimer) {m_slots[(uint64_t)pTimer->m_timeout.count() & m_slotFinderMask].addTimer(pTimer);}
-    TimerList tick();
+    inline std::chrono::milliseconds timeSpan() const {return m_timeSpan;}
+    bool addTimer(TimerPrivate *pTimer);
+    bool removeTimer(TimerPrivate *pTimer);
+    TimerList tick()
+    {
+        TimerList expiredTimers;
+        expiredTimers.swap(m_slots[m_idxNextTimersToExpire++]);
+        if (m_idxNextTimersToExpire == 64) [[unlikely]]
+            m_idxNextTimersToExpire = 0;
+        m_timerCount -= expiredTimers.size();
+        return expiredTimers;
+    }
+    inline bool isEmpty() const {return m_timerCount == 0;}
 
 private:
-    const uint64_t m_slotInterval;
-    uint64_t m_slotFinderMask = 0;
+    static std::chrono::milliseconds adjustResolution(std::chrono::milliseconds resolution);
+
+private:
+    const std::chrono::milliseconds m_resolution;
+    const std::chrono::milliseconds m_timeSpan;
+    const uint64_t m_slotFinderExponent;
     uint64_t m_idxNextTimersToExpire = 0;
+    uint64_t m_timerCount = 0;
     TimerList m_slots[64];
 };
 

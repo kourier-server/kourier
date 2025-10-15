@@ -45,10 +45,15 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         TcpSocketPrivate_epoll.h
         Timer.h
         Timer_epoll.cpp
+        TimerList.cpp
+        TimerList.h
+        TimerListNode.h
         TimerPrivate_epoll.cpp
         TimerPrivate_epoll.h
         TimerWheel.cpp
         TimerWheel.h
+        TimerWheels.cpp
+        TimerWheels.h
         TlsConfiguration.cpp
         TlsConfiguration.h
         TlsContext.cpp
