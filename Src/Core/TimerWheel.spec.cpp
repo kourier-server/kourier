@@ -153,7 +153,7 @@ SCENARIO("TimerWheel fails to add timers having a timeout greater than its time 
 }
 
 
-SCENARIO("Timer wheel signals expired timers on tick")
+SCENARIO("Timer wheel returns expired timers on tick")
 {
     GIVEN("a timer wheel with a given resolution")
     {
@@ -186,7 +186,7 @@ SCENARIO("Timer wheel signals expired timers on tick")
                 REQUIRE(!timerWheel.isEmpty());
             }
 
-            THEN("timers are signaled as expired after slotIndex + 1 ticks")
+            THEN("timers are returned as expired after slotIndex + 1 ticks")
             {
                 for (auto i = 0; i < slotIndex; ++i)
                 {
