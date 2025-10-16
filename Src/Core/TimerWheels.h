@@ -33,8 +33,8 @@ public:
     TimerWheels(std::shared_ptr<ClockTicker> pLowResolutionClockTicker,
                 std::shared_ptr<ClockTicker> pHighResolutionClockTicker);
     ~TimerWheels() = default;
-    bool addTimer(TimerPrivate *pTimer);
-    bool removeTimer(TimerPrivate *pTimer);
+    void addTimer(TimerPrivate *pTimer);
+    void removeTimer(TimerPrivate *pTimer);
     inline std::chrono::milliseconds lowResolutionTime() const {return m_lowResolutionTime;}
     Signal timedOutTimers(TimerList timers);
 
