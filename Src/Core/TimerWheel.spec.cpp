@@ -16,9 +16,11 @@
 //
 
 #include "TimerWheel.h"
+#include "TimerPrivate_epoll.h"
 #include <Spectator.h>
 
 using Kourier::TimerWheel;
+using Kourier::TimerPrivate;
 
 
 SCENARIO("TimerWheel ajusts given resolution")
@@ -119,50 +121,32 @@ SCENARIO("TimerWheel has 64 slots with given resolution")
 }
 
 
-// SCENARIO("TimerWheel sets resolution to 1 if given resolution is not positive")
-// {
-//     GIVEN("a timer wheel with specified non-positive resolution")
-//     {
-//         const auto resolution = GENERATE(AS(std::chrono::milliseconds),
-//                                          std::chrono::milliseconds(-1),
-//                                          std::chrono::milliseconds(0),
-//                                          std::chrono::milliseconds(-18),
-//                                          std::chrono::milliseconds(-1711));
-//         TimerWheel timerWheel(resolution);
+SCENARIO("TimerWheel fails to add timers having a timeout greater than its time span")
+{
+    GIVEN("a timer wheel with a given resolution")
+    {
+        const auto resolution = GENERATE(AS(std::chrono::milliseconds),
+                                         std::chrono::milliseconds(1),
+                                         std::chrono::milliseconds(1 << 6),
+                                         std::chrono::milliseconds(1 << 12),
+                                         std::chrono::milliseconds(1 << 18),
+                                         std::chrono::milliseconds(1 << 24),
+                                         std::chrono::milliseconds(1 << 30),
+                                         std::chrono::milliseconds(int64_t(1) << 36));
 
-//         WHEN("timer wheel resolution is fetched")
-//         {
-//             THEN("resolution is equal to 1 nanosecond")
-//             {
-//                 REQUIRE(timerWheel.resolution() == std::chrono::milliseconds(1));
+        WHEN("we try to add to wheel a timer with an interval greater than the wheel's time span")
+        {
+            TimerWheel timerWheel(resolution);
+            TimerPrivate timer;
+            const auto deltaOverMaxValue = GENERATE(AS(int64_t), 1, 3, 102417);
+            timer.setInterval(std::chrono::milliseconds(timerWheel.timeSpan().count() + deltaOverMaxValue));
 
-//                 AND_WHEN("period is fetched")
-//                 {
-//                     const auto period = timerWheel.period();
-
-//                     THEN("timer wheel informs correct period as 64 times the resolution")
-//                     {
-//                         REQUIRE(period == std::chrono::milliseconds(64));
-//                     }
-//                 }
-//             }
-//         }
-//     }
-// }
-
-
-// SCENARIO("TimerWheel informs when timers expire")
-// {
-//     TimerWheel timerWheel(std::chrono::milliseconds(10000));
-
-//     GIVEN("a timer wheel with three timers on each slot")
-//     {
-//         WHEN("a slot expires")
-//         {
-//             THEN("timers from expired slot are given in timersExpired signal")
-//             {
-
-//             }
-//         }
-//     }
-// }
+            THEN("timer wheel fails to add timer")
+            {
+                REQUIRE(timerWheel.isEmpty());
+                REQUIRE(!timerWheel.addTimer(&timer));
+                REQUIRE(timerWheel.isEmpty());
+            }
+        }
+    }
+}
