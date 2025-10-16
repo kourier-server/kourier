@@ -92,31 +92,31 @@ SCENARIO("TimerWheel ajusts given resolution")
 }
 
 
-// SCENARIO("TimerWheel has 64 slots with given resolution")
-// {
-//     GIVEN("a timer wheel with specified positive resolution")
-//     {
-//         const auto resolution = GENERATE(AS(std::chrono::milliseconds),
-//                                          std::chrono::milliseconds(1),
-//                                          std::chrono::milliseconds(10),
-//                                          std::chrono::milliseconds(18),
-//                                          std::chrono::milliseconds(1711),
-//                                          std::chrono::milliseconds(1000000),
-//                                          std::chrono::milliseconds(1000000000));
-//         TimerWheel timerWheel(resolution);
-//         REQUIRE(resolution == timerWheel.resolution());
+SCENARIO("TimerWheel has 64 slots with given resolution")
+{
+    GIVEN("a timer wheel with specified positive resolution")
+    {
+        const auto resolution = GENERATE(AS(std::chrono::milliseconds),
+                                         std::chrono::milliseconds(1),
+                                         std::chrono::milliseconds(10),
+                                         std::chrono::milliseconds(18),
+                                         std::chrono::milliseconds(1711),
+                                         std::chrono::milliseconds(1000000),
+                                         std::chrono::milliseconds(1000000000));
+        TimerWheel timerWheel(resolution);
+        const auto adjustedResolution = timerWheel.resolution();
 
-//         WHEN("timer wheel period is fetched")
-//         {
-//             const auto period = timerWheel.period();
+        WHEN("time span for timer wheel is fetched")
+        {
+            const auto timeSpan = timerWheel.timeSpan();
 
-//             THEN("timer wheel informs correct period as 64 times the resolution")
-//             {
-//                 REQUIRE(period.count() == (resolution.count()*64));
-//             }
-//         }
-//     }
-// }
+            THEN("timer wheel informs correct time span as 64 times the adjusted resolution")
+            {
+                REQUIRE(timeSpan.count() == (int64_t)((uint64_t)adjustedResolution.count() << 6));
+            }
+        }
+    }
+}
 
 
 // SCENARIO("TimerWheel sets resolution to 1 if given resolution is not positive")
