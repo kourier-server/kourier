@@ -57,7 +57,7 @@ void TimerList::swap(TimerList &other)
     }
 }
 
-void TimerList::addTimer(TimerPrivate *pTimer)
+void TimerList::pushFront(TimerPrivate *pTimer)
 {
     assert(pTimer);
     ++m_size;
@@ -67,7 +67,7 @@ void TimerList::addTimer(TimerPrivate *pTimer)
     pTimer->m_listNode.pNext->pPrevious = &pTimer->m_listNode;
 }
 
-void TimerList::removeTimer(TimerPrivate *pTimer)
+void TimerList::remove(TimerPrivate *pTimer)
 {
     assert(pTimer);
     --m_size;
@@ -81,7 +81,7 @@ TimerPrivate *TimerList::popFirst()
     if (m_size > 0) [[likely]]
     {
         pTimer = m_head.pNext->pTimer;
-        removeTimer(pTimer);
+        remove(pTimer);
     }
     return pTimer;
 }

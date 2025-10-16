@@ -28,18 +28,21 @@ class TimerListIterator
 public:
     TimerListIterator() = default;
     ~TimerListIterator() = default;
-    TimerPrivate *timer() {return pNode ? pNode->pTimer : nullptr;}
-    inline bool operator==(const TimerListIterator &it) {return (pNode == it.pNode);}
+    TimerPrivate *timer() {return m_pNode ? m_pNode->pTimer : nullptr;}
+    inline bool operator==(const TimerListIterator &it) {return (m_pNode == it.m_pNode);}
     inline bool operator!=(const TimerListIterator &it) {return !(*this == it);}
     inline TimerListIterator& operator++()
     {
-        assert(pNode->pNext);
-        pNode = pNode->pNext;
+        assert(m_pNode->pNext);
+        m_pNode = m_pNode->pNext;
         return *this;
     }
 
 private:
-    TimerListNode *pNode = nullptr;
+    inline constexpr TimerListIterator(TimerListNode *pNode) {m_pNode = pNode;}
+
+private:
+    TimerListNode *m_pNode = nullptr;
     friend class TimerList;
 };
 

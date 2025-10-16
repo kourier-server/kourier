@@ -36,7 +36,7 @@ bool TimerWheel::addTimer(TimerPrivate *pTimer)
     {
         ++m_timerCount;
         pTimer->m_pTimerWheel = this;
-        m_slots[(uint64_t)pTimer->m_timeout.count() >> m_slotFinderExponent].addTimer(pTimer);
+        m_slots[(uint64_t)pTimer->m_timeout.count() >> m_slotFinderExponent].pushFront(pTimer);
         return true;
     }
     else
@@ -50,7 +50,7 @@ bool TimerWheel::removeTimer(TimerPrivate *pTimer)
     {
         --m_timerCount;
         pTimer->m_pTimerWheel = nullptr;
-        m_slots[(uint64_t)pTimer->m_timeout.count() >> m_slotFinderExponent].removeTimer(pTimer);
+        m_slots[(uint64_t)pTimer->m_timeout.count() >> m_slotFinderExponent].remove(pTimer);
         return true;
     }
     else

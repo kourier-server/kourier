@@ -17,6 +17,7 @@
 
 #include "TimerList.h"
 #include <Spectator.h>
+#include <list>
 #include <set>
 
 using Kourier::TimerList;
@@ -38,7 +39,7 @@ SCENARIO("TimerList stores added timers")
             size_t counter = 0;
             for (auto &pTimer : timersToAdd)
             {
-                timerList.addTimer(pTimer);
+                timerList.pushFront(pTimer);
                 REQUIRE(timerList.size() == ++counter);
                 REQUIRE(!timerList.isEmpty());
             }
@@ -69,7 +70,7 @@ SCENARIO("TimerList allows lists to be swapped")
         std::set<TimerPrivate*> firstTimersToAdd;
         for (auto i = 0; i < firstTimersCount; ++i)
         {
-            firstTimersList.addTimer(&firstTimers[i]);
+            firstTimersList.pushFront(&firstTimers[i]);
             firstTimersToAdd.insert(&firstTimers[i]);
         }
         const auto secondTimersCount = GENERATE(AS(size_t), 0, 1, 2, 3);
@@ -78,7 +79,7 @@ SCENARIO("TimerList allows lists to be swapped")
         std::set<TimerPrivate*> secondTimersToAdd;
         for (auto i = 0; i < secondTimersCount; ++i)
         {
-            secondTimersList.addTimer(&secondTimers[i]);
+            secondTimersList.pushFront(&secondTimers[i]);
             secondTimersToAdd.insert(&secondTimers[i]);
         }
 
@@ -96,6 +97,35 @@ SCENARIO("TimerList allows lists to be swapped")
             {
                 REQUIRE(addedFirstTimers == firstTimersToAdd);
                 REQUIRE(addedSecondTimers == secondTimersToAdd);
+            }
+        }
+    }
+}
+
+
+SCENARIO("TimerList allows iteration over its items")
+{
+    GIVEN("a timer list")
+    {
+        const auto timerCount = GENERATE(AS(size_t), 0, 1, 2, 3);
+        TimerPrivate timers[3];
+        TimerList timersList;
+        std::list<TimerPrivate*> stdList;
+        for (auto i = 0; i < timerCount; ++i)
+        {
+            timersList.pushFront(&timers[i]);
+            stdList.push_front(&timers[i]);
+        }
+
+        WHEN("we iterate over its items")
+        {
+            std::list<TimerPrivate*> timersFromIteration;
+            for (auto it = timersList.begin(); it != timersList.end(); ++it)
+                timersFromIteration.push_back(it.timer());
+
+            THEN("iterator gives all added items")
+            {
+                REQUIRE(stdList == timersFromIteration);
             }
         }
     }

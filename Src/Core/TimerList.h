@@ -19,6 +19,7 @@
 #define KOURIER_TIMER_LIST_H
 
 #include "TimerPrivate_epoll.h"
+#include "TimerListIterator.h"
 
 
 namespace Kourier
@@ -30,11 +31,13 @@ public:
     TimerList();
     ~TimerList() = default;
     void swap(TimerList &other);
-    void addTimer(TimerPrivate *pTimer);
-    void removeTimer(TimerPrivate *pTimer);
+    void pushFront(TimerPrivate *pTimer);
+    void remove(TimerPrivate *pTimer);
     TimerPrivate *popFirst();
     inline bool isEmpty() const {return m_size == 0;}
     inline uint64_t size() const {return m_size;}
+    inline TimerListIterator begin() {return {m_head.pNext};}
+    inline TimerListIterator end() {return {&m_tail};}
 
 private:
     TimerListNode m_head;
