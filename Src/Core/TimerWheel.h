@@ -33,6 +33,7 @@ class TimerWheel
 public:
     TimerWheel(std::chrono::milliseconds resolution);
     ~TimerWheel() = default;
+    inline std::chrono::milliseconds resolution() const {return m_resolution;}
     inline std::chrono::milliseconds timeSpan() const {return m_timeSpan;}
     bool addTimer(TimerPrivate *pTimer);
     bool removeTimer(TimerPrivate *pTimer);
