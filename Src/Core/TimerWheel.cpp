@@ -25,7 +25,7 @@ namespace Kourier
 TimerWheel::TimerWheel(std::chrono::milliseconds resolution) :
     m_resolution(adjustResolution(resolution)),
     m_timeSpan((uint64_t)m_resolution.count() << 6),
-    m_slotFinderExponent(6 + std::countr_zero<uint64_t>(m_resolution.count()))
+    m_resolutionExponent(std::countr_zero<uint64_t>(m_resolution.count()))
 {
 }
 
@@ -36,7 +36,8 @@ bool TimerWheel::addTimer(TimerPrivate *pTimer)
     {
         ++m_timerCount;
         pTimer->m_pTimerWheel = this;
-        m_slots[(uint64_t)pTimer->m_timeout.count() >> m_slotFinderExponent].pushFront(pTimer);
+        pTimer->m_idxTimerWheelSlot = (((uint64_t)pTimer->m_timeout.count() >> m_resolutionExponent) + m_idxNextTimersToExpire) & 63;
+        m_slots[pTimer->m_idxTimerWheelSlot].pushFront(pTimer);
         return true;
     }
     else
@@ -46,11 +47,12 @@ bool TimerWheel::addTimer(TimerPrivate *pTimer)
 bool TimerWheel::removeTimer(TimerPrivate *pTimer)
 {
     assert(pTimer);
-    if (pTimer->m_timeout < m_timeSpan) [[likely]]
+    if (pTimer->m_pTimerWheel == this) [[likely]]
     {
         --m_timerCount;
+        m_slots[pTimer->m_idxTimerWheelSlot].remove(pTimer);
         pTimer->m_pTimerWheel = nullptr;
-        m_slots[(uint64_t)pTimer->m_timeout.count() >> m_slotFinderExponent].remove(pTimer);
+        pTimer->m_idxTimerWheelSlot = 0;
         return true;
     }
     else
@@ -64,6 +66,11 @@ TimerList TimerWheel::tick()
     if (m_idxNextTimersToExpire == 64) [[unlikely]]
         m_idxNextTimersToExpire = 0;
     m_timerCount -= expiredTimers.size();
+    for (auto it = expiredTimers.begin(); it != expiredTimers.end(); ++it)
+    {
+        it.timer()->m_pTimerWheel = nullptr;
+        it.timer()->m_timeout = std::chrono::milliseconds((uint64_t)it.timer()->m_timeout.count() & ((uint64_t)(m_resolution.count() - 1)));
+    }
     return expiredTimers;
 }
 

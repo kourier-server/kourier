@@ -18,6 +18,7 @@
 #include "TimerWheel.h"
 #include "TimerPrivate_epoll.h"
 #include <Spectator.h>
+#include <vector>
 
 using Kourier::TimerWheel;
 using Kourier::TimerPrivate;
@@ -133,10 +134,10 @@ SCENARIO("TimerWheel fails to add timers having a timeout greater than its time 
                                          std::chrono::milliseconds(1 << 24),
                                          std::chrono::milliseconds(1 << 30),
                                          std::chrono::milliseconds(int64_t(1) << 36));
+        TimerWheel timerWheel(resolution);
 
         WHEN("we try to add to wheel a timer with an interval greater than the wheel's time span")
         {
-            TimerWheel timerWheel(resolution);
             TimerPrivate timer;
             const auto deltaOverMaxValue = GENERATE(AS(int64_t), 1, 3, 102417);
             timer.setInterval(std::chrono::milliseconds(timerWheel.timeSpan().count() + deltaOverMaxValue));
@@ -146,6 +147,63 @@ SCENARIO("TimerWheel fails to add timers having a timeout greater than its time 
                 REQUIRE(timerWheel.isEmpty());
                 REQUIRE(!timerWheel.addTimer(&timer));
                 REQUIRE(timerWheel.isEmpty());
+            }
+        }
+    }
+}
+
+
+SCENARIO("Timer wheel signals expired timers on tick")
+{
+    GIVEN("a timer wheel with a given resolution")
+    {
+        const auto resolution = GENERATE(AS(std::chrono::milliseconds),
+                                         std::chrono::milliseconds(1),
+                                         std::chrono::milliseconds(1 << 6),
+                                         std::chrono::milliseconds(1 << 12),
+                                         std::chrono::milliseconds(1 << 18),
+                                         std::chrono::milliseconds(1 << 24),
+                                         std::chrono::milliseconds(1 << 30),
+                                         std::chrono::milliseconds(int64_t(1) << 36));
+        TimerWheel timerWheel(resolution);
+        REQUIRE(timerWheel.isEmpty());
+        const auto previousTickCount = GENERATE(AS(size_t), 0, 12, 70);
+        for (auto i = 0; i < previousTickCount; ++i)
+            timerWheel.tick();
+
+        WHEN("three timers are added to a slot")
+        {
+            const auto slotIndex = GENERATE_RANGE(AS(size_t), 0, 63);
+            std::vector<TimerPrivate> timers(3);
+            timers[0].setInterval(std::chrono::milliseconds(timerWheel.resolution().count()*slotIndex));
+            timers[1].setInterval(std::chrono::milliseconds(timerWheel.resolution().count()*slotIndex + timerWheel.resolution().count()/2));
+            timers[2].setInterval(std::chrono::milliseconds(timerWheel.resolution().count()*slotIndex + timerWheel.resolution().count() - 1));
+            for (auto &timer : timers)
+            {
+                REQUIRE(!timerWheel.contains(&timer));
+                REQUIRE(timerWheel.addTimer(&timer));
+                REQUIRE(timerWheel.contains(&timer));
+                REQUIRE(!timerWheel.isEmpty());
+            }
+
+            THEN("timers are signaled as expired after slotIndex + 1 ticks")
+            {
+                for (auto i = 0; i < slotIndex; ++i)
+                {
+                    REQUIRE(timerWheel.tick().isEmpty());
+                }
+                auto expiredTimers = timerWheel.tick();
+                REQUIRE(!expiredTimers.isEmpty());
+                REQUIRE(timerWheel.isEmpty());
+
+                AND_THEN("timer wheel releases ownership of expired timers and subtracts from each timer's timeout the time spent on wheel")
+                {
+                    for (auto it = expiredTimers.begin(); it != expiredTimers.end(); ++it)
+                    {
+                        REQUIRE(!timerWheel.contains(it.timer()));
+                        REQUIRE(it.timer()->timeout().count() == (it.timer()->interval().count() - (slotIndex * timerWheel.resolution().count())));
+                    }
+                }
             }
         }
     }

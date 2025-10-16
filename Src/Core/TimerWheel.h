@@ -35,10 +35,11 @@ public:
     ~TimerWheel() = default;
     inline std::chrono::milliseconds resolution() const {return m_resolution;}
     inline std::chrono::milliseconds timeSpan() const {return m_timeSpan;}
+    inline bool isEmpty() const {return m_timerCount == 0;}
     bool addTimer(TimerPrivate *pTimer);
     bool removeTimer(TimerPrivate *pTimer);
+    inline bool contains(TimerPrivate *pTimer) {assert(pTimer); return pTimer->m_pTimerWheel == this;}
     TimerList tick();
-    inline bool isEmpty() const {return m_timerCount == 0;}
 
 private:
     static std::chrono::milliseconds adjustResolution(std::chrono::milliseconds resolution);
@@ -46,7 +47,7 @@ private:
 private:
     const std::chrono::milliseconds m_resolution;
     const std::chrono::milliseconds m_timeSpan;
-    const uint64_t m_slotFinderExponent;
+    const uint64_t m_resolutionExponent;
     uint64_t m_idxNextTimersToExpire = 0;
     uint64_t m_timerCount = 0;
     TimerList m_slots[64];

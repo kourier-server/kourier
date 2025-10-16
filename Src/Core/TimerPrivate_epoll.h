@@ -40,7 +40,7 @@ public:
     inline bool isSingleShot() const {return m_isSingleShot;}
     inline void setSingleShot(bool singleShot) {m_isSingleShot = singleShot;}
     inline std::chrono::milliseconds interval() const {return m_interval;}
-    inline std::chrono::milliseconds timeout() const {return m_interval;}
+    inline std::chrono::milliseconds timeout() const {return m_timeout;}
     void setInterval(std::chrono::milliseconds interval);
 
 private:
@@ -53,6 +53,7 @@ private:
     Q_DECLARE_PUBLIC(Timer)
     TimerListNode m_listNode;
     TimerWheel *m_pTimerWheel = nullptr;
+    size_t m_idxTimerWheelSlot = 0;
     std::chrono::milliseconds m_interval;
     std::chrono::milliseconds m_timeout;
     std::chrono::milliseconds m_activationTime;
