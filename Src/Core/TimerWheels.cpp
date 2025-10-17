@@ -16,7 +16,10 @@
 //
 
 #include "TimerWheels.h"
+#include "EpollEventNotifier.h"
+#include "UnixUtils.h"
 #include <bit>
+#include <sys/eventfd.h>
 
 
 namespace Kourier
@@ -24,17 +27,27 @@ namespace Kourier
 
 TimerWheels::TimerWheels(std::shared_ptr<ClockTicker> pLowResolutionClockTicker,
                          std::shared_ptr<ClockTicker> pHighResolutionClockTicker)
-    : m_lowResolutionTime(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())),
+    : EpollEventSource(EPOLLET | EPOLLIN, EpollEventNotifier::current()),
+      m_eventFd(eventfd(0, EFD_NONBLOCK)),
+      m_lowResolutionTime(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())),
       m_pLowResolutionClockTicker(pLowResolutionClockTicker),
       m_pHighResolutionClockTicker(pHighResolutionClockTicker)
 
 {
+    if (-1 == m_eventFd)
+        qFatal("Failed to create event for epoll-based event dispatcher. Exiting.");
     if (!m_pLowResolutionClockTicker) [[unlikely]]
         qFatal("Failed to create timer wheels. Given low resolution clock ticker is null.");
     if (!m_pHighResolutionClockTicker) [[unlikely]]
         qFatal("Failed to create timer wheels. Given high resolution clock ticker is null.");
     Object::connect(m_pLowResolutionClockTicker.get(), &ClockTicker::tick, this, &TimerWheels::onLowResolutionTick);
     Object::connect(m_pHighResolutionClockTicker.get(), &ClockTicker::tick, this, &TimerWheels::onHighResolutionTick);
+}
+
+TimerWheels::~TimerWheels()
+{
+    setEnabled(false);
+    UnixUtils::safeClose(m_eventFd);
 }
 
 void TimerWheels::addTimer(TimerPrivate *pTimer)
@@ -47,8 +60,13 @@ void TimerWheels::addTimer(TimerPrivate *pTimer)
                                    4,4,4,4,4,4,
                                    5,5,5,5,5,5,
                                    6,6,6,6,6,6};
-    if (pTimer->timeout().count() >= (int64_t(1) << 42)) [[unlikely]]
-        pTimer->timeout() = std::chrono::milliseconds((int64_t(1) << 42) - 1);
+    if (pTimer->interval().count() == 0) [[unlikely]]
+    {
+        triggerTimerWhenControlReturnsToEventLoop(pTimer);
+        return;
+    }
+    else if (pTimer->timeout().count() > maxTimeout) [[unlikely]]
+        pTimer->timeout() = std::chrono::milliseconds(maxTimeout);
     m_timerWheels[idxFinder[std::countr_zero<uint64_t>(std::bit_floor<uint64_t>(pTimer->timeout().count()))]].addTimer(pTimer);
     setHighResolutionClockTickerEnabled(!m_timerWheels[0].isEmpty());
 }
@@ -57,7 +75,12 @@ void TimerWheels::removeTimer(TimerPrivate *pTimer)
 {
     assert(pTimer);
     if (pTimer->m_pTimerWheel) [[likely]]
+    {
         pTimer->m_pTimerWheel->removeTimer(pTimer);
+        setHighResolutionClockTickerEnabled(!m_timerWheels[0].isEmpty());
+    }
+    else
+        m_zeroIntervalTimers.remove(pTimer);
 }
 
 Signal TimerWheels::timedOutTimers(TimerList timers) KOURIER_SIGNAL(&TimerWheels::timedOutTimers, timers);
@@ -88,11 +111,7 @@ void Kourier::TimerWheels::onLowResolutionTick()
         if (it.timer()->timeout().count() > 0)
             m_timerWheels[0].addTimer(it.timer());
         else
-        {
-            it.timer()->m_pTimerWheel = nullptr;
-            it.timer()->m_idxTimerWheelSlot = 0;
             timers.pushFront(it.timer());
-        }
     }
     setHighResolutionClockTickerEnabled(!m_timerWheels[0].isEmpty());
     if (!timers.isEmpty())
@@ -103,7 +122,44 @@ void TimerWheels::onHighResolutionTick()
 {
     auto expiredTimers = m_timerWheels[0].tick();
     setHighResolutionClockTickerEnabled(!m_timerWheels[0].isEmpty());
-    timedOutTimers(expiredTimers);
+    if (!expiredTimers.isEmpty())
+        timedOutTimers(expiredTimers);
+}
+
+void TimerWheels::set()
+{
+    if (m_eventIsSet)
+        return;
+    else
+    {
+        setEnabled(true);
+        m_eventIsSet = true;
+        const uint64_t value = 1;
+        UnixUtils::safeWrite(m_eventFd, (const char*)&value, sizeof(value));
+    }
+}
+
+void TimerWheels::reset()
+{
+    if (!m_eventIsSet)
+        return;
+    else
+    {
+        m_eventIsSet = false;
+        uint64_t value = 0;
+        UnixUtils::safeRead(m_eventFd, (char*)&value, sizeof(value));
+    }
+}
+
+void TimerWheels::onEvent(uint32_t epollEvents)
+{
+    if (EPOLLIN == (epollEvents & EPOLLIN))
+    {
+        reset();
+        TimerList expiredTimers;
+        expiredTimers.swap(m_zeroIntervalTimers);
+        timedOutTimers(expiredTimers);
+    }
 }
 
 }

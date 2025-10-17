@@ -69,6 +69,7 @@ TimerList TimerWheel::tick()
     for (auto it = expiredTimers.begin(); it != expiredTimers.end(); ++it)
     {
         it.timer()->m_pTimerWheel = nullptr;
+        it.timer()->m_idxTimerWheelSlot = 0;
         it.timer()->m_timeout = std::chrono::milliseconds((uint64_t)it.timer()->m_timeout.count() & ((uint64_t)(m_resolution.count() - 1)));
     }
     return expiredTimers;

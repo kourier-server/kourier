@@ -76,6 +76,7 @@ private:
     friend class EpollTimerRegistrar;
     friend class TimerWheel;
     friend class ClockTicker;
+    friend class TimerWheels;
 };
 
 }

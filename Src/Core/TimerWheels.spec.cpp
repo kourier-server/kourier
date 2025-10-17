@@ -1,0 +1,130 @@
+//
+// Copyright (C) 2025 Glauco Pacheco <glauco@kourier.io>
+// SPDX-License-Identifier: AGPL-3.0-only
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as
+// published by the Free Software Foundation, version 3 of the License.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+//
+
+#include "TimerWheels.h"
+#include "TimerPrivate_epoll.h"
+#include <Spectator.h>
+
+using Kourier::TimerWheels;
+using Kourier::TimerPrivate;
+using Kourier::ClockTicker;
+
+
+SCENARIO("TimerWheels starts low resolution time to time elapsed since epoch")
+{
+    GIVEN("a timer wheels")
+    {
+        std::shared_ptr<ClockTicker> pLowResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+        std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+        TimerWheels timerWheels(pLowResolutionClockTicker, pHighResolutionClockTicker);
+        const auto timeElapsedSinceEpoch = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch());
+
+        WHEN("current low resolution time is fetched for time wheels")
+        {
+            const auto lowResolutionTime = timerWheels.lowResolutionTime();
+
+            THEN("timer wheel gives elapsed time since epoch")
+            {
+                REQUIRE(std::abs((lowResolutionTime - timeElapsedSinceEpoch).count()) <= 1);
+            }
+        }
+    }
+}
+
+
+SCENARIO("TimerWheels increases low resolution time by 64ms whenever low resolution clock ticker ticks")
+{
+    GIVEN("a timer wheels")
+    {
+        std::shared_ptr<ClockTicker> pLowResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+        std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+        TimerWheels timerWheels(pLowResolutionClockTicker, pHighResolutionClockTicker);
+
+        WHEN("low resolution clock ticker ticks")
+        {
+            const auto lowResolutionTime = timerWheels.lowResolutionTime();
+            const auto tickCount = GENERATE(AS(size_t), 1, 3, 8);
+            for (auto i = 0; i < tickCount; ++i)
+                pLowResolutionClockTicker->tick();
+
+            THEN("low resolution time increases 64ms per tick")
+            {
+                REQUIRE(timerWheels.lowResolutionTime() == (lowResolutionTime + std::chrono::milliseconds(tickCount*64)));
+            }
+        }
+    }
+}
+
+
+SCENARIO("TimerWheels disables high resolution clock ticker if wheel with 64ms time span becomes empty")
+{
+
+    GIVEN("a timer wheels with no timer on wheel having 64ms time span")
+    {
+        std::shared_ptr<ClockTicker> pLowResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+        std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+        TimerWheels timerWheels(pLowResolutionClockTicker, pHighResolutionClockTicker);
+
+        WHEN("high resolution clock ticker ticks")
+        {
+            pHighResolutionClockTicker->setEnabled(true);
+            REQUIRE(pHighResolutionClockTicker->isEnabled())
+            pHighResolutionClockTicker->tick();
+
+            THEN("timer wheels disables high resolution clock ticker")
+            {
+                REQUIRE(!pHighResolutionClockTicker->isEnabled())
+            }
+        }
+
+        WHEN("high resolution clock ticker ticks after adding timer on wheel with 64ms time span that will expire after 5ms")
+        {
+            TimerPrivate timer;
+            timer.setInterval(std::chrono::milliseconds(5));
+            timerWheels.addTimer(&timer);
+            pHighResolutionClockTicker->setEnabled(true);
+            REQUIRE(pHighResolutionClockTicker->isEnabled())
+            pHighResolutionClockTicker->tick();
+
+            THEN("timer wheels does not disable high resolution clock ticker")
+            {
+                REQUIRE(pHighResolutionClockTicker->isEnabled());
+
+                AND_WHEN("high resolution clock ticker ticks more three times")
+                {
+                    for (auto i = 0; i <= 3; ++i)
+                        pHighResolutionClockTicker->tick();
+
+                    THEN("timer wheels does not disable high resolution clock ticker")
+                    {
+                        REQUIRE(pHighResolutionClockTicker->isEnabled());
+
+                        AND_WHEN("high resolution clock ticker ticks one more time")
+                        {
+                            pHighResolutionClockTicker->tick();
+
+                            THEN("timer wheels disables high resolution clock ticker")
+                            {
+                                REQUIRE(!pHighResolutionClockTicker->isEnabled());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
