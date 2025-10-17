@@ -18,10 +18,16 @@
 #include "TimerWheels.h"
 #include "TimerPrivate_epoll.h"
 #include <Spectator.h>
+#include <QSemaphore>
+#include <vector>
+#include <set>
 
 using Kourier::TimerWheels;
 using Kourier::TimerPrivate;
+using Kourier::TimerList;
 using Kourier::ClockTicker;
+using Kourier::Object;
+using Spectator::SemaphoreAwaiter;
 
 
 SCENARIO("TimerWheels starts low resolution time to time elapsed since epoch")
@@ -148,6 +154,54 @@ SCENARIO("TimerWheels disables high resolution clock ticker if wheel with 64ms t
                         REQUIRE(!pHighResolutionClockTicker->isEnabled());
                     }
                 }
+            }
+        }
+    }
+}
+
+
+SCENARIO("TimerWheels emits timedOutTimers for timers having zero interval when control returns to the event loop")
+{
+    GIVEN("a timer wheels")
+    {
+        std::shared_ptr<ClockTicker> pLowResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+        std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+        TimerWheels timerWheels(pLowResolutionClockTicker, pHighResolutionClockTicker);
+        QSemaphore timedOutTimersSignalEmittedSemaphore;
+        TimerList expiredTimers;
+        Object::connect(&timerWheels, &TimerWheels::timedOutTimers, [&](TimerList timers)
+        {
+            expiredTimers.swap(timers);
+            timedOutTimersSignalEmittedSemaphore.release();
+        });
+
+        WHEN("timers with zero interval are added to the timer wheels")
+        {
+            const auto timersWithZeroIntervalToAddToTimerWheels = GENERATE(AS(size_t), 1, 3, 8);
+            std::vector<TimerPrivate> timersWithZeroInterval(timersWithZeroIntervalToAddToTimerWheels);
+            const bool setZeroIntervalExplicitly = GENERATE(AS(bool), true, false);
+            if (setZeroIntervalExplicitly)
+            {
+                for (auto &timer : timersWithZeroInterval)
+                    timer.setInterval(std::chrono::milliseconds(0));
+            }
+            for (auto &timer : timersWithZeroInterval)
+            {
+                REQUIRE(timer.interval() == std::chrono::milliseconds(0));
+                timerWheels.addTimer(&timer);
+            }
+
+            THEN("timer wheels emits timedOutTimers signal when control returns to the event loop")
+            {
+                REQUIRE(!timedOutTimersSignalEmittedSemaphore.tryAcquire());
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(timedOutTimersSignalEmittedSemaphore, 1));
+                std::set<TimerPrivate*> expectedTimers;
+                for (auto &timer : timersWithZeroInterval)
+                    expectedTimers.insert(&timer);
+                std::set<TimerPrivate*> emittedTimers;
+                for (auto it = expiredTimers.begin(); it != expiredTimers.end(); ++it)
+                    emittedTimers.insert(it.timer());
+                REQUIRE(emittedTimers == expectedTimers);
             }
         }
     }

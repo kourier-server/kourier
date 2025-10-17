@@ -64,7 +64,7 @@ private:
 
 private:
     static constexpr uint64_t maxTimeout = (int64_t(1) << 42) - 1;
-    std::chrono::milliseconds m_lowResolutionTime;
+    std::chrono::milliseconds m_lowResolutionTime = std::chrono::milliseconds(0);
     uint64_t m_lowResolutionTickCounter = 0;
     TimerList m_zeroIntervalTimers;
     std::shared_ptr<ClockTicker> m_pLowResolutionClockTicker;

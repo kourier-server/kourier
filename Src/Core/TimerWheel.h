@@ -45,9 +45,9 @@ private:
     static std::chrono::milliseconds adjustResolution(std::chrono::milliseconds resolution);
 
 private:
-    const std::chrono::milliseconds m_resolution;
-    const std::chrono::milliseconds m_timeSpan;
-    const uint64_t m_resolutionExponent;
+    const std::chrono::milliseconds m_resolution = std::chrono::milliseconds(0);
+    const std::chrono::milliseconds m_timeSpan = std::chrono::milliseconds(0);
+    const uint64_t m_resolutionExponent = 0;
     uint64_t m_idxNextTimersToExpire = 0;
     uint64_t m_timerCount = 0;
     TimerList m_slots[64];

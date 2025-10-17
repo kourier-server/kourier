@@ -43,8 +43,8 @@ private:
     void deactivateTicker();
 
 private:
-    const std::chrono::milliseconds m_resolution;
-    std::chrono::milliseconds m_currentTime;
+    const std::chrono::milliseconds m_resolution = std::chrono::milliseconds(0);
+    std::chrono::milliseconds m_currentTime = std::chrono::milliseconds(0);
     const int64_t m_timerFd;
     bool m_enabled = false;
 };

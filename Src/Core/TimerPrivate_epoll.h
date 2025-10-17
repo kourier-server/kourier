@@ -54,9 +54,9 @@ private:
     TimerListNode m_listNode;
     TimerWheel *m_pTimerWheel = nullptr;
     size_t m_idxTimerWheelSlot = 0;
-    std::chrono::milliseconds m_interval;
-    std::chrono::milliseconds m_timeout;
-    std::chrono::milliseconds m_activationTime;
+    std::chrono::milliseconds m_interval = std::chrono::milliseconds(0);
+    std::chrono::milliseconds m_timeout = std::chrono::milliseconds(0);
+    std::chrono::milliseconds m_activationTime = std::chrono::milliseconds(0);
     EpollEventNotifier * const m_pEventNotifier;
     bool m_isSingleShot = false;
     enum class State : uint8_t {Active, Inactive};
