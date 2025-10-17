@@ -47,7 +47,8 @@ void TimerWheels::addTimer(TimerPrivate *pTimer)
                                    4,4,4,4,4,4,
                                    5,5,5,5,5,5,
                                    6,6,6,6,6,6};
-    pTimer->timeout() = std::chrono::milliseconds((uint64_t)pTimer->timeout().count() & ((uint64_t(1) << 42) - 1));
+    if (pTimer->timeout().count() >= (int64_t(1) << 42)) [[unlikely]]
+        pTimer->timeout() = std::chrono::milliseconds((int64_t(1) << 42) - 1);
     m_timerWheels[idxFinder[std::countr_zero<uint64_t>(std::bit_floor<uint64_t>(pTimer->timeout().count()))]].addTimer(pTimer);
 }
 
