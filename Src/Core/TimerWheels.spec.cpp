@@ -126,5 +126,29 @@ SCENARIO("TimerWheels disables high resolution clock ticker if wheel with 64ms t
                 }
             }
         }
+
+        WHEN("a timer that will expire after 5ms is added to wheel with 64ms time span")
+        {
+            TimerPrivate timer;
+            timer.setInterval(std::chrono::milliseconds(5));
+            timerWheels.addTimer(&timer);
+            pHighResolutionClockTicker->setEnabled(true);
+            REQUIRE(pHighResolutionClockTicker->isEnabled())
+
+            THEN("timer wheels does not disable high resolution clock ticker")
+            {
+                REQUIRE(pHighResolutionClockTicker->isEnabled());
+
+                AND_WHEN("added timer is removed")
+                {
+                    timerWheels.removeTimer(&timer);
+
+                    THEN("timer wheels disables high resolution clock ticker")
+                    {
+                        REQUIRE(!pHighResolutionClockTicker->isEnabled());
+                    }
+                }
+            }
+        }
     }
 }
