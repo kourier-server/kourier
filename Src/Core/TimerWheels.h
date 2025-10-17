@@ -41,10 +41,17 @@ public:
 private:
     void onLowResolutionTick();
     void onHighResolutionTick();
-    void setHighResolutionClockTickerEnabled(bool enabled);
+    inline void setHighResolutionClockTickerEnabled(bool enabled) {m_pHighResolutionClockTicker->setEnabled(enabled);}
+    inline void processExpiredTimers(TimerList expiredTimers)
+    {
+        for (auto it = expiredTimers.begin(); it != expiredTimers.end(); ++it)
+            addTimer(it.timer());
+    }
+    inline static constexpr bool isMultipleOfPowerOfTwo(uint64_t value, uint8_t exponent) {return !(value & ((uint64_t(1) << exponent) - 1));}
 
 private:
     std::chrono::milliseconds m_lowResolutionTime;
+    uint64_t m_lowResolutionTickCounter = 0;
     std::shared_ptr<ClockTicker> m_pLowResolutionClockTicker;
     std::shared_ptr<ClockTicker> m_pHighResolutionClockTicker;
     TimerWheel m_timerWheels[7] = {TimerWheel(std::chrono::milliseconds(1)),
