@@ -207,4 +207,45 @@ SCENARIO("Timer wheel returns expired timers on tick")
             }
         }
     }
+
+    GIVEN("a timer wheel with a resolution of 1ms")
+    {
+        TimerWheel timerWheel(std::chrono::milliseconds(1));
+
+        WHEN("a timer with an interval of 60ms is added to the timer wheel")
+        {
+            TimerPrivate timer60ms;
+            timer60ms.setInterval(std::chrono::milliseconds(60));
+
+            THEN("timer wheel successfully adds the timer")
+            {
+                REQUIRE(timerWheel.addTimer(&timer60ms));
+
+                AND_WHEN("a timer with 5ms is added after 55 ticks")
+                {
+                    for (auto i = 0; i < 55; ++i)
+                    {
+                        REQUIRE(timerWheel.tick().isEmpty());
+                    }
+                    TimerPrivate timer5ms;
+                    timer5ms.setInterval(std::chrono::milliseconds(5));
+                    REQUIRE(timerWheel.addTimer(&timer5ms));
+
+                    THEN("both timers are returned as expired after 5 ticks")
+                    {
+                        for (auto i = 0; i < 5; ++i)
+                        {
+                            REQUIRE(timerWheel.tick().isEmpty());
+                        }
+                        auto timerList = timerWheel.tick();
+                        REQUIRE(timerList.size() == 2);
+                        auto *pFirstTimer = timerList.popFirst();
+                        auto *pSecondTimer = timerList.popFirst();
+                        REQUIRE((pFirstTimer == &timer60ms && pSecondTimer == &timer5ms)
+                                || (pFirstTimer == &timer5ms && pSecondTimer == &timer60ms));
+                    }
+                }
+            }
+        }
+    }
 }
