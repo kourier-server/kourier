@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "TimerWheels.h"
+#include "TimerNotifier.h"
 #include "EpollEventNotifier.h"
 #include "UnixUtils.h"
 #include <bit>
@@ -25,8 +25,8 @@
 namespace Kourier
 {
 
-TimerWheels::TimerWheels(std::shared_ptr<ClockTicker> pLowResolutionClockTicker,
-                         std::shared_ptr<ClockTicker> pHighResolutionClockTicker)
+TimerNotifier::TimerNotifier(std::shared_ptr<ClockTicker> pLowResolutionClockTicker,
+                             std::shared_ptr<ClockTicker> pHighResolutionClockTicker)
     : EpollEventSource(EPOLLET | EPOLLIN, EpollEventNotifier::current()),
       m_eventFd(eventfd(0, EFD_NONBLOCK)),
       m_lowResolutionTime(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())),
@@ -40,17 +40,17 @@ TimerWheels::TimerWheels(std::shared_ptr<ClockTicker> pLowResolutionClockTicker,
         qFatal("Failed to create timer wheels. Given low resolution clock ticker is null.");
     if (!m_pHighResolutionClockTicker) [[unlikely]]
         qFatal("Failed to create timer wheels. Given high resolution clock ticker is null.");
-    Object::connect(m_pLowResolutionClockTicker.get(), &ClockTicker::tick, this, &TimerWheels::onLowResolutionTick);
-    Object::connect(m_pHighResolutionClockTicker.get(), &ClockTicker::tick, this, &TimerWheels::onHighResolutionTick);
+    Object::connect(m_pLowResolutionClockTicker.get(), &ClockTicker::tick, this, &TimerNotifier::onLowResolutionTick);
+    Object::connect(m_pHighResolutionClockTicker.get(), &ClockTicker::tick, this, &TimerNotifier::onHighResolutionTick);
 }
 
-TimerWheels::~TimerWheels()
+TimerNotifier::~TimerNotifier()
 {
     setEnabled(false);
     UnixUtils::safeClose(m_eventFd);
 }
 
-void TimerWheels::addTimer(TimerPrivate *pTimer)
+void TimerNotifier::addTimer(TimerPrivate *pTimer)
 {
     assert(pTimer);
     const uint8_t idxFinder[42] = {0,0,0,0,0,0,
@@ -71,7 +71,7 @@ void TimerWheels::addTimer(TimerPrivate *pTimer)
     setHighResolutionClockTickerEnabled(!m_timerWheels[0].isEmpty());
 }
 
-void TimerWheels::removeTimer(TimerPrivate *pTimer)
+void TimerNotifier::removeTimer(TimerPrivate *pTimer)
 {
     assert(pTimer);
     if (pTimer->m_pTimerWheel) [[likely]]
@@ -83,9 +83,9 @@ void TimerWheels::removeTimer(TimerPrivate *pTimer)
         m_zeroIntervalTimers.remove(pTimer);
 }
 
-Signal TimerWheels::timedOutTimers(TimerList timers) KOURIER_SIGNAL(&TimerWheels::timedOutTimers, timers);
+Signal TimerNotifier::timedOutTimers(TimerList timers) KOURIER_SIGNAL(&TimerNotifier::timedOutTimers, timers);
 
-void Kourier::TimerWheels::onLowResolutionTick()
+void Kourier::TimerNotifier::onLowResolutionTick()
 {
     m_lowResolutionTime += std::chrono::milliseconds(64);
     ++m_lowResolutionTickCounter;
@@ -118,7 +118,7 @@ void Kourier::TimerWheels::onLowResolutionTick()
         timedOutTimers(timers);
 }
 
-void TimerWheels::onHighResolutionTick()
+void TimerNotifier::onHighResolutionTick()
 {
     auto expiredTimers = m_timerWheels[0].tick();
     setHighResolutionClockTickerEnabled(!m_timerWheels[0].isEmpty());
@@ -126,7 +126,7 @@ void TimerWheels::onHighResolutionTick()
         timedOutTimers(expiredTimers);
 }
 
-void TimerWheels::set()
+void TimerNotifier::set()
 {
     if (m_eventIsSet)
         return;
@@ -139,7 +139,7 @@ void TimerWheels::set()
     }
 }
 
-void TimerWheels::reset()
+void TimerNotifier::reset()
 {
     if (!m_eventIsSet)
         return;
@@ -151,7 +151,7 @@ void TimerWheels::reset()
     }
 }
 
-void TimerWheels::onEvent(uint32_t epollEvents)
+void TimerNotifier::onEvent(uint32_t epollEvents)
 {
     if (EPOLLIN == (epollEvents & EPOLLIN))
     {

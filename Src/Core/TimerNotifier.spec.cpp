@@ -15,14 +15,14 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "TimerWheels.h"
+#include "TimerNotifier.h"
 #include "TimerPrivate_epoll.h"
 #include <Spectator.h>
 #include <QSemaphore>
 #include <vector>
 #include <set>
 
-using Kourier::TimerWheels;
+using Kourier::TimerNotifier;
 using Kourier::TimerPrivate;
 using Kourier::TimerList;
 using Kourier::ClockTicker;
@@ -30,18 +30,18 @@ using Kourier::Object;
 using Spectator::SemaphoreAwaiter;
 
 
-SCENARIO("TimerWheels starts low resolution time to time elapsed since epoch")
+SCENARIO("TimerNotifier starts low resolution time to time elapsed since epoch")
 {
-    GIVEN("a timer wheels")
+    GIVEN("a timer notifier")
     {
         std::shared_ptr<ClockTicker> pLowResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
         std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
-        TimerWheels timerWheels(pLowResolutionClockTicker, pHighResolutionClockTicker);
+        TimerNotifier timerNotifier(pLowResolutionClockTicker, pHighResolutionClockTicker);
         const auto timeElapsedSinceEpoch = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch());
 
         WHEN("current low resolution time is fetched for time wheels")
         {
-            const auto lowResolutionTime = timerWheels.lowResolutionTime();
+            const auto lowResolutionTime = timerNotifier.lowResolutionTime();
 
             THEN("timer wheel gives elapsed time since epoch")
             {
@@ -52,38 +52,38 @@ SCENARIO("TimerWheels starts low resolution time to time elapsed since epoch")
 }
 
 
-SCENARIO("TimerWheels increases low resolution time by 64ms whenever low resolution clock ticker ticks")
+SCENARIO("TimerNotifier increases low resolution time by 64ms whenever low resolution clock ticker ticks")
 {
-    GIVEN("a timer wheels")
+    GIVEN("a timer notifier")
     {
         std::shared_ptr<ClockTicker> pLowResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
         std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
-        TimerWheels timerWheels(pLowResolutionClockTicker, pHighResolutionClockTicker);
+        TimerNotifier timerNotifier(pLowResolutionClockTicker, pHighResolutionClockTicker);
 
         WHEN("low resolution clock ticker ticks")
         {
-            const auto lowResolutionTime = timerWheels.lowResolutionTime();
+            const auto lowResolutionTime = timerNotifier.lowResolutionTime();
             const auto tickCount = GENERATE(AS(size_t), 1, 3, 8);
             for (auto i = 0; i < tickCount; ++i)
                 pLowResolutionClockTicker->tick();
 
             THEN("low resolution time increases 64ms per tick")
             {
-                REQUIRE(timerWheels.lowResolutionTime() == (lowResolutionTime + std::chrono::milliseconds(tickCount*64)));
+                REQUIRE(timerNotifier.lowResolutionTime() == (lowResolutionTime + std::chrono::milliseconds(tickCount*64)));
             }
         }
     }
 }
 
 
-SCENARIO("TimerWheels disables high resolution clock ticker if wheel with 64ms time span becomes empty")
+SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms time span becomes empty")
 {
 
-    GIVEN("a timer wheels with no timer on wheel having 64ms time span")
+    GIVEN("a timer notifier with no timer on wheel having 64ms time span")
     {
         std::shared_ptr<ClockTicker> pLowResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
         std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
-        TimerWheels timerWheels(pLowResolutionClockTicker, pHighResolutionClockTicker);
+        TimerNotifier timerNotifier(pLowResolutionClockTicker, pHighResolutionClockTicker);
 
         WHEN("high resolution clock ticker ticks")
         {
@@ -91,7 +91,7 @@ SCENARIO("TimerWheels disables high resolution clock ticker if wheel with 64ms t
             REQUIRE(pHighResolutionClockTicker->isEnabled())
             pHighResolutionClockTicker->tick();
 
-            THEN("timer wheels disables high resolution clock ticker")
+            THEN("timer notifier disables high resolution clock ticker")
             {
                 REQUIRE(!pHighResolutionClockTicker->isEnabled())
             }
@@ -101,12 +101,12 @@ SCENARIO("TimerWheels disables high resolution clock ticker if wheel with 64ms t
         {
             TimerPrivate timer;
             timer.setInterval(std::chrono::milliseconds(5));
-            timerWheels.addTimer(&timer);
+            timerNotifier.addTimer(&timer);
             pHighResolutionClockTicker->setEnabled(true);
             REQUIRE(pHighResolutionClockTicker->isEnabled())
             pHighResolutionClockTicker->tick();
 
-            THEN("timer wheels does not disable high resolution clock ticker")
+            THEN("timer notifier does not disable high resolution clock ticker")
             {
                 REQUIRE(pHighResolutionClockTicker->isEnabled());
 
@@ -115,7 +115,7 @@ SCENARIO("TimerWheels disables high resolution clock ticker if wheel with 64ms t
                     for (auto i = 0; i <= 3; ++i)
                         pHighResolutionClockTicker->tick();
 
-                    THEN("timer wheels does not disable high resolution clock ticker")
+                    THEN("timer notifier does not disable high resolution clock ticker")
                     {
                         REQUIRE(pHighResolutionClockTicker->isEnabled());
 
@@ -123,7 +123,7 @@ SCENARIO("TimerWheels disables high resolution clock ticker if wheel with 64ms t
                         {
                             pHighResolutionClockTicker->tick();
 
-                            THEN("timer wheels disables high resolution clock ticker")
+                            THEN("timer notifier disables high resolution clock ticker")
                             {
                                 REQUIRE(!pHighResolutionClockTicker->isEnabled());
                             }
@@ -137,19 +137,19 @@ SCENARIO("TimerWheels disables high resolution clock ticker if wheel with 64ms t
         {
             TimerPrivate timer;
             timer.setInterval(std::chrono::milliseconds(5));
-            timerWheels.addTimer(&timer);
+            timerNotifier.addTimer(&timer);
             pHighResolutionClockTicker->setEnabled(true);
             REQUIRE(pHighResolutionClockTicker->isEnabled())
 
-            THEN("timer wheels does not disable high resolution clock ticker")
+            THEN("timer notifier does not disable high resolution clock ticker")
             {
                 REQUIRE(pHighResolutionClockTicker->isEnabled());
 
                 AND_WHEN("added timer is removed")
                 {
-                    timerWheels.removeTimer(&timer);
+                    timerNotifier.removeTimer(&timer);
 
-                    THEN("timer wheels disables high resolution clock ticker")
+                    THEN("timer notifier disables high resolution clock ticker")
                     {
                         REQUIRE(!pHighResolutionClockTicker->isEnabled());
                     }
@@ -160,25 +160,25 @@ SCENARIO("TimerWheels disables high resolution clock ticker if wheel with 64ms t
 }
 
 
-SCENARIO("TimerWheels emits timedOutTimers for timers having zero interval when control returns to the event loop")
+SCENARIO("TimerNotifier emits timedOutTimers for timers having zero interval when control returns to the event loop")
 {
-    GIVEN("a timer wheels")
+    GIVEN("a timer notifier")
     {
         std::shared_ptr<ClockTicker> pLowResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
         std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
-        TimerWheels timerWheels(pLowResolutionClockTicker, pHighResolutionClockTicker);
+        TimerNotifier timerNotifier(pLowResolutionClockTicker, pHighResolutionClockTicker);
         QSemaphore timedOutTimersSignalEmittedSemaphore;
         TimerList expiredTimers;
-        Object::connect(&timerWheels, &TimerWheels::timedOutTimers, [&](TimerList timers)
+        Object::connect(&timerNotifier, &TimerNotifier::timedOutTimers, [&](TimerList timers)
         {
             expiredTimers.swap(timers);
             timedOutTimersSignalEmittedSemaphore.release();
         });
 
-        WHEN("timers with zero interval are added to the timer wheels")
+        WHEN("timers with zero interval are added to the timer notifier")
         {
-            const auto timersWithZeroIntervalToAddToTimerWheels = GENERATE(AS(size_t), 1, 3, 8);
-            std::vector<TimerPrivate> timersWithZeroInterval(timersWithZeroIntervalToAddToTimerWheels);
+            const auto timersWithZeroIntervalToAddToTimerNotifier = GENERATE(AS(size_t), 1, 3, 8);
+            std::vector<TimerPrivate> timersWithZeroInterval(timersWithZeroIntervalToAddToTimerNotifier);
             const bool setZeroIntervalExplicitly = GENERATE(AS(bool), true, false);
             if (setZeroIntervalExplicitly)
             {
@@ -188,10 +188,10 @@ SCENARIO("TimerWheels emits timedOutTimers for timers having zero interval when 
             for (auto &timer : timersWithZeroInterval)
             {
                 REQUIRE(timer.interval() == std::chrono::milliseconds(0));
-                timerWheels.addTimer(&timer);
+                timerNotifier.addTimer(&timer);
             }
 
-            THEN("timer wheels emits timedOutTimers signal when control returns to the event loop")
+            THEN("timer notifier emits timedOutTimers signal when control returns to the event loop")
             {
                 REQUIRE(!timedOutTimersSignalEmittedSemaphore.tryAcquire());
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(timedOutTimersSignalEmittedSemaphore, 1));

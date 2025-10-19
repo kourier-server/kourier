@@ -15,8 +15,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
 
-#ifndef KOURIER_TIMER_WHEELS_H
-#define KOURIER_TIMER_WHEELS_H
+#ifndef KOURIER_TIMER_NOTIFIER_H
+#define KOURIER_TIMER_NOTIFIER_H
 
 #include "EpollEventSource.h"
 #include "TimerWheel.h"
@@ -27,13 +27,13 @@
 namespace Kourier
 {
 
-class TimerWheels : public EpollEventSource
+class TimerNotifier : public EpollEventSource
 {
-KOURIER_OBJECT(Kourier::TimerWheels)
+KOURIER_OBJECT(Kourier::TimerNotifier)
 public:
-    TimerWheels(std::shared_ptr<ClockTicker> pLowResolutionClockTicker,
-                std::shared_ptr<ClockTicker> pHighResolutionClockTicker);
-    ~TimerWheels() override;
+    TimerNotifier(std::shared_ptr<ClockTicker> pLowResolutionClockTicker,
+                  std::shared_ptr<ClockTicker> pHighResolutionClockTicker);
+    ~TimerNotifier() override;
     void addTimer(TimerPrivate *pTimer);
     void removeTimer(TimerPrivate *pTimer);
     inline std::chrono::milliseconds lowResolutionTime() const {return m_lowResolutionTime;}
@@ -82,4 +82,4 @@ private:
 
 }
 
-#endif // KOURIER_TIMER_WHEELS_H
+#endif // KOURIER_TIMER_NOTIFIER_H

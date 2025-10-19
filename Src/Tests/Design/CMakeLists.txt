@@ -19,7 +19,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         ../../Core/Timer.spec.cpp
         ../../Core/TimerList.spec.cpp
         ../../Core/TimerWheel.spec.cpp
-        ../../Core/TimerWheels.spec.cpp
+        ../../Core/TimerNotifier.spec.cpp
         ../../Core/TlsSocket.spec.cpp
         ../../Core/UnixSignalListener.spec.cpp
         ../../Http/HttpBrokerPrivate.spec.cpp

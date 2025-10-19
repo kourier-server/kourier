@@ -53,8 +53,8 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         TimerPrivate_epoll.h
         TimerWheel.cpp
         TimerWheel.h
-        TimerWheels.cpp
-        TimerWheels.h
+        TimerNotifier.cpp
+        TimerNotifier.h
         TlsConfiguration.cpp
         TlsConfiguration.h
         TlsContext.cpp
