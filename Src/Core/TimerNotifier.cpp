@@ -102,8 +102,6 @@ void TimerNotifier::removeTimer(TimerPrivate *pTimer)
         m_zeroIntervalTimers.remove(pTimer);
 }
 
-Signal TimerNotifier::timedOutTimers(TimerList timers) KOURIER_SIGNAL(&TimerNotifier::timedOutTimers, timers);
-
 void Kourier::TimerNotifier::onLowResolutionTick()
 {
     m_lowResolutionTime += std::chrono::milliseconds(64);
@@ -134,7 +132,7 @@ void Kourier::TimerNotifier::onLowResolutionTick()
     }
     setHighResolutionClockTickerEnabled(!m_timerWheels[0].isEmpty());
     if (!timers.isEmpty())
-        timedOutTimers(timers);
+        notifyTimers(timers);
 }
 
 void TimerNotifier::onHighResolutionTick()
@@ -142,7 +140,7 @@ void TimerNotifier::onHighResolutionTick()
     auto expiredTimers = m_timerWheels[0].tick();
     setHighResolutionClockTickerEnabled(!m_timerWheels[0].isEmpty());
     if (!expiredTimers.isEmpty())
-        timedOutTimers(expiredTimers);
+        notifyTimers(expiredTimers);
 }
 
 void TimerNotifier::set()
@@ -177,8 +175,25 @@ void TimerNotifier::onEvent(uint32_t epollEvents)
         reset();
         TimerList expiredTimers;
         expiredTimers.swap(m_zeroIntervalTimers);
-        timedOutTimers(expiredTimers);
+        notifyTimers(expiredTimers);
     }
+}
+
+void TimerNotifier::notifyTimers(TimerList timers)
+{
+    if (!m_isNotifyingTimers) [[likely]]
+        m_isNotifyingTimers = true;
+    else [[unlikely]]
+    {
+        m_timersBeingNotified.pushFront(timers);
+        return;
+    }
+    while (!m_timersBeingNotified.isEmpty())
+    {
+        auto *pTimer = m_timersBeingNotified.popFirst();
+        pTimer->processTimeout();
+    }
+    m_isNotifyingTimers = false;
 }
 
 }

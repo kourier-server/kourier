@@ -33,7 +33,6 @@ public:
     inline bool operator!=(const TimerListIterator &it) {return !(*this == it);}
     inline TimerListIterator& operator++()
     {
-        assert(m_pNode->pNext);
         m_pNode = m_pNode->pNext;
         return *this;
     }

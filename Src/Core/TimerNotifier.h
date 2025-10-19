@@ -38,7 +38,6 @@ public:
     void addTimer(TimerPrivate *pTimer);
     void removeTimer(TimerPrivate *pTimer);
     inline std::chrono::milliseconds lowResolutionTime() const {return m_lowResolutionTime;}
-    Signal timedOutTimers(TimerList timers);
     int64_t fileDescriptor() const override {return m_eventFd;}
 
 private:
@@ -62,12 +61,14 @@ private:
         m_zeroIntervalTimers.pushFront(pTimer);
     }
     void onEvent(uint32_t epollEvents) override;
+    void notifyTimers(TimerList timers);
 
 private:
     static constexpr uint64_t maxTimeout = (int64_t(1) << 42) - 1;
     std::chrono::milliseconds m_lowResolutionTime = std::chrono::milliseconds(0);
     uint64_t m_lowResolutionTickCounter = 0;
     TimerList m_zeroIntervalTimers;
+    TimerList m_timersBeingNotified;
     std::shared_ptr<ClockTicker> m_pLowResolutionClockTicker;
     std::shared_ptr<ClockTicker> m_pHighResolutionClockTicker;
     TimerWheel m_timerWheels[7] = {TimerWheel(std::chrono::milliseconds(1)),
@@ -79,6 +80,7 @@ private:
                                    TimerWheel(std::chrono::milliseconds(uint64_t(1) << 36))};
     int64_t m_eventFd = -1;
     bool m_eventIsSet = false;
+    bool m_isNotifyingTimers = false;
 };
 
 }

@@ -28,20 +28,21 @@ namespace Kourier
 class TimerList
 {
 public:
-    TimerList();
+    TimerList() = default;
     ~TimerList() = default;
     void swap(TimerList &other);
     void pushFront(TimerPrivate *pTimer);
+    void pushFront(TimerList timers);
     void remove(TimerPrivate *pTimer);
     TimerPrivate *popFirst();
     inline bool isEmpty() const {return m_size == 0;}
     inline uint64_t size() const {return m_size;}
-    inline TimerListIterator begin() {return {m_head.pNext};}
-    inline TimerListIterator end() {return {&m_tail};}
+    inline TimerListIterator begin() {return {m_pHead};}
+    inline TimerListIterator end() {return {nullptr};}
 
 private:
-    TimerListNode m_head;
-    TimerListNode m_tail;
+    TimerListNode *m_pHead = nullptr;
+    TimerListNode *m_pTail = nullptr;
     uint64_t m_size = 0;
 };
 

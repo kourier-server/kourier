@@ -21,12 +21,6 @@
 namespace Kourier
 {
 
-TimerList::TimerList()
-{
-    m_head.pNext = &m_tail;
-    m_tail.pPrevious = &m_head;
-}
-
 void TimerList::swap(TimerList &other)
 {
     if (this != &other) [[likely]]
@@ -34,45 +28,59 @@ void TimerList::swap(TimerList &other)
         TimerList temp = *this;
         *this = other;
         other = temp;
-        if (!isEmpty())
-        {
-            m_head.pNext->pPrevious = &m_head;
-            m_tail.pPrevious->pNext = &m_tail;
-        }
-        else
-        {
-            m_head.pNext = &m_tail;
-            m_tail.pPrevious = &m_head;
-        }
-        if (!other.isEmpty())
-        {
-            other.m_head.pNext->pPrevious = &other.m_head;
-            other.m_tail.pPrevious->pNext = &other.m_tail;
-        }
-        else
-        {
-            other.m_head.pNext = &other.m_tail;
-            other.m_tail.pPrevious = &other.m_head;
-        }
     }
 }
 
 void TimerList::pushFront(TimerPrivate *pTimer)
 {
     assert(pTimer);
+    pTimer->m_listNode.pNext = m_pHead;
+    pTimer->m_listNode.pPrevious = nullptr;
+    if (!isEmpty()) [[likely]]
+    {
+        m_pHead->pPrevious = &pTimer->m_listNode;
+        m_pHead = &pTimer->m_listNode;
+    }
+    else [[unlikely]]
+    {
+        m_pHead = &pTimer->m_listNode;
+        m_pTail = m_pHead;
+    }
     ++m_size;
-    pTimer->m_listNode.pNext = m_head.pNext;
-    pTimer->m_listNode.pPrevious = &m_head;
-    m_head.pNext = &pTimer->m_listNode;
-    pTimer->m_listNode.pNext->pPrevious = &pTimer->m_listNode;
+}
+
+void TimerList::pushFront(TimerList timers)
+{
+    if (this != &timers) [[likely]]
+    {
+        if (timers.isEmpty()) [[unlikely]]
+            return;
+        else if (isEmpty()) [[unlikely]]
+            *this = timers;
+        else [[likely]]
+        {
+            timers.m_pTail->pNext = m_pHead;
+            m_pHead->pPrevious = timers.m_pTail;
+            m_pHead = timers.m_pHead;
+            m_size += timers.m_size;
+        }
+    }
 }
 
 void TimerList::remove(TimerPrivate *pTimer)
 {
     assert(pTimer);
     --m_size;
-    pTimer->m_listNode.pPrevious->pNext = pTimer->m_listNode.pNext;
-    pTimer->m_listNode.pNext->pPrevious = pTimer->m_listNode.pPrevious;
+    if (pTimer->m_listNode.pPrevious)
+        pTimer->m_listNode.pPrevious->pNext = pTimer->m_listNode.pNext;
+    if (pTimer->m_listNode.pNext)
+        pTimer->m_listNode.pNext->pPrevious = pTimer->m_listNode.pPrevious;
+    if (m_pHead == &pTimer->m_listNode)
+        m_pHead = m_pHead->pNext;
+    if (m_pTail == &pTimer->m_listNode)
+        m_pTail = m_pTail->pPrevious;
+    pTimer->m_listNode.pNext = nullptr;
+    pTimer->m_listNode.pPrevious = nullptr;
 }
 
 TimerPrivate *TimerList::popFirst()
@@ -80,8 +88,11 @@ TimerPrivate *TimerList::popFirst()
     TimerPrivate *pTimer = nullptr;
     if (m_size > 0) [[likely]]
     {
-        pTimer = m_head.pNext->pTimer;
-        remove(pTimer);
+        pTimer = m_pHead->pTimer;
+        m_pHead = m_pHead->pNext;
+        pTimer->m_listNode.pNext = nullptr;
+        pTimer->m_listNode.pPrevious = nullptr;
+        --m_size;
     }
     return pTimer;
 }

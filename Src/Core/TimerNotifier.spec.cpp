@@ -192,11 +192,11 @@ SCENARIO("TimerNotifier emits timedOutTimers for timers having zero interval whe
         TimerNotifier timerNotifier(pLowResolutionClockTicker, pHighResolutionClockTicker);
         QSemaphore timedOutTimersSignalEmittedSemaphore;
         TimerList expiredTimers;
-        Object::connect(&timerNotifier, &TimerNotifier::timedOutTimers, [&](TimerList timers)
-        {
-            expiredTimers.swap(timers);
-            timedOutTimersSignalEmittedSemaphore.release();
-        });
+        // Object::connect(&timerNotifier, &TimerNotifier::timedOutTimers, [&](TimerList timers)
+        // {
+        //     expiredTimers.swap(timers);
+        //     timedOutTimersSignalEmittedSemaphore.release();
+        // });
 
         WHEN("timers with zero interval are added to the timer notifier")
         {

@@ -103,6 +103,44 @@ SCENARIO("TimerList allows lists to be swapped")
 }
 
 
+SCENARIO("TimerList allows insertion of lists")
+{
+    GIVEN("two timer lists")
+    {
+        const auto firstTimersCount = GENERATE(AS(size_t), 0, 1, 2, 3);
+        TimerPrivate firstTimers[3];
+        TimerList firstTimersList;
+        for (auto i = 0; i < firstTimersCount; ++i)
+            firstTimersList.pushFront(&firstTimers[i]);
+        const auto secondTimersCount = GENERATE(AS(size_t), 0, 1, 2, 3);
+        TimerPrivate secondTimers[3];
+        TimerList secondTimersList;
+        for (auto i = 0; i < secondTimersCount; ++i)
+            secondTimersList.pushFront(&secondTimers[i]);
+
+        WHEN("first list is added to the second")
+        {
+            secondTimersList.pushFront(firstTimersList);
+
+            THEN("second timers list pushes first timers list to the front")
+            {
+                std::list<TimerPrivate*> expectedList;
+                for (auto i = 0; i < secondTimersCount; ++i)
+                    expectedList.push_front(&secondTimers[i]);
+                for (auto i = 0; i < firstTimersCount; ++i)
+                    expectedList.push_front(&firstTimers[i]);
+                REQUIRE(expectedList.size() == secondTimersList.size());
+                while (!secondTimersList.isEmpty())
+                {
+                    REQUIRE(expectedList.front() == secondTimersList.popFirst());
+                    expectedList.pop_front();
+                }
+            }
+        }
+    }
+}
+
+
 SCENARIO("TimerList allows iteration over its items")
 {
     GIVEN("a timer list")
