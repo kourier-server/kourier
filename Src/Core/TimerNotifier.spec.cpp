@@ -76,6 +76,29 @@ SCENARIO("TimerNotifier increases low resolution time by 64ms whenever low resol
 }
 
 
+SCENARIO("TimerNotifier enables low resolution clock ticker on creation")
+{
+    GIVEN("disabled low and high resolution clock tickers")
+    {
+        std::shared_ptr<ClockTicker> pLowResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+        std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+        REQUIRE(!pLowResolutionClockTicker->isEnabled());
+        REQUIRE(!pHighResolutionClockTicker->isEnabled());
+
+        WHEN("timer notifier is created with given clock tickers")
+        {
+            TimerNotifier timerNotifier(pLowResolutionClockTicker, pHighResolutionClockTicker);
+
+            THEN("timer notifier enables low resolution clock ticker")
+            {
+                REQUIRE(pLowResolutionClockTicker->isEnabled());
+                REQUIRE(!pHighResolutionClockTicker->isEnabled());
+            }
+        }
+    }
+}
+
+
 SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms time span becomes empty")
 {
 

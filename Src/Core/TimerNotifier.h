@@ -31,6 +31,7 @@ class TimerNotifier : public EpollEventSource
 {
 KOURIER_OBJECT(Kourier::TimerNotifier)
 public:
+    TimerNotifier();
     TimerNotifier(std::shared_ptr<ClockTicker> pLowResolutionClockTicker,
                   std::shared_ptr<ClockTicker> pHighResolutionClockTicker);
     ~TimerNotifier() override;

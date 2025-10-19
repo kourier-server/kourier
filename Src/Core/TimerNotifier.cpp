@@ -25,6 +25,24 @@
 namespace Kourier
 {
 
+TimerNotifier::TimerNotifier()
+    : EpollEventSource(EPOLLET | EPOLLIN, EpollEventNotifier::current()),
+      m_eventFd(eventfd(0, EFD_NONBLOCK)),
+      m_lowResolutionTime(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())),
+      m_pLowResolutionClockTicker(std::make_shared<ClockTicker>(std::chrono::milliseconds(64))),
+      m_pHighResolutionClockTicker(std::make_shared<ClockTicker>(std::chrono::milliseconds(1)))
+{
+    if (-1 == m_eventFd)
+        qFatal("Failed to create event for epoll-based event dispatcher. Exiting.");
+    if (!m_pLowResolutionClockTicker) [[unlikely]]
+        qFatal("Failed to create timer wheels. Given low resolution clock ticker is null.");
+    if (!m_pHighResolutionClockTicker) [[unlikely]]
+        qFatal("Failed to create timer wheels. Given high resolution clock ticker is null.");
+    Object::connect(m_pLowResolutionClockTicker.get(), &ClockTicker::tick, this, &TimerNotifier::onLowResolutionTick);
+    Object::connect(m_pHighResolutionClockTicker.get(), &ClockTicker::tick, this, &TimerNotifier::onHighResolutionTick);
+    m_pLowResolutionClockTicker->setEnabled(true);
+}
+
 TimerNotifier::TimerNotifier(std::shared_ptr<ClockTicker> pLowResolutionClockTicker,
                              std::shared_ptr<ClockTicker> pHighResolutionClockTicker)
     : EpollEventSource(EPOLLET | EPOLLIN, EpollEventNotifier::current()),
@@ -42,6 +60,7 @@ TimerNotifier::TimerNotifier(std::shared_ptr<ClockTicker> pLowResolutionClockTic
         qFatal("Failed to create timer wheels. Given high resolution clock ticker is null.");
     Object::connect(m_pLowResolutionClockTicker.get(), &ClockTicker::tick, this, &TimerNotifier::onLowResolutionTick);
     Object::connect(m_pHighResolutionClockTicker.get(), &ClockTicker::tick, this, &TimerNotifier::onHighResolutionTick);
+    m_pLowResolutionClockTicker->setEnabled(true);
 }
 
 TimerNotifier::~TimerNotifier()
