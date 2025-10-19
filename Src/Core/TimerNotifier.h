@@ -58,17 +58,16 @@ private:
         set();
         pTimer->m_pTimerWheel = nullptr;
         pTimer->m_idxTimerWheelSlot = 0;
-        m_zeroIntervalTimers.pushFront(pTimer);
+        m_timersToNotify.pushFront(pTimer);
     }
     void onEvent(uint32_t epollEvents) override;
-    void notifyTimers(TimerList timers);
+    void notifyTimers();
 
 private:
     static constexpr uint64_t maxTimeout = (int64_t(1) << 42) - 1;
     std::chrono::milliseconds m_lowResolutionTime = std::chrono::milliseconds(0);
     uint64_t m_lowResolutionTickCounter = 0;
-    TimerList m_zeroIntervalTimers;
-    TimerList m_timersBeingNotified;
+    TimerList m_timersToNotify;
     std::shared_ptr<ClockTicker> m_pLowResolutionClockTicker;
     std::shared_ptr<ClockTicker> m_pHighResolutionClockTicker;
     TimerWheel m_timerWheels[7] = {TimerWheel(std::chrono::milliseconds(1)),
