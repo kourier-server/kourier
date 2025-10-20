@@ -70,15 +70,24 @@ void TimerList::pushFront(TimerList timers)
 void TimerList::remove(TimerPrivate *pTimer)
 {
     assert(pTimer);
-    --m_size;
-    if (pTimer->m_listNode.pPrevious)
-        pTimer->m_listNode.pPrevious->pNext = pTimer->m_listNode.pNext;
-    if (pTimer->m_listNode.pNext)
-        pTimer->m_listNode.pNext->pPrevious = pTimer->m_listNode.pPrevious;
-    if (m_pHead == &pTimer->m_listNode)
-        m_pHead = m_pHead->pNext;
-    if (m_pTail == &pTimer->m_listNode)
+    if (m_pHead == &pTimer->m_listNode) [[unlikely]]
+        popFirst();
+    else if (m_pTail == &pTimer->m_listNode) [[unlikely]]
+    {
         m_pTail = m_pTail->pPrevious;
+        assert(m_pTail);
+        m_pTail->pNext = nullptr;
+    }
+    else [[likely]]
+    {
+        pTimer->m_listNode.pPrevious->pNext = pTimer->m_listNode.pNext;
+        pTimer->m_listNode.pNext->pPrevious = pTimer->m_listNode.pPrevious;
+    }
+    if (--m_size == 0) [[unlikely]]
+    {
+        m_pHead = nullptr;
+        m_pTail = nullptr;
+    }
     pTimer->m_listNode.pNext = nullptr;
     pTimer->m_listNode.pPrevious = nullptr;
 }
@@ -92,7 +101,13 @@ TimerPrivate *TimerList::popFirst()
         m_pHead = m_pHead->pNext;
         pTimer->m_listNode.pNext = nullptr;
         pTimer->m_listNode.pPrevious = nullptr;
-        --m_size;
+        if (--m_size == 0) [[unlikely]]
+        {
+            m_pHead = nullptr;
+            m_pTail = nullptr;
+        }
+        else [[likely]]
+            m_pHead->pPrevious = nullptr;
     }
     return pTimer;
 }

@@ -28,12 +28,19 @@ class TimerListIterator
 public:
     TimerListIterator() = default;
     ~TimerListIterator() = default;
-    TimerPrivate *timer() {return m_pNode ? m_pNode->pTimer : nullptr;}
+    TimerPrivate *timer()
+    {
+        if (m_pNode) [[likely]]
+            return m_pNode->pTimer;
+        else [[unlikely]]
+            return nullptr;
+    }
     inline bool operator==(const TimerListIterator &it) {return (m_pNode == it.m_pNode);}
     inline bool operator!=(const TimerListIterator &it) {return !(*this == it);}
     inline TimerListIterator& operator++()
     {
-        m_pNode = m_pNode->pNext;
+        if (m_pNode) [[likely]]
+            m_pNode = m_pNode->pNext;
         return *this;
     }
 
