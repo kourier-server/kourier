@@ -49,7 +49,6 @@ private:
         for (auto it = expiredTimers.begin(); it != expiredTimers.end(); ++it)
             addTimer(it.timer());
     }
-    inline static constexpr bool isMultipleOfPowerOfTwo(uint64_t value, uint8_t exponent) {return !(value & ((uint64_t(1) << exponent) - 1));}
     void set();
     void reset();
     inline void triggerTimerWhenControlReturnsToEventLoop(TimerPrivate *pTimer)

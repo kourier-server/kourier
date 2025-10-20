@@ -35,9 +35,9 @@ TimerNotifier::TimerNotifier()
     if (-1 == m_eventFd)
         qFatal("Failed to create event for epoll-based event dispatcher. Exiting.");
     if (!m_pLowResolutionClockTicker) [[unlikely]]
-        qFatal("Failed to create timer wheels. Given low resolution clock ticker is null.");
+        qFatal("Failed to create timer notifier. Given low resolution clock ticker is null.");
     if (!m_pHighResolutionClockTicker) [[unlikely]]
-        qFatal("Failed to create timer wheels. Given high resolution clock ticker is null.");
+        qFatal("Failed to create timer notifier. Given high resolution clock ticker is null.");
     Object::connect(m_pLowResolutionClockTicker.get(), &ClockTicker::tick, this, &TimerNotifier::onLowResolutionTick);
     Object::connect(m_pHighResolutionClockTicker.get(), &ClockTicker::tick, this, &TimerNotifier::onHighResolutionTick);
     m_pLowResolutionClockTicker->setEnabled(true);
@@ -55,9 +55,9 @@ TimerNotifier::TimerNotifier(std::shared_ptr<ClockTicker> pLowResolutionClockTic
     if (-1 == m_eventFd)
         qFatal("Failed to create event for epoll-based event dispatcher. Exiting.");
     if (!m_pLowResolutionClockTicker) [[unlikely]]
-        qFatal("Failed to create timer wheels. Given low resolution clock ticker is null.");
+        qFatal("Failed to create timer notifier. Given low resolution clock ticker is null.");
     if (!m_pHighResolutionClockTicker) [[unlikely]]
-        qFatal("Failed to create timer wheels. Given high resolution clock ticker is null.");
+        qFatal("Failed to create timer notifier. Given high resolution clock ticker is null.");
     Object::connect(m_pLowResolutionClockTicker.get(), &ClockTicker::tick, this, &TimerNotifier::onLowResolutionTick);
     Object::connect(m_pHighResolutionClockTicker.get(), &ClockTicker::tick, this, &TimerNotifier::onHighResolutionTick);
     m_pLowResolutionClockTicker->setEnabled(true);
@@ -72,13 +72,13 @@ TimerNotifier::~TimerNotifier()
 void TimerNotifier::addTimer(TimerPrivate *pTimer)
 {
     assert(pTimer);
-    const uint8_t idxFinder[42] = {0,0,0,0,0,0,
-                                   1,1,1,1,1,1,
-                                   2,2,2,2,2,2,
-                                   3,3,3,3,3,3,
-                                   4,4,4,4,4,4,
-                                   5,5,5,5,5,5,
-                                   6,6,6,6,6,6};
+    const uint8_t wheelIdxMap[42] = {0,0,0,0,0,0,
+                                     1,1,1,1,1,1,
+                                     2,2,2,2,2,2,
+                                     3,3,3,3,3,3,
+                                     4,4,4,4,4,4,
+                                     5,5,5,5,5,5,
+                                     6,6,6,6,6,6};
     if (pTimer->interval().count() == 0) [[unlikely]]
     {
         triggerTimerWhenControlReturnsToEventLoop(pTimer);
@@ -86,7 +86,7 @@ void TimerNotifier::addTimer(TimerPrivate *pTimer)
     }
     else if (pTimer->timeout().count() > maxTimeout) [[unlikely]]
         pTimer->timeout() = std::chrono::milliseconds(maxTimeout);
-    m_timerWheels[idxFinder[std::countr_zero<uint64_t>(std::bit_floor<uint64_t>(pTimer->timeout().count()))]].addTimer(pTimer);
+    m_timerWheels[wheelIdxMap[std::countr_zero<uint64_t>(std::bit_floor<uint64_t>(pTimer->timeout().count()))]].addTimer(pTimer);
     setHighResolutionClockTickerEnabled(!m_timerWheels[0].isEmpty());
 }
 
@@ -106,28 +106,23 @@ void Kourier::TimerNotifier::onLowResolutionTick()
 {
     m_lowResolutionTime += std::chrono::milliseconds(64);
     ++m_lowResolutionTickCounter;
-    uint8_t largestWheelToTick = 1;
-    if (isMultipleOfPowerOfTwo(m_lowResolutionTickCounter, 30))
-        largestWheelToTick = 6;
-    else if (isMultipleOfPowerOfTwo(m_lowResolutionTickCounter, 24))
-        largestWheelToTick = 5;
-    else if (isMultipleOfPowerOfTwo(m_lowResolutionTickCounter, 18))
-        largestWheelToTick = 4;
-    else if (isMultipleOfPowerOfTwo(m_lowResolutionTickCounter, 12))
-        largestWheelToTick = 3;
-    else if (isMultipleOfPowerOfTwo(m_lowResolutionTickCounter, 6))
-        largestWheelToTick = 2;
-    else
-        largestWheelToTick = 1;
+    const uint8_t wheelIdxMap[42] = {0,0,0,0,0,0,
+                                     1,1,1,1,1,1,
+                                     2,2,2,2,2,2,
+                                     3,3,3,3,3,3,
+                                     4,4,4,4,4,4,
+                                     5,5,5,5,5,5,
+                                     6,6,6,6,6,6};
+    const auto largestWheelToTick = wheelIdxMap[std::countr_zero<uint64_t>(std::bit_floor<uint64_t>(m_lowResolutionTickCounter << 6))];
     for (auto i = largestWheelToTick; i > 1; --i)
         processExpiredTimers(m_timerWheels[i].tick());
     auto expiredTimers = m_timerWheels[1].tick();
     TimerList timers;
     for (auto it = expiredTimers.begin(); it != expiredTimers.end(); ++it)
     {
-        if (it.timer()->timeout().count() > 0)
+        if (it.timer()->timeout().count() > 0) [[likely]]
             m_timerWheels[0].addTimer(it.timer());
-        else
+        else [[unlikely]]
             timers.pushFront(it.timer());
     }
     setHighResolutionClockTickerEnabled(!m_timerWheels[0].isEmpty());
