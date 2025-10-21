@@ -42,6 +42,8 @@ public:
     inline std::chrono::milliseconds interval() const {return m_interval;}
     inline std::chrono::milliseconds timeout() const {return m_timeout;}
     void setInterval(std::chrono::milliseconds interval);
+    inline void setTimerType(Timer::TimerType timerType) {m_timerType = timerType;}
+    inline Timer::TimerType timerType() const {return m_timerType;}
 
 private:
     void activateTimer(std::chrono::milliseconds interval);
@@ -61,6 +63,7 @@ private:
     bool m_isSingleShot = false;
     enum class State : uint8_t {Active, Inactive};
     State m_state = State::Inactive;
+    Timer::TimerType m_timerType = Timer::TimerType::Coarse;
     friend class EpollTimerRegistrar;
     friend class TimerWheel;
     friend class TimerList;

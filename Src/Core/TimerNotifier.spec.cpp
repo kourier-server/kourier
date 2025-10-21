@@ -106,6 +106,27 @@ SCENARIO("TimerNotifier enables low resolution clock ticker on creation")
             THEN("timer notifier enables low resolution clock ticker")
             {
                 REQUIRE(pLowResolutionClockTicker->isEnabled());
+            }
+        }
+    }
+}
+
+
+SCENARIO("TimerNotifier disables high resolution clock ticker on creation")
+{
+    GIVEN("enabled low and high resolution clock tickers")
+    {
+        std::shared_ptr<ClockTicker> pLowResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+        std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+        pLowResolutionClockTicker->setEnabled(true);
+        pHighResolutionClockTicker->setEnabled(true);
+
+        WHEN("timer notifier is created with given clock tickers")
+        {
+            TimerNotifier timerNotifier(pLowResolutionClockTicker, pHighResolutionClockTicker);
+
+            THEN("timer notifier disables high resolution clock ticker")
+            {
                 REQUIRE(!pHighResolutionClockTicker->isEnabled());
             }
         }
@@ -149,7 +170,7 @@ SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms
 
                 AND_WHEN("high resolution clock ticker ticks more three times")
                 {
-                    for (auto i = 0; i <= 3; ++i)
+                    for (auto i = 0; i < 3; ++i)
                         pHighResolutionClockTicker->tick();
 
                     THEN("timer notifier does not disable high resolution clock ticker")
@@ -173,10 +194,9 @@ SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms
         WHEN("a timer that will expire after 5ms is added to wheel with 64ms time span")
         {
             Timer timer;
+            pHighResolutionClockTicker->setEnabled(true);
             TimerNotifierTest::fetchTimerPrivate(&timer)->setInterval(std::chrono::milliseconds(5));
             timerNotifier.addTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
-            pHighResolutionClockTicker->setEnabled(true);
-            REQUIRE(pHighResolutionClockTicker->isEnabled())
 
             THEN("timer notifier does not disable high resolution clock ticker")
             {

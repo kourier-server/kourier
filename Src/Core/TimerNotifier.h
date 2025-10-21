@@ -41,13 +41,15 @@ public:
     int64_t fileDescriptor() const override {return m_eventFd;}
 
 private:
+    inline static std::chrono::milliseconds msSinceEpoch() {return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch());}
+    void addAdjustedTimer(TimerPrivate *pTimer);
     void onLowResolutionTick();
     void onHighResolutionTick();
     inline void setHighResolutionClockTickerEnabled(bool enabled) {m_pHighResolutionClockTicker->setEnabled(enabled);}
     inline void processExpiredTimers(TimerList expiredTimers)
     {
         for (auto it = expiredTimers.begin(); it != expiredTimers.end(); ++it)
-            addTimer(it.timer());
+            addAdjustedTimer(it.timer());
     }
     void set();
     void reset();

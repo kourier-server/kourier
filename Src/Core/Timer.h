@@ -33,6 +33,7 @@ class KOURIER_EXPORT Timer : public Object
 {
 KOURIER_OBJECT(Kourier::Timer)
 public:
+    enum class TimerType : uint8_t {Precise, Coarse, VeryCoarse};
     Timer();
     ~Timer() override;
     void start();
@@ -44,6 +45,8 @@ public:
     void setSingleShot(bool singleShot);
     std::chrono::milliseconds interval() const;
     void setInterval(std::chrono::milliseconds interval);
+    TimerType timerType() const;
+    void setTimerType(TimerType timerType);
 
 private:
     std::unique_ptr<TimerPrivate> d_ptr;

@@ -79,4 +79,16 @@ void Timer::setInterval(std::chrono::milliseconds interval)
     return d->setInterval(interval);
 }
 
+Timer::TimerType Timer::timerType() const
+{
+    Q_D(const Timer);
+    return d->timerType();
+}
+
+void Timer::setTimerType(TimerType timerType)
+{
+    Q_D(Timer);
+    d->setTimerType(timerType);
+}
+
 }

@@ -28,7 +28,7 @@ namespace Kourier
 TimerNotifier::TimerNotifier()
     : EpollEventSource(EPOLLET | EPOLLIN, EpollEventNotifier::current()),
       m_eventFd(eventfd(0, EFD_NONBLOCK)),
-      m_lowResolutionTime(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())),
+      m_lowResolutionTime(msSinceEpoch()),
       m_pLowResolutionClockTicker(std::make_shared<ClockTicker>(std::chrono::milliseconds(64))),
       m_pHighResolutionClockTicker(std::make_shared<ClockTicker>(std::chrono::milliseconds(1)))
 {
@@ -40,6 +40,8 @@ TimerNotifier::TimerNotifier()
         qFatal("Failed to create timer notifier. Given high resolution clock ticker is null.");
     Object::connect(m_pLowResolutionClockTicker.get(), &ClockTicker::tick, this, &TimerNotifier::onLowResolutionTick);
     Object::connect(m_pHighResolutionClockTicker.get(), &ClockTicker::tick, this, &TimerNotifier::onHighResolutionTick);
+    m_pHighResolutionClockTicker->setEnabled(false);
+    m_pLowResolutionClockTicker->setEnabled(false);
     m_pLowResolutionClockTicker->setEnabled(true);
 }
 
@@ -47,7 +49,7 @@ TimerNotifier::TimerNotifier(std::shared_ptr<ClockTicker> pLowResolutionClockTic
                              std::shared_ptr<ClockTicker> pHighResolutionClockTicker)
     : EpollEventSource(EPOLLET | EPOLLIN, EpollEventNotifier::current()),
       m_eventFd(eventfd(0, EFD_NONBLOCK)),
-      m_lowResolutionTime(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())),
+      m_lowResolutionTime(msSinceEpoch()),
       m_pLowResolutionClockTicker(pLowResolutionClockTicker),
       m_pHighResolutionClockTicker(pHighResolutionClockTicker)
 
@@ -60,6 +62,8 @@ TimerNotifier::TimerNotifier(std::shared_ptr<ClockTicker> pLowResolutionClockTic
         qFatal("Failed to create timer notifier. Given high resolution clock ticker is null.");
     Object::connect(m_pLowResolutionClockTicker.get(), &ClockTicker::tick, this, &TimerNotifier::onLowResolutionTick);
     Object::connect(m_pHighResolutionClockTicker.get(), &ClockTicker::tick, this, &TimerNotifier::onHighResolutionTick);
+    m_pHighResolutionClockTicker->setEnabled(false);
+    m_pLowResolutionClockTicker->setEnabled(false);
     m_pLowResolutionClockTicker->setEnabled(true);
 }
 
@@ -72,22 +76,26 @@ TimerNotifier::~TimerNotifier()
 void TimerNotifier::addTimer(TimerPrivate *pTimer)
 {
     assert(pTimer);
-    const uint8_t wheelIdxMap[42] = {0,0,0,0,0,0,
-                                     1,1,1,1,1,1,
-                                     2,2,2,2,2,2,
-                                     3,3,3,3,3,3,
-                                     4,4,4,4,4,4,
-                                     5,5,5,5,5,5,
-                                     6,6,6,6,6,6};
-    if (pTimer->interval().count() == 0) [[unlikely]]
+    pTimer->m_timeout = pTimer->interval();
+    if (pTimer->m_timeout.count() > 0) [[likely]]
     {
-        triggerTimerWhenControlReturnsToEventLoop(pTimer);
-        return;
+        switch(pTimer->timerType())
+        {
+            case Timer::TimerType::Coarse: [[likely]]
+            case Timer::TimerType::VeryCoarse: [[unlikely]]
+                if (pTimer->m_timeout.count() >= 4096)
+                  break;
+            case Timer::TimerType::Precise: [[unlikely]]
+                if (pTimer->m_timeout >= std::chrono::milliseconds(64))
+                {
+                    const auto currentTime = msSinceEpoch();
+                    const auto timeFix = (currentTime >= m_lowResolutionTime) ? (currentTime - m_lowResolutionTime) : std::chrono::milliseconds(0);
+                    pTimer->m_timeout += timeFix;
+                }
+                break;
+        }
     }
-    else if (pTimer->timeout().count() > maxTimeout) [[unlikely]]
-        pTimer->timeout() = std::chrono::milliseconds(maxTimeout);
-    m_timerWheels[wheelIdxMap[std::countr_zero<uint64_t>(std::bit_floor<uint64_t>(pTimer->timeout().count()))]].addTimer(pTimer);
-    setHighResolutionClockTickerEnabled(!m_timerWheels[0].isEmpty());
+    addAdjustedTimer(pTimer);
 }
 
 void TimerNotifier::removeTimer(TimerPrivate *pTimer)
@@ -100,6 +108,27 @@ void TimerNotifier::removeTimer(TimerPrivate *pTimer)
     }
     else
         m_timersToNotify.remove(pTimer);
+}
+
+void TimerNotifier::addAdjustedTimer(TimerPrivate *pTimer)
+{
+    assert(pTimer);
+    const uint8_t wheelIdxMap[42] = {0,0,0,0,0,0,
+                                     1,1,1,1,1,1,
+                                     2,2,2,2,2,2,
+                                     3,3,3,3,3,3,
+                                     4,4,4,4,4,4,
+                                     5,5,5,5,5,5,
+                                     6,6,6,6,6,6};
+    if (pTimer->timeout().count() == 0) [[unlikely]]
+    {
+        triggerTimerWhenControlReturnsToEventLoop(pTimer);
+        return;
+    }
+    else if (pTimer->timeout().count() > maxTimeout) [[unlikely]]
+        pTimer->timeout() = std::chrono::milliseconds(maxTimeout);
+    m_timerWheels[wheelIdxMap[std::countr_zero<uint64_t>(std::bit_floor<uint64_t>(pTimer->timeout().count()))]].addTimer(pTimer);
+    setHighResolutionClockTickerEnabled(!m_timerWheels[0].isEmpty());
 }
 
 void Kourier::TimerNotifier::onLowResolutionTick()
