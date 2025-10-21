@@ -26,8 +26,6 @@
 namespace Kourier
 {
 
-class TimerPrivate;
-
 class TimerWheel
 {
 public:
@@ -36,9 +34,10 @@ public:
     inline std::chrono::milliseconds resolution() const {return m_resolution;}
     inline std::chrono::milliseconds timeSpan() const {return m_timeSpan;}
     inline bool isEmpty() const {return m_timerCount == 0;}
+    inline bool canAdd(TimerPrivate *pTimer) {return (pTimer && m_resolution <= pTimer->m_timeout && pTimer->m_timeout < m_timeSpan);}
     bool addTimer(TimerPrivate *pTimer);
+    inline bool contains(TimerPrivate *pTimer) {return (pTimer && pTimer->m_pTimerWheel == this);}
     bool removeTimer(TimerPrivate *pTimer);
-    inline bool contains(TimerPrivate *pTimer) {assert(pTimer); return pTimer->m_pTimerWheel == this;}
     TimerList tick();
 
 private:
@@ -48,7 +47,7 @@ private:
     const std::chrono::milliseconds m_resolution = std::chrono::milliseconds(0);
     const std::chrono::milliseconds m_timeSpan = std::chrono::milliseconds(0);
     const uint64_t m_resolutionExponent = 0;
-    uint64_t m_idxNextTimersToExpire = 0;
+    uint64_t m_idxLastTimersToExpire = 0;
     uint64_t m_timerCount = 0;
     TimerList m_slots[64];
 };
