@@ -23,6 +23,8 @@
 #include <memory>
 
 
+namespace Test::TimerNotifier {class TimerNotifierTest;}
+
 namespace Kourier
 {
 class TimerPrivate;
@@ -46,6 +48,7 @@ public:
 private:
     std::unique_ptr<TimerPrivate> d_ptr;
     Q_DECLARE_PRIVATE(Timer)
+    friend class Test::TimerNotifier::TimerNotifierTest;
 };
 
 }

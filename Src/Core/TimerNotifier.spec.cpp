@@ -16,6 +16,7 @@
 //
 
 #include "TimerNotifier.h"
+#include "Timer.h"
 #include "TimerPrivate_epoll.h"
 #include <Spectator.h>
 #include <QSemaphore>
@@ -23,11 +24,24 @@
 #include <set>
 
 using Kourier::TimerNotifier;
+using Kourier::Timer;
 using Kourier::TimerPrivate;
 using Kourier::TimerList;
 using Kourier::ClockTicker;
 using Kourier::Object;
 using Spectator::SemaphoreAwaiter;
+
+
+namespace Test::TimerNotifier
+{
+    class TimerNotifierTest
+    {
+    public:
+        inline static TimerPrivate *fetchTimerPrivate(Timer *pTimer) {return pTimer->d_ptr.get();}
+    };
+}
+
+using namespace Test::TimerNotifier;
 
 
 SCENARIO("TimerNotifier starts low resolution time to time elapsed since epoch")
@@ -122,9 +136,9 @@ SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms
 
         WHEN("high resolution clock ticker ticks after adding timer on wheel with 64ms time span that will expire after 5ms")
         {
-            TimerPrivate timer;
-            timer.setInterval(std::chrono::milliseconds(5));
-            timerNotifier.addTimer(&timer);
+            Timer timer;
+            TimerNotifierTest::fetchTimerPrivate(&timer)->setInterval(std::chrono::milliseconds(5));
+            timerNotifier.addTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
             pHighResolutionClockTicker->setEnabled(true);
             REQUIRE(pHighResolutionClockTicker->isEnabled())
             pHighResolutionClockTicker->tick();
@@ -158,9 +172,9 @@ SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms
 
         WHEN("a timer that will expire after 5ms is added to wheel with 64ms time span")
         {
-            TimerPrivate timer;
-            timer.setInterval(std::chrono::milliseconds(5));
-            timerNotifier.addTimer(&timer);
+            Timer timer;
+            TimerNotifierTest::fetchTimerPrivate(&timer)->setInterval(std::chrono::milliseconds(5));
+            timerNotifier.addTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
             pHighResolutionClockTicker->setEnabled(true);
             REQUIRE(pHighResolutionClockTicker->isEnabled())
 
@@ -170,7 +184,7 @@ SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms
 
                 AND_WHEN("added timer is removed")
                 {
-                    timerNotifier.removeTimer(&timer);
+                    timerNotifier.removeTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
 
                     THEN("timer notifier disables high resolution clock ticker")
                     {
@@ -183,48 +197,101 @@ SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms
 }
 
 
-SCENARIO("TimerNotifier emits timedOutTimers for timers having zero interval when control returns to the event loop")
+SCENARIO("TimerNotifier times out timers having zero interval when control returns to the event loop")
 {
     GIVEN("a timer notifier")
     {
         std::shared_ptr<ClockTicker> pLowResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
         std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
         TimerNotifier timerNotifier(pLowResolutionClockTicker, pHighResolutionClockTicker);
-        QSemaphore timedOutTimersSignalEmittedSemaphore;
-        TimerList expiredTimers;
-        // Object::connect(&timerNotifier, &TimerNotifier::timedOutTimers, [&](TimerList timers)
-        // {
-        //     expiredTimers.swap(timers);
-        //     timedOutTimersSignalEmittedSemaphore.release();
-        // });
 
         WHEN("timers with zero interval are added to the timer notifier")
         {
             const auto timersWithZeroIntervalToAddToTimerNotifier = GENERATE(AS(size_t), 1, 3, 8);
-            std::vector<TimerPrivate> timersWithZeroInterval(timersWithZeroIntervalToAddToTimerNotifier);
+            std::vector<Timer> timersWithZeroInterval(timersWithZeroIntervalToAddToTimerNotifier);
+            QSemaphore timeoutSemaphore;
+            std::set<Timer*> timedOutTimers;
+            for (auto &timer : timersWithZeroInterval)
+            {
+                Object::connect(&timer, &Timer::timeout, [&, pTimer = &timer]()
+                {
+                    REQUIRE(!timedOutTimers.contains(pTimer))
+                    timedOutTimers.insert(pTimer);
+                    timeoutSemaphore.release();
+                });
+            }
             const bool setZeroIntervalExplicitly = GENERATE(AS(bool), true, false);
             if (setZeroIntervalExplicitly)
             {
                 for (auto &timer : timersWithZeroInterval)
-                    timer.setInterval(std::chrono::milliseconds(0));
+                    TimerNotifierTest::fetchTimerPrivate(&timer)->setInterval(std::chrono::milliseconds(0));
             }
             for (auto &timer : timersWithZeroInterval)
             {
                 REQUIRE(timer.interval() == std::chrono::milliseconds(0));
-                timerNotifier.addTimer(&timer);
+                timerNotifier.addTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
             }
 
-            THEN("timer notifier emits timedOutTimers signal when control returns to the event loop")
+            THEN("time notifier makes added timers emit timeout when control returns to the event loop")
             {
-                REQUIRE(!timedOutTimersSignalEmittedSemaphore.tryAcquire());
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(timedOutTimersSignalEmittedSemaphore, 1));
-                std::set<TimerPrivate*> expectedTimers;
+                REQUIRE(!timeoutSemaphore.tryAcquire());
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(timeoutSemaphore, timersWithZeroIntervalToAddToTimerNotifier, 10));
+                std::set<Timer*> expectedTimers;
                 for (auto &timer : timersWithZeroInterval)
                     expectedTimers.insert(&timer);
-                std::set<TimerPrivate*> emittedTimers;
-                for (auto it = expiredTimers.begin(); it != expiredTimers.end(); ++it)
-                    emittedTimers.insert(it.timer());
-                REQUIRE(emittedTimers == expectedTimers);
+                REQUIRE(timedOutTimers == expectedTimers);
+            }
+        }
+    }
+}
+
+
+SCENARIO("TimerNotifier times out timers when their timeout reaches zero")
+{
+    GIVEN("a timer notifier")
+    {
+        std::shared_ptr<ClockTicker> pLowResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+        std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+        TimerNotifier timerNotifier(pLowResolutionClockTicker, pHighResolutionClockTicker);
+
+        WHEN("timers with intervals smaller than 64ms are added to the timer notifier")
+        {
+            std::vector<Timer> timers(3);
+            TimerNotifierTest::fetchTimerPrivate(&timers[0])->setInterval(std::chrono::milliseconds(1));
+            TimerNotifierTest::fetchTimerPrivate(&timers[1])->setInterval(std::chrono::milliseconds(32));
+            TimerNotifierTest::fetchTimerPrivate(&timers[2])->setInterval(std::chrono::milliseconds(63));
+            QSemaphore timeoutSemaphore;
+            std::set<Timer*> timedOutTimers;
+            for (auto &timer : timers)
+            {
+                timer.setSingleShot(false);
+                timerNotifier.addTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
+                Object::connect(&timer, &Timer::timeout, [&, pTimer = &timer]()
+                {
+                    REQUIRE(!timedOutTimers.contains(pTimer))
+                    timedOutTimers.insert(pTimer);
+                    timeoutSemaphore.release();
+                });
+            }
+
+            THEN("time notifier times out timer after high resolution clock ticker ticks until timeout reaches zero")
+            {
+                for (auto tickCounter = 1; tickCounter < 128; ++tickCounter)
+                {
+                    pHighResolutionClockTicker->tick();
+                    for (auto &timer : timers)
+                    {
+                        if (tickCounter == timer.interval().count())
+                        {
+                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(timeoutSemaphore, 1));
+                        }
+                    }
+                }
+                REQUIRE(!timeoutSemaphore.tryAcquire());
+                std::set<Timer*> expectedTimers;
+                for (auto &timer : timers)
+                    expectedTimers.insert(&timer);
+                REQUIRE(timedOutTimers == expectedTimers);
             }
         }
     }

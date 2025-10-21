@@ -37,7 +37,7 @@ public:
     inline void start(std::chrono::milliseconds interval) {activateTimer(interval);}
     inline void stop() {deactivateTimer();}
     inline bool isActive() const {return m_state == State::Active;}
-    inline bool isSingleShot() const {return m_isSingleShot;}
+    inline bool isSingleShot() const {return m_isSingleShot && m_interval.count() > 0;}
     inline void setSingleShot(bool singleShot) {m_isSingleShot = singleShot;}
     inline std::chrono::milliseconds interval() const {return m_interval;}
     inline std::chrono::milliseconds timeout() const {return m_timeout;}
