@@ -38,6 +38,7 @@ namespace Test::TimerNotifier
     {
     public:
         inline static TimerPrivate *fetchTimerPrivate(Timer *pTimer) {return pTimer->d_ptr.get();}
+        inline static void setLowResolutionTime(class TimerNotifier &timerNotifer, std::chrono::milliseconds time) {timerNotifer.m_lowResolutionTime = time;}
     };
 }
 
@@ -312,6 +313,136 @@ SCENARIO("TimerNotifier times out timers when their timeout reaches zero")
                 for (auto &timer : timers)
                     expectedTimers.insert(&timer);
                 REQUIRE(timedOutTimers == expectedTimers);
+            }
+        }
+    }
+}
+
+
+SCENARIO("TimerNotifier ajdusts timeout of added timers")
+{
+    GIVEN("a timer notifier whose low resolution clock ticker ticked some time ago")
+    {
+        std::shared_ptr<ClockTicker> pLowResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+        std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+        TimerNotifier timerNotifier(pLowResolutionClockTicker, pHighResolutionClockTicker);
+        const auto timeAgoInMs = GENERATE(AS(std::chrono::milliseconds),
+                                          std::chrono::milliseconds(0),
+                                          std::chrono::milliseconds(1),
+                                          std::chrono::milliseconds(18),
+                                          std::chrono::milliseconds(63));
+        const auto msSinceEpochToSet = timerNotifier.lowResolutionTime() - timeAgoInMs;
+        TimerNotifierTest::setLowResolutionTime(timerNotifier, msSinceEpochToSet);
+        REQUIRE(timerNotifier.lowResolutionTime() == msSinceEpochToSet);
+
+        WHEN("a timer with positive interval smaller than 64ms is added to timer notifier")
+        {
+            const auto intervalToSet = GENERATE(AS(std::chrono::milliseconds),
+                                                std::chrono::milliseconds(1),
+                                                std::chrono::milliseconds(5),
+                                                std::chrono::milliseconds(23),
+                                                std::chrono::milliseconds(63));
+            const auto timerType = GENERATE(AS(Timer::TimerType),
+                                            Timer::TimerType::Precise,
+                                            Timer::TimerType::Coarse,
+                                            Timer::TimerType::VeryCoarse);
+            Timer timer;
+            timer.setTimerType(timerType);
+            timer.setInterval(intervalToSet);
+            timerNotifier.addTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
+
+            THEN("timer notifier does not adjust timeout")
+            {
+                REQUIRE(TimerNotifierTest::fetchTimerPrivate(&timer)->timeout() == intervalToSet);
+            }
+        }
+
+        WHEN("a coarse or very coarse timer with positive interval greater or equal to 4096ms is added to timer notifier")
+        {
+            const auto intervalToSet = GENERATE(AS(std::chrono::milliseconds),
+                                                std::chrono::milliseconds(4096),
+                                                std::chrono::milliseconds(5003),
+                                                std::chrono::milliseconds(uint64_t(1) << 26),
+                                                std::chrono::milliseconds(215177));
+            const auto timerType = GENERATE(AS(Timer::TimerType),
+                                            Timer::TimerType::Coarse,
+                                            Timer::TimerType::VeryCoarse);
+            Timer timer;
+            timer.setTimerType(timerType);
+            timer.setInterval(intervalToSet);
+            timerNotifier.addTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
+
+            THEN("timer notifier does not adjust timeout")
+            {
+                REQUIRE(TimerNotifierTest::fetchTimerPrivate(&timer)->timeout() == intervalToSet);
+            }
+        }
+
+        WHEN("a timer with positive interval belonging to the set [65ms, 4096ms[ is added to timer notifier")
+        {
+            const auto intervalToSet = GENERATE(AS(std::chrono::milliseconds),
+                                                std::chrono::milliseconds(65),
+                                                std::chrono::milliseconds(72),
+                                                std::chrono::milliseconds(1025),
+                                                std::chrono::milliseconds(4095));
+            const auto timerType = GENERATE(AS(Timer::TimerType),
+                                            Timer::TimerType::Precise,
+                                            Timer::TimerType::Coarse,
+                                            Timer::TimerType::VeryCoarse);
+            Timer timer;
+            timer.setTimerType(timerType);
+            timer.setInterval(intervalToSet);
+            const auto msSinceEpochBeforeAdding = TimerNotifier::msSinceEpoch();
+            timerNotifier.addTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
+            const auto msSinceEpochAfterAdding = TimerNotifier::msSinceEpoch();
+
+            THEN("timer notifier adjusts timeout")
+            {
+                const auto timeout = TimerNotifierTest::fetchTimerPrivate(&timer)->timeout();
+                bool hasAdjustedTimeout = false;
+                for (auto i = msSinceEpochBeforeAdding; i <= msSinceEpochAfterAdding; ++i)
+                {
+                    const auto expectedAdjustedInterval = intervalToSet + (i - timerNotifier.lowResolutionTime());
+                    if (timeout == expectedAdjustedInterval)
+                    {
+                        hasAdjustedTimeout = true;
+                        break;
+                    }
+                }
+                REQUIRE(hasAdjustedTimeout);
+            }
+        }
+
+
+        WHEN("a precise timer with positive interval greater or equal to 4096ms is added to timer notifier")
+        {
+            const auto intervalToSet = GENERATE(AS(std::chrono::milliseconds),
+                                                std::chrono::milliseconds(4096),
+                                                std::chrono::milliseconds(5003),
+                                                std::chrono::milliseconds(uint64_t(1) << 26),
+                                                std::chrono::milliseconds(215177));
+            const auto timerType = GENERATE(AS(Timer::TimerType), Timer::TimerType::Precise);
+            Timer timer;
+            timer.setTimerType(timerType);
+            timer.setInterval(intervalToSet);
+            const auto msSinceEpochBeforeAdding = TimerNotifier::msSinceEpoch();
+            timerNotifier.addTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
+            const auto msSinceEpochAfterAdding = TimerNotifier::msSinceEpoch();
+
+            THEN("timer notifier adjusts timeout")
+            {
+                const auto timeout = TimerNotifierTest::fetchTimerPrivate(&timer)->timeout();
+                bool hasAdjustedTimeout = false;
+                for (auto i = msSinceEpochBeforeAdding; i <= msSinceEpochAfterAdding; ++i)
+                {
+                    const auto expectedAdjustedInterval = intervalToSet + (i - timerNotifier.lowResolutionTime());
+                    if (timeout == expectedAdjustedInterval)
+                    {
+                        hasAdjustedTimeout = true;
+                        break;
+                    }
+                }
+                REQUIRE(hasAdjustedTimeout);
             }
         }
     }

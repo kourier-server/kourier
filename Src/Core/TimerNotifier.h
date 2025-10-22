@@ -23,6 +23,7 @@
 #include "ClockTicker.h"
 #include <memory>
 
+namespace Test::TimerNotifier {class TimerNotifierTest;}
 
 namespace Kourier
 {
@@ -39,9 +40,9 @@ public:
     void removeTimer(TimerPrivate *pTimer);
     inline std::chrono::milliseconds lowResolutionTime() const {return m_lowResolutionTime;}
     int64_t fileDescriptor() const override {return m_eventFd;}
+    inline static std::chrono::milliseconds msSinceEpoch() {return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch());}
 
 private:
-    inline static std::chrono::milliseconds msSinceEpoch() {return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch());}
     void addAdjustedTimer(TimerPrivate *pTimer);
     void onLowResolutionTick();
     void onHighResolutionTick();
@@ -81,6 +82,7 @@ private:
     int64_t m_eventFd = -1;
     bool m_eventIsSet = false;
     bool m_isNotifyingTimers = false;
+    friend class Test::TimerNotifier::TimerNotifierTest;
 };
 
 }
