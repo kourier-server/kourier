@@ -22,11 +22,13 @@
 #include "TimerListNode.h"
 #include <chrono>
 
+namespace Test::TimerNotifier {class TimerNotifierTest;}
 
 namespace Kourier
 {
 
 class TimerWheel;
+class TimerNotifier;
 
 class TimerPrivate
 {
@@ -37,7 +39,7 @@ public:
     inline void start(std::chrono::milliseconds interval) {activateTimer(interval);}
     inline void stop() {deactivateTimer();}
     inline bool isActive() const {return m_state == State::Active;}
-    inline bool isSingleShot() const {return m_isSingleShot && m_interval.count() > 0;}
+    inline bool isSingleShot() const {return m_isSingleShot || m_interval.count() == 0;}
     inline void setSingleShot(bool singleShot) {m_isSingleShot = singleShot;}
     inline std::chrono::milliseconds interval() const {return m_interval;}
     inline std::chrono::milliseconds timeout() const {return m_timeout;}
@@ -58,8 +60,7 @@ private:
     size_t m_idxTimerWheelSlot = 0;
     std::chrono::milliseconds m_interval = std::chrono::milliseconds(0);
     std::chrono::milliseconds m_timeout = std::chrono::milliseconds(0);
-    std::chrono::milliseconds m_activationTime = std::chrono::milliseconds(0);
-    EpollEventNotifier * const m_pEventNotifier;
+    TimerNotifier *m_pTimerNotifier;
     bool m_isSingleShot = false;
     enum class State : uint8_t {Active, Inactive};
     State m_state = State::Inactive;
@@ -68,6 +69,7 @@ private:
     friend class TimerWheel;
     friend class TimerList;
     friend class TimerNotifier;
+    friend class Test::TimerNotifier::TimerNotifierTest;
 };
 
 }

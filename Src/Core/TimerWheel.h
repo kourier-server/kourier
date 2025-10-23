@@ -39,6 +39,7 @@ public:
     inline bool contains(TimerPrivate *pTimer) {return (pTimer && pTimer->m_pTimerWheel == this);}
     bool removeTimer(TimerPrivate *pTimer);
     TimerList tick();
+    inline size_t getSlotIdx(TimerPrivate *pTimer) {return (((uint64_t)pTimer->m_timeout.count() >> m_resolutionExponent) + m_idxLastTimersToExpire) & 63;}
 
 private:
     static std::chrono::milliseconds adjustResolution(std::chrono::milliseconds resolution);

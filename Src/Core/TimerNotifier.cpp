@@ -69,38 +69,61 @@ TimerNotifier::TimerNotifier(std::shared_ptr<ClockTicker> pLowResolutionClockTic
 
 TimerNotifier::~TimerNotifier()
 {
-    setEnabled(false);
-    UnixUtils::safeClose(m_eventFd);
+    disable();
 }
 
 void TimerNotifier::addTimer(TimerPrivate *pTimer)
 {
     assert(pTimer);
-    pTimer->m_timeout = pTimer->interval();
-    if (pTimer->m_timeout.count() > 0) [[likely]]
+    const uint8_t wheelIdxMap[42] = {0,0,0,0,0,0,
+                                     1,1,1,1,1,1,
+                                     2,2,2,2,2,2,
+                                     3,3,3,3,3,3,
+                                     4,4,4,4,4,4,
+                                     5,5,5,5,5,5,
+                                     6,6,6,6,6,6};
+    if (!m_isEnabled) [[unlikely]]
+        return;
+    auto timeout = pTimer->interval();
+    if (timeout.count() > 0) [[likely]]
     {
         switch(pTimer->timerType())
         {
             case Timer::TimerType::Coarse: [[likely]]
             case Timer::TimerType::VeryCoarse: [[unlikely]]
-                if (pTimer->m_timeout.count() >= 4096)
+                if (timeout.count() >= 4096)
                   break;
             case Timer::TimerType::Precise: [[unlikely]]
-                if (pTimer->m_timeout >= std::chrono::milliseconds(64))
+                if (timeout >= std::chrono::milliseconds(64))
                 {
                     const auto currentTime = msSinceEpoch();
                     const auto timeFix = (currentTime >= m_lowResolutionTime) ? (currentTime - m_lowResolutionTime) : std::chrono::milliseconds(0);
-                    pTimer->m_timeout += timeFix;
+                    timeout += timeFix;
                 }
                 break;
         }
     }
+    auto * const pTimerWheel = &m_timerWheels[wheelIdxMap[std::countr_zero<uint64_t>(std::bit_floor<uint64_t>(pTimer->timeout().count()))]];
+    const auto idxSlot = pTimerWheel->getSlotIdx(pTimer);
+    if (pTimer->m_state == TimerPrivate::State::Active)
+    {
+        if (timeout == pTimer->m_timeout
+            && pTimerWheel == pTimer->m_pTimerWheel
+            && idxSlot == pTimer->m_idxTimerWheelSlot)
+            return;
+        else
+            removeTimer(pTimer);
+    }
+    pTimer->m_timeout = timeout;
     addAdjustedTimer(pTimer);
 }
 
 void TimerNotifier::removeTimer(TimerPrivate *pTimer)
 {
     assert(pTimer);
+    if (!m_isEnabled || pTimer->m_state != TimerPrivate::State::Active)
+        return;
+    pTimer->m_state = TimerPrivate::State::Inactive;
     if (pTimer->m_pTimerWheel) [[likely]]
     {
         pTimer->m_pTimerWheel->removeTimer(pTimer);
@@ -108,6 +131,8 @@ void TimerNotifier::removeTimer(TimerPrivate *pTimer)
     }
     else
         m_timersToNotify.remove(pTimer);
+    pTimer->m_pTimerWheel = nullptr;
+    pTimer->m_idxTimerWheelSlot = 0;
 }
 
 void TimerNotifier::addAdjustedTimer(TimerPrivate *pTimer)
@@ -122,11 +147,13 @@ void TimerNotifier::addAdjustedTimer(TimerPrivate *pTimer)
                                      6,6,6,6,6,6};
     if (pTimer->timeout().count() == 0) [[unlikely]]
     {
+        pTimer->m_state = TimerPrivate::State::Active;
         triggerTimerWhenControlReturnsToEventLoop(pTimer);
         return;
     }
     else if (pTimer->timeout().count() > maxTimeout) [[unlikely]]
         pTimer->timeout() = std::chrono::milliseconds(maxTimeout);
+    pTimer->m_state = TimerPrivate::State::Active;
     m_timerWheels[wheelIdxMap[std::countr_zero<uint64_t>(std::bit_floor<uint64_t>(pTimer->timeout().count()))]].addTimer(pTimer);
     setHighResolutionClockTickerEnabled(!m_timerWheels[0].isEmpty());
 }
@@ -219,6 +246,20 @@ void TimerNotifier::notifyTimers()
         pTimer->processTimeout();
     }
     m_isNotifyingTimers = false;
+}
+
+void TimerNotifier::disable()
+{
+    if (m_isEnabled)
+    {
+        m_isEnabled = false;
+        setEnabled(false);
+        UnixUtils::safeClose(m_eventFd);
+        m_pLowResolutionClockTicker->setEnabled(false);
+        Object::disconnect(m_pLowResolutionClockTicker.get(), &ClockTicker::tick, this, &TimerNotifier::onLowResolutionTick);
+        m_pHighResolutionClockTicker->setEnabled(false);
+        Object::disconnect(m_pHighResolutionClockTicker.get(), &ClockTicker::tick, this, &TimerNotifier::onHighResolutionTick);
+    }
 }
 
 }

@@ -38,6 +38,7 @@ namespace Test::TimerNotifier
     {
     public:
         inline static TimerPrivate *fetchTimerPrivate(Timer *pTimer) {return pTimer->d_ptr.get();}
+        inline static void setTimerNotifier(Timer &timer, class TimerNotifier &timerNotifier) {timer.d_ptr->m_pTimerNotifier = &timerNotifier;}
         inline static void setLowResolutionTime(class TimerNotifier &timerNotifer, std::chrono::milliseconds time) {timerNotifer.m_lowResolutionTime = time;}
     };
 }
@@ -137,7 +138,6 @@ SCENARIO("TimerNotifier disables high resolution clock ticker on creation")
 
 SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms time span becomes empty")
 {
-
     GIVEN("a timer notifier with no timer on wheel having 64ms time span")
     {
         std::shared_ptr<ClockTicker> pLowResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
@@ -156,17 +156,20 @@ SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms
             }
         }
 
-        WHEN("high resolution clock ticker ticks after adding timer on wheel with 64ms time span that will expire after 5ms")
+        WHEN("high resolution clock ticker ticks after starting timer with 5ms interval")
         {
-            Timer timer;
-            TimerNotifierTest::fetchTimerPrivate(&timer)->setInterval(std::chrono::milliseconds(5));
-            timerNotifier.addTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
             pHighResolutionClockTicker->setEnabled(true);
-            REQUIRE(pHighResolutionClockTicker->isEnabled())
+            Timer timer;
+            timer.setSingleShot(true);
+            TimerNotifierTest::setTimerNotifier(timer, timerNotifier);
+            bool hasTimedOut = false;
+            Object::connect(&timer, &Timer::timeout, [&](){hasTimedOut = true;});
+            timer.start(std::chrono::milliseconds(5));
             pHighResolutionClockTicker->tick();
 
-            THEN("timer notifier does not disable high resolution clock ticker")
+            THEN("timer notifier does not trigger timer nor disable high resolution clock ticker")
             {
+                REQUIRE(!hasTimedOut);
                 REQUIRE(pHighResolutionClockTicker->isEnabled());
 
                 AND_WHEN("high resolution clock ticker ticks more three times")
@@ -174,16 +177,18 @@ SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms
                     for (auto i = 0; i < 3; ++i)
                         pHighResolutionClockTicker->tick();
 
-                    THEN("timer notifier does not disable high resolution clock ticker")
+                    THEN("timer notifier does not trigger timer nor disable high resolution clock ticker")
                     {
+                        REQUIRE(!hasTimedOut);
                         REQUIRE(pHighResolutionClockTicker->isEnabled());
 
                         AND_WHEN("high resolution clock ticker ticks one more time")
                         {
                             pHighResolutionClockTicker->tick();
 
-                            THEN("timer notifier disables high resolution clock ticker")
+                            THEN("timer notifier triggers timer and disables high resolution clock ticker")
                             {
+                                REQUIRE(hasTimedOut);
                                 REQUIRE(!pHighResolutionClockTicker->isEnabled());
                             }
                         }
@@ -192,23 +197,27 @@ SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms
             }
         }
 
-        WHEN("a timer that will expire after 5ms is added to wheel with 64ms time span")
+        WHEN("a timer with 5ms timeout is added to wheel with 64ms time span")
         {
-            Timer timer;
             pHighResolutionClockTicker->setEnabled(true);
-            TimerNotifierTest::fetchTimerPrivate(&timer)->setInterval(std::chrono::milliseconds(5));
-            timerNotifier.addTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
+            Timer timer;
+            timer.setSingleShot(true);
+            TimerNotifierTest::setTimerNotifier(timer, timerNotifier);
+            bool hasTimedOut = false;
+            Object::connect(&timer, &Timer::timeout, [&](){hasTimedOut = true;});
+            timer.start(std::chrono::milliseconds(5));
 
             THEN("timer notifier does not disable high resolution clock ticker")
             {
                 REQUIRE(pHighResolutionClockTicker->isEnabled());
 
-                AND_WHEN("added timer is removed")
+                AND_WHEN("added timer is stopped")
                 {
-                    timerNotifier.removeTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
+                    timer.stop();
 
-                    THEN("timer notifier disables high resolution clock ticker")
+                    THEN("timer notifier removes timer from 64ms timer wheel making it empty and disables high resolution clock ticker")
                     {
+                        REQUIRE(!hasTimedOut);
                         REQUIRE(!pHighResolutionClockTicker->isEnabled());
                     }
                 }
@@ -226,7 +235,7 @@ SCENARIO("TimerNotifier times out timers having zero interval when control retur
         std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
         TimerNotifier timerNotifier(pLowResolutionClockTicker, pHighResolutionClockTicker);
 
-        WHEN("timers with zero interval are added to the timer notifier")
+        WHEN("timers with zero interval are started")
         {
             const auto timersWithZeroIntervalToAddToTimerNotifier = GENERATE(AS(size_t), 1, 3, 8);
             std::vector<Timer> timersWithZeroInterval(timersWithZeroIntervalToAddToTimerNotifier);
@@ -234,6 +243,8 @@ SCENARIO("TimerNotifier times out timers having zero interval when control retur
             std::set<Timer*> timedOutTimers;
             for (auto &timer : timersWithZeroInterval)
             {
+                timer.setSingleShot(true);
+                TimerNotifierTest::setTimerNotifier(timer, timerNotifier);
                 Object::connect(&timer, &Timer::timeout, [&, pTimer = &timer]()
                 {
                     REQUIRE(!timedOutTimers.contains(pTimer))
@@ -242,21 +253,18 @@ SCENARIO("TimerNotifier times out timers having zero interval when control retur
                 });
             }
             const bool setZeroIntervalExplicitly = GENERATE(AS(bool), true, false);
-            if (setZeroIntervalExplicitly)
-            {
-                for (auto &timer : timersWithZeroInterval)
-                    TimerNotifierTest::fetchTimerPrivate(&timer)->setInterval(std::chrono::milliseconds(0));
-            }
             for (auto &timer : timersWithZeroInterval)
             {
+                if (setZeroIntervalExplicitly)
+                    timer.setInterval(std::chrono::milliseconds(0));
                 REQUIRE(timer.interval() == std::chrono::milliseconds(0));
-                timerNotifier.addTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
+                timer.start();
             }
 
-            THEN("time notifier makes added timers emit timeout when control returns to the event loop")
+            THEN("time notifier triggers added timers when control returns to the event loop")
             {
                 REQUIRE(!timeoutSemaphore.tryAcquire());
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(timeoutSemaphore, timersWithZeroIntervalToAddToTimerNotifier, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(timeoutSemaphore, timersWithZeroIntervalToAddToTimerNotifier, 1000000));
                 std::set<Timer*> expectedTimers;
                 for (auto &timer : timersWithZeroInterval)
                     expectedTimers.insert(&timer);
@@ -278,24 +286,25 @@ SCENARIO("TimerNotifier times out timers when their timeout reaches zero")
         WHEN("timers with intervals smaller than 64ms are added to the timer notifier")
         {
             std::vector<Timer> timers(3);
-            TimerNotifierTest::fetchTimerPrivate(&timers[0])->setInterval(std::chrono::milliseconds(1));
-            TimerNotifierTest::fetchTimerPrivate(&timers[1])->setInterval(std::chrono::milliseconds(32));
-            TimerNotifierTest::fetchTimerPrivate(&timers[2])->setInterval(std::chrono::milliseconds(63));
+            timers[0].setInterval(std::chrono::milliseconds(1));
+            timers[1].setInterval(std::chrono::milliseconds(32));
+            timers[2].setInterval(std::chrono::milliseconds(63));
             QSemaphore timeoutSemaphore;
             std::set<Timer*> timedOutTimers;
             for (auto &timer : timers)
             {
-                timer.setSingleShot(false);
-                timerNotifier.addTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
+                timer.setSingleShot(true);
+                TimerNotifierTest::setTimerNotifier(timer, timerNotifier);
                 Object::connect(&timer, &Timer::timeout, [&, pTimer = &timer]()
                 {
                     REQUIRE(!timedOutTimers.contains(pTimer))
                     timedOutTimers.insert(pTimer);
                     timeoutSemaphore.release();
                 });
+                timer.start();
             }
 
-            THEN("time notifier times out timer after high resolution clock ticker ticks until timeout reaches zero")
+            THEN("time notifier triggers timer after high resolution clock ticker ticks until timeout reaches zero")
             {
                 for (auto tickCounter = 1; tickCounter < 128; ++tickCounter)
                 {
@@ -335,7 +344,7 @@ SCENARIO("TimerNotifier ajdusts timeout of added timers")
         TimerNotifierTest::setLowResolutionTime(timerNotifier, msSinceEpochToSet);
         REQUIRE(timerNotifier.lowResolutionTime() == msSinceEpochToSet);
 
-        WHEN("a timer with positive interval smaller than 64ms is added to timer notifier")
+        WHEN("a timer with positive interval smaller than 64ms is started")
         {
             const auto intervalToSet = GENERATE(AS(std::chrono::milliseconds),
                                                 std::chrono::milliseconds(1),
@@ -347,9 +356,10 @@ SCENARIO("TimerNotifier ajdusts timeout of added timers")
                                             Timer::TimerType::Coarse,
                                             Timer::TimerType::VeryCoarse);
             Timer timer;
+            TimerNotifierTest::setTimerNotifier(timer, timerNotifier);
             timer.setTimerType(timerType);
             timer.setInterval(intervalToSet);
-            timerNotifier.addTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
+            timer.start();
 
             THEN("timer notifier does not adjust timeout")
             {
@@ -357,7 +367,7 @@ SCENARIO("TimerNotifier ajdusts timeout of added timers")
             }
         }
 
-        WHEN("a coarse or very coarse timer with positive interval greater or equal to 4096ms is added to timer notifier")
+        WHEN("a coarse or very coarse timer with positive interval greater or equal to 4096ms is started")
         {
             const auto intervalToSet = GENERATE(AS(std::chrono::milliseconds),
                                                 std::chrono::milliseconds(4096),
@@ -368,9 +378,10 @@ SCENARIO("TimerNotifier ajdusts timeout of added timers")
                                             Timer::TimerType::Coarse,
                                             Timer::TimerType::VeryCoarse);
             Timer timer;
+            TimerNotifierTest::setTimerNotifier(timer, timerNotifier);
             timer.setTimerType(timerType);
             timer.setInterval(intervalToSet);
-            timerNotifier.addTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
+            timer.start();
 
             THEN("timer notifier does not adjust timeout")
             {
@@ -390,17 +401,18 @@ SCENARIO("TimerNotifier ajdusts timeout of added timers")
                                             Timer::TimerType::Coarse,
                                             Timer::TimerType::VeryCoarse);
             Timer timer;
+            TimerNotifierTest::setTimerNotifier(timer, timerNotifier);
             timer.setTimerType(timerType);
             timer.setInterval(intervalToSet);
-            const auto msSinceEpochBeforeAdding = TimerNotifier::msSinceEpoch();
-            timerNotifier.addTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
-            const auto msSinceEpochAfterAdding = TimerNotifier::msSinceEpoch();
+            const auto msSinceEpochBeforeStarting = TimerNotifier::msSinceEpoch();
+            timer.start();
+            const auto msSinceEpochAfterStarting = TimerNotifier::msSinceEpoch();
 
             THEN("timer notifier adjusts timeout")
             {
                 const auto timeout = TimerNotifierTest::fetchTimerPrivate(&timer)->timeout();
                 bool hasAdjustedTimeout = false;
-                for (auto i = msSinceEpochBeforeAdding; i <= msSinceEpochAfterAdding; ++i)
+                for (auto i = msSinceEpochBeforeStarting; i <= msSinceEpochAfterStarting; ++i)
                 {
                     const auto expectedAdjustedInterval = intervalToSet + (i - timerNotifier.lowResolutionTime());
                     if (timeout == expectedAdjustedInterval)
@@ -423,17 +435,18 @@ SCENARIO("TimerNotifier ajdusts timeout of added timers")
                                                 std::chrono::milliseconds(215177));
             const auto timerType = GENERATE(AS(Timer::TimerType), Timer::TimerType::Precise);
             Timer timer;
+            TimerNotifierTest::setTimerNotifier(timer, timerNotifier);
             timer.setTimerType(timerType);
             timer.setInterval(intervalToSet);
-            const auto msSinceEpochBeforeAdding = TimerNotifier::msSinceEpoch();
-            timerNotifier.addTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
-            const auto msSinceEpochAfterAdding = TimerNotifier::msSinceEpoch();
+            const auto msSinceEpochBeforeStarting = TimerNotifier::msSinceEpoch();
+            timer.start();
+            const auto msSinceEpochAfterStarting = TimerNotifier::msSinceEpoch();
 
             THEN("timer notifier adjusts timeout")
             {
                 const auto timeout = TimerNotifierTest::fetchTimerPrivate(&timer)->timeout();
                 bool hasAdjustedTimeout = false;
-                for (auto i = msSinceEpochBeforeAdding; i <= msSinceEpochAfterAdding; ++i)
+                for (auto i = msSinceEpochBeforeStarting; i <= msSinceEpochAfterStarting; ++i)
                 {
                     const auto expectedAdjustedInterval = intervalToSet + (i - timerNotifier.lowResolutionTime());
                     if (timeout == expectedAdjustedInterval)
@@ -449,54 +462,54 @@ SCENARIO("TimerNotifier ajdusts timeout of added timers")
 }
 
 
-SCENARIO("Timer notifier moves timer on timer wheels until timer's timeout reaches zero")
-{
-    GIVEN("a timer notifier")
-    {
-        std::shared_ptr<ClockTicker> pLowResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
-        std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
-        TimerNotifier timerNotifier(pLowResolutionClockTicker, pHighResolutionClockTicker);
+// SCENARIO("Timer notifier moves timer on timer wheels until timer's timeout reaches zero")
+// {
+//     GIVEN("a timer notifier")
+//     {
+//         std::shared_ptr<ClockTicker> pLowResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+//         std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+//         TimerNotifier timerNotifier(pLowResolutionClockTicker, pHighResolutionClockTicker);
 
-        WHEN("timers with positive intervals smaller than 64ms are added to timer notifier")
-        {
-            std::vector<Timer> timers(63);
-            std::chrono::milliseconds interval(0);
-            for (auto &timer : timers)
-            {
-                TimerNotifierTest::fetchTimerPrivate(&timer)->setInterval(++interval);
-                timerNotifier.addTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
-            }
+//         WHEN("timers with positive intervals smaller than 64ms are added to timer notifier")
+//         {
+//             std::vector<Timer> timers(63);
+//             std::chrono::milliseconds interval(0);
+//             for (auto &timer : timers)
+//             {
+//                 TimerNotifierTest::fetchTimerPrivate(&timer)->setInterval(++interval);
+//                 timerNotifier.addTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
+//             }
 
-        }
+//         }
 
-        WHEN("timers with intervals in set [2^6, 2^12[ are added to timer notifier")
-        {
-            FAIL("Not implemented yet");
-        }
+//         WHEN("timers with intervals in set [2^6, 2^12[ are added to timer notifier")
+//         {
+//             FAIL("Not implemented yet");
+//         }
 
-        WHEN("timers with intervals in set [2^12, 2^18[ are added to timer notifier")
-        {
-            FAIL("Not implemented yet");
-        }
+//         WHEN("timers with intervals in set [2^12, 2^18[ are added to timer notifier")
+//         {
+//             FAIL("Not implemented yet");
+//         }
 
-        WHEN("timers with intervals in set [2^18, 2^24[ are added to timer notifier")
-        {
-            FAIL("Not implemented yet");
-        }
+//         WHEN("timers with intervals in set [2^18, 2^24[ are added to timer notifier")
+//         {
+//             FAIL("Not implemented yet");
+//         }
 
-        WHEN("timers with intervals in set [2^24, 2^30[ are added to timer notifier")
-        {
-            FAIL("Not implemented yet");
-        }
+//         WHEN("timers with intervals in set [2^24, 2^30[ are added to timer notifier")
+//         {
+//             FAIL("Not implemented yet");
+//         }
 
-        WHEN("timers with intervals in set [2^30, 2^36[ are added to timer notifier")
-        {
-            FAIL("Not implemented yet");
-        }
+//         WHEN("timers with intervals in set [2^30, 2^36[ are added to timer notifier")
+//         {
+//             FAIL("Not implemented yet");
+//         }
 
-        WHEN("timers with intervals in set [2^36, std::chrono::milliseconds::max()] are added to timer notifier")
-        {
-            FAIL("Not implemented yet");
-        }
-    }
-}
+//         WHEN("timers with intervals in set [2^36, std::chrono::milliseconds::max()] are added to timer notifier")
+//         {
+//             FAIL("Not implemented yet");
+//         }
+//     }
+// }

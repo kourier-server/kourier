@@ -16,15 +16,37 @@
 //
 
 #include "TimerPrivate_epoll.h"
-#include "EpollEventNotifier.h"
+#include "TimerNotifier.h"
+#include "NoDestroy.h"
 #include <QDateTime>
 
 
 namespace Kourier
 {
 
+class TimerNotifierDisabler
+{
+public:
+    TimerNotifierDisabler(TimerNotifier *pTimerNotifier) : m_pTimerNotifier(pTimerNotifier)
+    {
+        if (!m_pTimerNotifier)
+            qFatal("Failed to setup time notifier disabler. Given timer notifier is null.");
+    }
+    ~TimerNotifierDisabler() {m_pTimerNotifier->disable();}
+
+private:
+    TimerNotifier * const m_pTimerNotifier;
+};
+
+static TimerNotifier* currentTimerNotifier()
+{
+    static thread_local NoDestroy<TimerNotifier> timerNotifier;
+    static thread_local TimerNotifierDisabler timerNotifierDisabler(&timerNotifier());
+    return &(timerNotifier());
+}
+
 TimerPrivate::TimerPrivate() :
-    m_pEventNotifier(EpollEventNotifier::current())
+    m_pTimerNotifier(currentTimerNotifier())
 {
     m_listNode.pTimer = this;
 }
@@ -47,12 +69,12 @@ void TimerPrivate::activateTimer(std::chrono::milliseconds interval)
 {
     m_interval = interval;
     m_timeout = m_interval;
-    m_pEventNotifier->registerTimer(this);
+    m_pTimerNotifier->addTimer(this);
 }
 
 void TimerPrivate::deactivateTimer()
 {
-    m_pEventNotifier->unregisterTimer(this);
+    m_pTimerNotifier->removeTimer(this);
 }
 
 void TimerPrivate::processTimeout()

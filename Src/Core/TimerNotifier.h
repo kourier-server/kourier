@@ -64,6 +64,7 @@ private:
     }
     void onEvent(uint32_t epollEvents) override;
     void notifyTimers();
+    void disable();
 
 private:
     static constexpr uint64_t maxTimeout = (int64_t(1) << 42) - 1;
@@ -82,7 +83,9 @@ private:
     int64_t m_eventFd = -1;
     bool m_eventIsSet = false;
     bool m_isNotifyingTimers = false;
+    bool m_isEnabled = true;
     friend class Test::TimerNotifier::TimerNotifierTest;
+    friend class TimerNotifierDisabler;
 };
 
 }
