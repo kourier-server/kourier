@@ -447,3 +447,56 @@ SCENARIO("TimerNotifier ajdusts timeout of added timers")
         }
     }
 }
+
+
+SCENARIO("Timer notifier moves timer on timer wheels until timer's timeout reaches zero")
+{
+    GIVEN("a timer notifier")
+    {
+        std::shared_ptr<ClockTicker> pLowResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+        std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+        TimerNotifier timerNotifier(pLowResolutionClockTicker, pHighResolutionClockTicker);
+
+        WHEN("timers with positive intervals smaller than 64ms are added to timer notifier")
+        {
+            std::vector<Timer> timers(63);
+            std::chrono::milliseconds interval(0);
+            for (auto &timer : timers)
+            {
+                TimerNotifierTest::fetchTimerPrivate(&timer)->setInterval(++interval);
+                timerNotifier.addTimer(TimerNotifierTest::fetchTimerPrivate(&timer));
+            }
+
+        }
+
+        WHEN("timers with intervals in set [2^6, 2^12[ are added to timer notifier")
+        {
+            FAIL("Not implemented yet");
+        }
+
+        WHEN("timers with intervals in set [2^12, 2^18[ are added to timer notifier")
+        {
+            FAIL("Not implemented yet");
+        }
+
+        WHEN("timers with intervals in set [2^18, 2^24[ are added to timer notifier")
+        {
+            FAIL("Not implemented yet");
+        }
+
+        WHEN("timers with intervals in set [2^24, 2^30[ are added to timer notifier")
+        {
+            FAIL("Not implemented yet");
+        }
+
+        WHEN("timers with intervals in set [2^30, 2^36[ are added to timer notifier")
+        {
+            FAIL("Not implemented yet");
+        }
+
+        WHEN("timers with intervals in set [2^36, std::chrono::milliseconds::max()] are added to timer notifier")
+        {
+            FAIL("Not implemented yet");
+        }
+    }
+}
