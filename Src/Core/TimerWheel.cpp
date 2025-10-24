@@ -35,7 +35,7 @@ bool TimerWheel::addTimer(TimerPrivate *pTimer)
     {
         ++m_timerCount;
         pTimer->m_pTimerWheel = this;
-        pTimer->m_idxTimerWheelSlot = getSlotIdx(pTimer);
+        pTimer->m_idxTimerWheelSlot = getSlotIdx(pTimer->timeout());
         m_slots[pTimer->m_idxTimerWheelSlot].pushFront(pTimer);
         return true;
     }

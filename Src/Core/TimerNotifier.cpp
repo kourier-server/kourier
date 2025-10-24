@@ -75,6 +75,8 @@ TimerNotifier::~TimerNotifier()
 void TimerNotifier::addTimer(TimerPrivate *pTimer)
 {
     assert(pTimer);
+    if (!m_isEnabled) [[unlikely]]
+        return;
     const uint8_t wheelIdxMap[42] = {0,0,0,0,0,0,
                                      1,1,1,1,1,1,
                                      2,2,2,2,2,2,
@@ -82,8 +84,6 @@ void TimerNotifier::addTimer(TimerPrivate *pTimer)
                                      4,4,4,4,4,4,
                                      5,5,5,5,5,5,
                                      6,6,6,6,6,6};
-    if (!m_isEnabled) [[unlikely]]
-        return;
     auto timeout = pTimer->interval();
     if (timeout.count() > 0) [[likely]]
     {
@@ -103,8 +103,8 @@ void TimerNotifier::addTimer(TimerPrivate *pTimer)
                 break;
         }
     }
-    auto * const pTimerWheel = &m_timerWheels[wheelIdxMap[std::countr_zero<uint64_t>(std::bit_floor<uint64_t>(pTimer->timeout().count()))]];
-    const auto idxSlot = pTimerWheel->getSlotIdx(pTimer);
+    auto * const pTimerWheel = &(m_timerWheels[wheelIdxMap[std::countr_zero<uint64_t>(std::bit_floor<uint64_t>(timeout.count()))]]);
+    const auto idxSlot = pTimerWheel->getSlotIdx(timeout);
     if (pTimer->m_state == TimerPrivate::State::Active)
     {
         if (timeout == pTimer->m_timeout
