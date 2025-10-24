@@ -60,7 +60,6 @@ void TimerPrivate::setInterval(std::chrono::milliseconds interval)
         break;
     case State::Inactive:
         m_interval = interval;
-        m_timeout = m_interval;
         break;
     }
 }
@@ -68,7 +67,6 @@ void TimerPrivate::setInterval(std::chrono::milliseconds interval)
 void TimerPrivate::activateTimer(std::chrono::milliseconds interval)
 {
     m_interval = interval;
-    m_timeout = m_interval;
     m_pTimerNotifier->addTimer(this);
 }
 
