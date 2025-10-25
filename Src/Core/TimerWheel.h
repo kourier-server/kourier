@@ -40,6 +40,7 @@ public:
     bool removeTimer(TimerPrivate *pTimer);
     TimerList tick();
     inline size_t getSlotIdx(std::chrono::milliseconds timeout) {return (((uint64_t)timeout.count() >> m_resolutionExponent) + m_idxLastTimersToExpire) & 63;}
+    inline uint64_t timerCount() const {return m_timerCount;}
 
 private:
     static std::chrono::milliseconds adjustResolution(std::chrono::milliseconds resolution);

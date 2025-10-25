@@ -41,9 +41,12 @@ public:
     inline bool isActive() const {return m_state == State::Active;}
     inline bool isSingleShot() const {return m_isSingleShot || m_interval.count() == 0;}
     inline void setSingleShot(bool singleShot) {m_isSingleShot = singleShot;}
-    inline std::chrono::milliseconds interval() const {return m_interval;}
-    inline std::chrono::milliseconds timeout() const {return m_timeout;}
     void setInterval(std::chrono::milliseconds interval);
+    inline std::chrono::milliseconds interval() const {return m_interval;}
+    inline void setTimeout(std::chrono::milliseconds timeout) {m_timeout = timeout;}
+    inline std::chrono::milliseconds timeout() const {return m_timeout;}
+    inline void setExtraTimeout(std::chrono::milliseconds extraTimeout) {m_extraTimeout = extraTimeout;}
+    inline std::chrono::milliseconds extraTimeout() const {return m_extraTimeout;}
     inline void setTimerType(Timer::TimerType timerType) {m_timerType = timerType;}
     inline Timer::TimerType timerType() const {return m_timerType;}
 
@@ -60,6 +63,7 @@ private:
     size_t m_idxTimerWheelSlot = 0;
     std::chrono::milliseconds m_interval = std::chrono::milliseconds(0);
     std::chrono::milliseconds m_timeout = std::chrono::milliseconds(0);
+    std::chrono::milliseconds m_extraTimeout = std::chrono::milliseconds(0);
     TimerNotifier *m_pTimerNotifier;
     bool m_isSingleShot = false;
     enum class State : uint8_t {Active, Inactive};
