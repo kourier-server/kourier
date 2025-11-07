@@ -26,7 +26,6 @@
 using Kourier::TimerNotifier;
 using Kourier::Timer;
 using Kourier::TimerPrivate;
-using Kourier::TimerList;
 using Kourier::ClockTicker;
 using Kourier::Object;
 using Spectator::SemaphoreAwaiter;
