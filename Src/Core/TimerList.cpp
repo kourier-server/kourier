@@ -25,9 +25,15 @@ void TimerList::swap(TimerList &other)
 {
     if (this != &other) [[likely]]
     {
-        TimerList temp = *this;
-        *this = other;
-        other = temp;
+        TimerListNode *pHead = m_pHead;
+        TimerListNode *pTail = m_pTail;
+        uint64_t size = m_size;
+        m_pHead = other.m_pHead;
+        m_pTail = other.m_pTail;
+        m_size = other.m_size;
+        other.m_pHead = pHead;
+        other.m_pTail = pTail;
+        other.m_size = size;
     }
 }
 
@@ -49,20 +55,23 @@ void TimerList::pushFront(TimerPrivate *pTimer)
     ++m_size;
 }
 
-void TimerList::pushFront(TimerList timers)
+void TimerList::pushFront(TimerList &timers)
 {
     if (this != &timers) [[likely]]
     {
         if (timers.isEmpty()) [[unlikely]]
             return;
         else if (isEmpty()) [[unlikely]]
-            *this = timers;
+            this->swap(timers);
         else [[likely]]
         {
             timers.m_pTail->pNext = m_pHead;
             m_pHead->pPrevious = timers.m_pTail;
             m_pHead = timers.m_pHead;
             m_size += timers.m_size;
+            timers.m_pHead = nullptr;
+            timers.m_pTail = nullptr;
+            timers.m_size = 0;
         }
     }
 }

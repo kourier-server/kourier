@@ -29,12 +29,15 @@ class TimerList
 {
 public:
     TimerList() = default;
-    ~TimerList() = default;
+    TimerList(const TimerList&) = delete;
+    ~TimerList() {clear();}
+    TimerList &operator=(const TimerList&) = delete;
     void swap(TimerList &other);
     void pushFront(TimerPrivate *pTimer);
-    void pushFront(TimerList timers);
+    void pushFront(TimerList &timers);
     void remove(TimerPrivate *pTimer);
     TimerPrivate *popFirst();
+    void clear() {while (!isEmpty()) {popFirst();}}
     inline bool isEmpty() const {return m_size == 0;}
     inline uint64_t size() const {return m_size;}
     inline TimerListIterator begin() {return {m_pHead};}

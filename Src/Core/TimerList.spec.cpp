@@ -53,6 +53,7 @@ SCENARIO("TimerList stores added timers")
                     addedTimers.insert(timerList.popFirst());
                     REQUIRE(previousSize == (timerList.size() + 1));
                 }
+                REQUIRE(timerList.isEmpty());
                 REQUIRE(addedTimers == timersToAdd);
             }
         }
@@ -122,8 +123,9 @@ SCENARIO("TimerList allows insertion of lists")
         {
             secondTimersList.pushFront(firstTimersList);
 
-            THEN("second timers list pushes first timers list to the front")
+            THEN("second timers list pushes first timers list to the front and makes first timers list empty")
             {
+                REQUIRE(firstTimersList.isEmpty());
                 std::list<TimerPrivate*> expectedList;
                 for (auto i = 0; i < secondTimersCount; ++i)
                     expectedList.push_front(&secondTimers[i]);

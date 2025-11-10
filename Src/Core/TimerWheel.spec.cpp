@@ -16,12 +16,14 @@
 //
 
 #include "TimerWheel.h"
+#include "Core/TimerList.h"
 #include "TimerPrivate_epoll.h"
 #include <Spectator.h>
 #include <vector>
 
 using Kourier::TimerWheel;
 using Kourier::TimerPrivate;
+using Kourier::TimerList;
 
 
 SCENARIO("TimerWheel ajusts given resolution")
@@ -181,8 +183,9 @@ SCENARIO("Timer wheel returns expired timers on tick")
                                          std::chrono::milliseconds(int64_t(1) << 36));
         TimerWheel timerWheel(resolution);
         const auto previousTickCount = GENERATE(AS(size_t), 0, 12, 70);
+        TimerList expiredTimers;
         for (auto i = 0; i < previousTickCount; ++i)
-            timerWheel.tick();
+            timerWheel.tick(expiredTimers);
 
         WHEN("three timers are added to a slot")
         {
@@ -203,9 +206,12 @@ SCENARIO("Timer wheel returns expired timers on tick")
             {
                 for (auto i = 0; i < slotIndex - 1; ++i)
                 {
-                    REQUIRE(timerWheel.tick().isEmpty());
+                    TimerList expiredTimers;
+                    timerWheel.tick(expiredTimers);
+                    REQUIRE(expiredTimers.isEmpty());
                 }
-                auto expiredTimers = timerWheel.tick();
+                TimerList expiredTimers;
+                timerWheel.tick(expiredTimers);
                 REQUIRE(!expiredTimers.isEmpty());
                 REQUIRE(timerWheel.isEmpty());
 
@@ -225,8 +231,9 @@ SCENARIO("Timer wheel returns expired timers on tick")
     {
         TimerWheel timerWheel(std::chrono::milliseconds(1));
         const auto previousTickCount = GENERATE(AS(size_t), 0, 12, 70);
+        TimerList expiredTimers;
         for (auto i = 0; i < previousTickCount; ++i)
-            timerWheel.tick();
+            timerWheel.tick(expiredTimers);
 
         WHEN("a timer with an interval of 60ms is added to the timer wheel")
         {
@@ -241,7 +248,9 @@ SCENARIO("Timer wheel returns expired timers on tick")
                 {
                     for (auto i = 0; i < 55; ++i)
                     {
-                        REQUIRE(timerWheel.tick().isEmpty());
+                        TimerList expiredTimers;
+                        timerWheel.tick(expiredTimers);
+                        REQUIRE(expiredTimers.isEmpty());
                     }
                     TimerPrivate timer5ms;
                     timer5ms.setInterval(std::chrono::milliseconds(5));
@@ -251,9 +260,12 @@ SCENARIO("Timer wheel returns expired timers on tick")
                     {
                         for (auto i = 0; i < 4; ++i)
                         {
-                            REQUIRE(timerWheel.tick().isEmpty());
+                            TimerList expiredTimers;
+                            timerWheel.tick(expiredTimers);
+                            REQUIRE(expiredTimers.isEmpty());
                         }
-                        auto timerList = timerWheel.tick();
+                        TimerList timerList;
+                        timerWheel.tick(timerList);
                         REQUIRE(timerList.size() == 2);
                         auto *pFirstTimer = timerList.popFirst();
                         auto *pSecondTimer = timerList.popFirst();

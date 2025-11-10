@@ -54,13 +54,14 @@ private:
     void onLowResolutionTick();
     void onHighResolutionTick();
     inline void setHighResolutionClockTickerEnabled(bool enabled) {m_pHighResolutionClockTicker->setEnabled(enabled);}
-    inline void processExpiredTimers(TimerList expiredTimers)
+    inline void processExpiredTimers(TimerList &expiredTimers)
     {
-        for (auto it = expiredTimers.begin(); it != expiredTimers.end(); ++it)
+        while (!expiredTimers.isEmpty())
         {
-            it.timer()->setTimeout(it.timer()->timeout() + it.timer()->extraTimeout());
-            it.timer()->setExtraTimeout(std::chrono::milliseconds(0));
-            addAdjustedTimer(it.timer());
+            auto *pTimer = expiredTimers.popFirst();
+            pTimer->setTimeout(pTimer->timeout() + pTimer->extraTimeout());
+            pTimer->setExtraTimeout(std::chrono::milliseconds(0));
+            addAdjustedTimer(pTimer);
         }
     }
     void set();

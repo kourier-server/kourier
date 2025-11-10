@@ -38,7 +38,7 @@ public:
     bool addTimer(TimerPrivate *pTimer);
     inline bool contains(TimerPrivate *pTimer) {return (pTimer && pTimer->m_pTimerWheel == this);}
     bool removeTimer(TimerPrivate *pTimer);
-    TimerList tick();
+    void tick(TimerList &expiredTimers);
     inline size_t getSlotIdx(std::chrono::milliseconds timeout) {return (((uint64_t)timeout.count() >> m_resolutionExponent) + m_idxLastTimersToExpire) & 63;}
     inline uint64_t timerCount() const {return m_timerCount;}
 

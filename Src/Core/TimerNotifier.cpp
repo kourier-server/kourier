@@ -169,13 +169,18 @@ void Kourier::TimerNotifier::onLowResolutionTick()
                                      6,6,6,6,6,6};
     const auto largestWheelToTick = wheelIdxMap[std::countr_zero<uint64_t>(std::bit_floor<uint64_t>(m_lowResolutionTickCounter << 6))];
     for (auto i = largestWheelToTick; i > 0; --i)
-        processExpiredTimers(m_timerWheels[i].tick());
+    {
+        TimerList expiredTimers;
+        m_timerWheels[i].tick(expiredTimers);
+        processExpiredTimers(expiredTimers);
+    }
     setHighResolutionClockTickerEnabled(!m_timerWheels[0].isEmpty());
 }
 
 void TimerNotifier::onHighResolutionTick()
 {
-    auto expiredTimers = m_timerWheels[0].tick();
+    TimerList expiredTimers;
+    m_timerWheels[0].tick(expiredTimers);
     setHighResolutionClockTickerEnabled(!m_timerWheels[0].isEmpty());
     if (!expiredTimers.isEmpty())
     {
