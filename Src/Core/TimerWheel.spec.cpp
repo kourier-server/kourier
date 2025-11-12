@@ -185,7 +185,10 @@ SCENARIO("Timer wheel returns expired timers on tick")
         const auto previousTickCount = GENERATE(AS(size_t), 0, 12, 70);
         TimerList expiredTimers;
         for (auto i = 0; i < previousTickCount; ++i)
+        {
             timerWheel.tick(expiredTimers);
+            REQUIRE(expiredTimers.isEmpty());
+        }
 
         WHEN("three timers are added to a slot")
         {
@@ -233,7 +236,10 @@ SCENARIO("Timer wheel returns expired timers on tick")
         const auto previousTickCount = GENERATE(AS(size_t), 0, 12, 70);
         TimerList expiredTimers;
         for (auto i = 0; i < previousTickCount; ++i)
+        {
             timerWheel.tick(expiredTimers);
+            REQUIRE(expiredTimers.isEmpty());
+        }
 
         WHEN("a timer with an interval of 60ms is added to the timer wheel")
         {
