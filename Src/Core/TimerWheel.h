@@ -34,12 +34,12 @@ public:
     inline std::chrono::milliseconds resolution() const {return m_resolution;}
     inline std::chrono::milliseconds timeSpan() const {return m_timeSpan;}
     inline bool isEmpty() const {return m_timerCount == 0;}
-    inline bool canAdd(TimerPrivate *pTimer) {return (pTimer && m_resolution <= pTimer->m_timeout && pTimer->m_timeout < m_timeSpan);}
+    inline bool canAdd(TimerPrivate *pTimer) const {return (pTimer && m_resolution <= pTimer->m_timeout && pTimer->m_timeout <= m_timeSpan);}
     bool addTimer(TimerPrivate *pTimer);
-    inline bool contains(TimerPrivate *pTimer) {return (pTimer && pTimer->m_pTimerWheel == this);}
+    inline bool contains(TimerPrivate *pTimer) const {return (pTimer && pTimer->m_pTimerWheel == this);}
     bool removeTimer(TimerPrivate *pTimer);
     void tick(TimerList &expiredTimers);
-    inline size_t getSlotIdx(std::chrono::milliseconds timeout) {return (((uint64_t)timeout.count() >> m_resolutionExponent) + m_idxLastTimersToExpire) & 63;}
+    inline size_t getSlotIdx(std::chrono::milliseconds timeout) const {return ((((uint64_t)timeout.count() - 1ull) >> m_resolutionExponent) + m_idxNextTimersToExpire) & 63;}
     inline uint64_t timerCount() const {return m_timerCount;}
 
 private:
@@ -49,7 +49,7 @@ private:
     const std::chrono::milliseconds m_resolution = std::chrono::milliseconds(0);
     const std::chrono::milliseconds m_timeSpan = std::chrono::milliseconds(0);
     const uint64_t m_resolutionExponent = 0;
-    uint64_t m_idxLastTimersToExpire = 0;
+    uint64_t m_idxNextTimersToExpire = 0;
     uint64_t m_timerCount = 0;
     TimerList m_slots[64];
 };

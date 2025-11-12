@@ -59,16 +59,16 @@ bool TimerWheel::removeTimer(TimerPrivate *pTimer)
 
 void TimerWheel::tick(TimerList &expiredTimers)
 {
-    if (++m_idxLastTimersToExpire == 64) [[unlikely]]
-        m_idxLastTimersToExpire = 0;
     expiredTimers.clear();
-    expiredTimers.swap(m_slots[m_idxLastTimersToExpire]);
+    expiredTimers.swap(m_slots[m_idxNextTimersToExpire]);
+    if (++m_idxNextTimersToExpire == 64) [[unlikely]]
+        m_idxNextTimersToExpire = 0;
     m_timerCount -= expiredTimers.size();
     for (auto it = expiredTimers.begin(); it != expiredTimers.end(); ++it)
     {
         it.timer()->m_pTimerWheel = nullptr;
         it.timer()->m_idxTimerWheelSlot = 0;
-        it.timer()->m_timeout = std::chrono::milliseconds((uint64_t)it.timer()->m_timeout.count() & ((uint64_t)(m_resolution.count() - 1)));
+        it.timer()->m_timeout = std::chrono::milliseconds((uint64_t)it.timer()->m_timeout.count() & ((uint64_t)(m_resolution.count() - 1ull)));
     }
 }
 
