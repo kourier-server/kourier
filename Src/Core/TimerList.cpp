@@ -80,7 +80,10 @@ void TimerList::remove(TimerPrivate *pTimer)
 {
     assert(pTimer);
     if (m_pHead == &pTimer->m_listNode) [[unlikely]]
+    {
         popFirst();
+        return;
+    }
     else if (m_pTail == &pTimer->m_listNode) [[unlikely]]
     {
         m_pTail = m_pTail->pPrevious;

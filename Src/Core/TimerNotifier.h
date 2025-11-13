@@ -79,19 +79,19 @@ private:
     void disable();
 
 private:
-    static constexpr uint64_t maxTimeout = (int64_t(1) << 42) - 1;
+    static constexpr uint64_t maxTimeout = 1ull << 42;
     std::chrono::milliseconds m_lowResolutionTime = std::chrono::milliseconds(0);
     uint64_t m_lowResolutionTickCounter = 0;
     TimerList m_timersToNotify;
     std::shared_ptr<ClockTicker> m_pLowResolutionClockTicker;
     std::shared_ptr<ClockTicker> m_pHighResolutionClockTicker;
     TimerWheel m_timerWheels[7] = {TimerWheel(std::chrono::milliseconds(1)),
-                                   TimerWheel(std::chrono::milliseconds(uint64_t(1) << 6)),
-                                   TimerWheel(std::chrono::milliseconds(uint64_t(1) << 12)),
-                                   TimerWheel(std::chrono::milliseconds(uint64_t(1) << 18)),
-                                   TimerWheel(std::chrono::milliseconds(uint64_t(1) << 24)),
-                                   TimerWheel(std::chrono::milliseconds(uint64_t(1) << 30)),
-                                   TimerWheel(std::chrono::milliseconds(uint64_t(1) << 36))};
+                                   TimerWheel(std::chrono::milliseconds(1ull << 6)),
+                                   TimerWheel(std::chrono::milliseconds(1ull << 12)),
+                                   TimerWheel(std::chrono::milliseconds(1ull << 18)),
+                                   TimerWheel(std::chrono::milliseconds(1ull << 24)),
+                                   TimerWheel(std::chrono::milliseconds(1ull << 30)),
+                                   TimerWheel(std::chrono::milliseconds(1ull << 36))};
     int64_t m_eventFd = -1;
     bool m_eventIsSet = false;
     bool m_isNotifyingTimers = false;
