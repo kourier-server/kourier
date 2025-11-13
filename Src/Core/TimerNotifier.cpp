@@ -103,7 +103,7 @@ void TimerNotifier::addTimer(TimerPrivate *pTimer)
                                          4,4,4,4,4,4,
                                          5,5,5,5,5,5,
                                          6,6,6,6,6,6};
-        auto * const pTimerWheel = &(m_timerWheels[wheelIdxMap[std::countr_zero<uint64_t>(std::bit_floor<uint64_t>(pTimer->timeout().count() - 1ull))]]);
+        auto * const pTimerWheel = &(m_timerWheels[wheelIdxMap[std::countr_zero<uint64_t>(std::bit_floor<uint64_t>(std::max<uint64_t>(1ull, pTimer->timeout().count() - 1ull)))]]);
         const auto idxSlot = pTimerWheel->getSlotIdx(pTimer->timeout());
         pTimer->setExtraTimeout(pTimer->extraTimeout() + std::chrono::milliseconds((m_lowResolutionTickCounter << 6) & (pTimerWheel->resolution().count() - 1)));
         if (pTimer->m_state == TimerPrivate::State::Active
@@ -151,7 +151,7 @@ void TimerNotifier::addAdjustedTimer(TimerPrivate *pTimer)
         pTimer->timeout() = std::chrono::milliseconds(maxTimeout);
         pTimer->setExtraTimeout(std::chrono::milliseconds(0));
     }
-    m_timerWheels[wheelIdxMap[std::countr_zero<uint64_t>(std::bit_floor<uint64_t>(pTimer->timeout().count() - 1ull))]].addTimer(pTimer);
+    m_timerWheels[wheelIdxMap[std::countr_zero<uint64_t>(std::bit_floor<uint64_t>(std::max<uint64_t>(1ull, pTimer->timeout().count() - 1ull)))]].addTimer(pTimer);
     setHighResolutionClockTickerEnabled(!m_timerWheels[0].isEmpty());
 }
 

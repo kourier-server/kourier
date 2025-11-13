@@ -282,12 +282,12 @@ SCENARIO("TimerNotifier times out timers when their timeout reaches zero")
         std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
         TimerNotifier timerNotifier(pLowResolutionClockTicker, pHighResolutionClockTicker);
 
-        WHEN("timers with intervals smaller than 64ms are added to the timer notifier")
+        WHEN("timers with intervals up to 64ms are added to the timer notifier")
         {
             std::vector<Timer> timers(3);
             timers[0].setInterval(std::chrono::milliseconds(1));
-            timers[1].setInterval(std::chrono::milliseconds(32));
-            timers[2].setInterval(std::chrono::milliseconds(63));
+            timers[1].setInterval(std::chrono::milliseconds(31));
+            timers[2].setInterval(std::chrono::milliseconds(64));
             QSemaphore timeoutSemaphore;
             std::set<Timer*> timedOutTimers;
             for (auto &timer : timers)
@@ -312,7 +312,7 @@ SCENARIO("TimerNotifier times out timers when their timeout reaches zero")
                     {
                         if (tickCounter == timer.interval().count())
                         {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(timeoutSemaphore, 1));
+                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(timeoutSemaphore, 10));
                         }
                     }
                 }

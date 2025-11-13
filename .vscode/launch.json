@@ -9,7 +9,7 @@
             "type": "lldb-dap",
             "request": "launch",
             "program": "${command:cmake.launchTargetPath}",
-            "args": ["-s", "TimerNotifier times out timers having zero interval when control returns to the event loop"],
+            "args": ["-s", "TimerNotifier times out timers when their timeout reaches zero"],
             "env": [],
             "cwd": "${workspaceRoot}",
             "internalConsoleOptions": "openOnSessionStart",
