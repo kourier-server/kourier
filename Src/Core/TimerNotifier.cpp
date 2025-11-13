@@ -159,14 +159,14 @@ void Kourier::TimerNotifier::onLowResolutionTick()
 {
     m_lowResolutionTime += std::chrono::milliseconds(64);
     ++m_lowResolutionTickCounter;
-    const uint8_t wheelIdxMap[42] = {0,0,0,0,0,0,
+    const uint8_t wheelIdxMap[64] = {0,0,0,0,0,0,
                                      1,1,1,1,1,1,
                                      2,2,2,2,2,2,
                                      3,3,3,3,3,3,
                                      4,4,4,4,4,4,
                                      5,5,5,5,5,5,
-                                     6,6,6,6,6,6};
-    const auto largestWheelIdxToTick = wheelIdxMap[std::countr_zero<uint64_t>(std::bit_floor<uint64_t>(m_lowResolutionTickCounter << 6))];
+                                     6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6};
+    const auto largestWheelIdxToTick = wheelIdxMap[std::countr_zero<uint64_t>(m_lowResolutionTickCounter << 6)];
     TimerList expiredTimers;
     for (auto i = largestWheelIdxToTick; i > 0; --i)
     {

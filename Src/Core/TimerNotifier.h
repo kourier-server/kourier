@@ -41,13 +41,6 @@ public:
     inline std::chrono::milliseconds lowResolutionTime() const {return m_lowResolutionTime;}
     int64_t fileDescriptor() const override {return m_eventFd;}
     inline static std::chrono::milliseconds msSinceEpoch() {return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch());}
-    inline uint64_t timerCount(size_t wheelIdx) const
-    {
-        if (wheelIdx < 7) [[likely]]
-            return m_timerWheels[wheelIdx].timerCount();
-        else [[unlikely]]
-            return 0;
-    }
 
 private:
     void addAdjustedTimer(TimerPrivate *pTimer);

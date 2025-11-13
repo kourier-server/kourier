@@ -20,10 +20,12 @@
 #include "TimerPrivate_epoll.h"
 #include <Spectator.h>
 #include <QSemaphore>
+#include <chrono>
 #include <vector>
 #include <set>
 
 using Kourier::TimerNotifier;
+using Kourier::TimerWheel;
 using Kourier::Timer;
 using Kourier::TimerPrivate;
 using Kourier::ClockTicker;
@@ -39,6 +41,8 @@ namespace Test::TimerNotifier
         inline static TimerPrivate *fetchTimerPrivate(Timer *pTimer) {return pTimer->d_ptr.get();}
         inline static void setTimerNotifier(Timer &timer, class TimerNotifier &timerNotifier) {timer.d_ptr->m_pTimerNotifier = &timerNotifier;}
         inline static void setLowResolutionTime(class TimerNotifier &timerNotifer, std::chrono::milliseconds time) {timerNotifer.m_lowResolutionTime = time;}
+        inline static TimerWheel &timerWheel(class TimerNotifier &timerNotifier, size_t idx) {REQUIRE(idx < 7); return timerNotifier.m_timerWheels[idx];}
+        inline static void setLowResolutionTickCounter(class TimerNotifier &timerNotifier, uint64_t tickCount) {timerNotifier.m_lowResolutionTickCounter += tickCount; timerNotifier.m_lowResolutionTime += std::chrono::milliseconds(tickCount << 6);}
     };
 }
 
@@ -467,7 +471,56 @@ SCENARIO("TimerNotifier ajdusts timeout of added timers")
 }
 
 
-SCENARIO("Timer notifier moves timer on timer wheels until timer's timeout reaches zero")
+SCENARIO("TimerNotifier ticks all timer wheels having a resolution that is a multiple of the elapsed time whenever the low resolution clock ticker ticks")
+{
+    GIVEN("a time notifier")
+    {
+        std::shared_ptr<ClockTicker> pLowResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+        std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+        TimerNotifier timerNotifier(pLowResolutionClockTicker, pHighResolutionClockTicker);
+
+        WHEN("low resolution clock ticker ticks")
+        {
+            THEN("timer notifier ticks all wheels whose resolution are a multiple of the elapsed time")
+            {
+                const auto initialElapsedTime = GENERATE(AS(uint64_t),
+                                                        0,
+                                                        (1ull << 6) - 64,
+                                                        (1ull << 12) - 64,
+                                                        (1ull << 18) - 64,
+                                                        (1ull << 24) - 64,
+                                                        (1ull << 30) - 64,
+                                                        (1ull << 36) - 64,
+                                                        (1ull << 42) - 64,
+                                                        (1ull << 50) - 64);
+                TimerNotifierTest::setLowResolutionTickCounter(timerNotifier, initialElapsedTime >> 6);
+                uint64_t elapsedTime = initialElapsedTime;
+                uint64_t currentWheelTickCount[7] = {0};
+                for (auto i = 0; i < 128; ++i)
+                {
+                    elapsedTime += 64;
+                    pLowResolutionClockTicker->tick();
+                    for (auto i = 1; i < 7; ++i)
+                    {
+                        const auto wheelResolution = TimerNotifierTest::timerWheel(timerNotifier, i).resolution().count();
+                        const auto wheelTickCount = TimerNotifierTest::timerWheel(timerNotifier, i).tickCount();
+                        if (elapsedTime & (wheelResolution - 1))
+                        {
+                            REQUIRE(currentWheelTickCount[i] == wheelTickCount)
+                        }
+                        else
+                        {
+                            REQUIRE(++currentWheelTickCount[i] == wheelTickCount)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+SCENARIO("TimerNotifier moves timer on timer wheels until timer's timeout reaches zero")
 {
     GIVEN("a timer notifier")
     {
@@ -491,10 +544,10 @@ SCENARIO("Timer notifier moves timer on timer wheels until timer's timeout reach
                 for (auto i = 1; i < interval.count(); ++i)
                 {
                     pHighResolutionClockTicker->tick();
-                    REQUIRE(timerNotifier.timerCount(0) == 1);
+                    REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, 0).timerCount() == 1);
                 }
                 pHighResolutionClockTicker->tick();
-                REQUIRE(timerNotifier.timerCount(0) == 0);
+                REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, 0).timerCount() == 0);
             }
         }
 
@@ -527,5 +580,19 @@ SCENARIO("Timer notifier moves timer on timer wheels until timer's timeout reach
         // {
         //     FAIL("Not implemented yet");
         // }
+
+        WHEN("timers with intervals in set [2^36 + 1, std::chrono::milliseconds::max()] are added to timer notifier")
+        {
+            
+            TimerNotifierTest::setLowResolutionTickCounter(timerNotifier, (1ull << 36) - 5);
+
+            THEN("timer notifier adds them to the last wheel")
+            {
+                AND_WHEN("")
+                {
+
+                }
+            }
+        }
     }
 }

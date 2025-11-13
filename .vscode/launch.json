@@ -9,7 +9,7 @@
             "type": "lldb-dap",
             "request": "launch",
             "program": "${command:cmake.launchTargetPath}",
-            "args": ["-f", "TimerNotifier.spec.cpp"],
+            "args": ["-s", "TimerNotifier ticks all timer wheels having a resolution that is a multiple of the elapsed time whenever the low resolution clock ticker ticks"],
             "env": [],
             "cwd": "${workspaceRoot}",
             "internalConsoleOptions": "openOnSessionStart",

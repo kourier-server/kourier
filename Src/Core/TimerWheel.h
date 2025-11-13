@@ -41,6 +41,7 @@ public:
     void tick(TimerList &expiredTimers);
     inline size_t getSlotIdx(std::chrono::milliseconds timeout) const {return ((((uint64_t)timeout.count() - 1ull) >> m_resolutionExponent) + m_idxNextTimersToExpire) & 63;}
     inline uint64_t timerCount() const {return m_timerCount;}
+    inline uint64_t tickCount() const {return m_tickCount;}
 
 private:
     static std::chrono::milliseconds adjustResolution(std::chrono::milliseconds resolution);
@@ -51,6 +52,7 @@ private:
     const uint64_t m_resolutionExponent = 0;
     uint64_t m_idxNextTimersToExpire = 0;
     uint64_t m_timerCount = 0;
+    uint64_t m_tickCount = 0;
     TimerList m_slots[64];
 };
 

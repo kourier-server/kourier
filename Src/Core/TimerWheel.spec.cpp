@@ -19,11 +19,36 @@
 #include "Core/TimerList.h"
 #include "TimerPrivate_epoll.h"
 #include <Spectator.h>
+#include <chrono>
 #include <vector>
 
 using Kourier::TimerWheel;
 using Kourier::TimerPrivate;
 using Kourier::TimerList;
+
+
+SCENARIO("TimerWheel increases tick count on every tick")
+{
+    GIVEN("a timer wheel")
+    {
+        TimerWheel timerWheel(std::chrono::milliseconds(1));
+        REQUIRE(timerWheel.tickCount() == 0);
+
+        WHEN("tick is called a couple of times")
+        {
+            THEN("timer wheel increases tick count on every tick")
+            {
+                for (auto i = 1; i <= 5; ++i)
+                {
+                    TimerList expiredTimers;
+                    timerWheel.tick(expiredTimers);
+                    REQUIRE(expiredTimers.isEmpty());
+                    REQUIRE(timerWheel.tickCount() == i);
+                }
+            }
+        }
+    }
+}
 
 
 SCENARIO("TimerWheel ajusts given resolution")

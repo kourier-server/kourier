@@ -59,6 +59,7 @@ bool TimerWheel::removeTimer(TimerPrivate *pTimer)
 
 void TimerWheel::tick(TimerList &expiredTimers)
 {
+    ++m_tickCount;
     expiredTimers.clear();
     expiredTimers.swap(m_slots[m_idxNextTimersToExpire]);
     if (++m_idxNextTimersToExpire == 64) [[unlikely]]
