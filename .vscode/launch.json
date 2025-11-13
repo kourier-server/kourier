@@ -9,7 +9,7 @@
             "type": "lldb-dap",
             "request": "launch",
             "program": "${command:cmake.launchTargetPath}",
-            "args": ["-s", "TimerNotifier times out timers when their timeout reaches zero"],
+            "args": ["-f", "TimerNotifier.spec.cpp"],
             "env": [],
             "cwd": "${workspaceRoot}",
             "internalConsoleOptions": "openOnSessionStart",

@@ -343,13 +343,13 @@ SCENARIO("TimerNotifier ajdusts timeout of added timers")
         TimerNotifierTest::setLowResolutionTime(timerNotifier, msSinceEpochToSet);
         REQUIRE(timerNotifier.lowResolutionTime() == msSinceEpochToSet);
 
-        WHEN("a timer with positive interval smaller than 64ms is started")
+        WHEN("a timer with positive interval up to 64ms is started")
         {
             const auto intervalToSet = GENERATE(AS(std::chrono::milliseconds),
                                                 std::chrono::milliseconds(1),
                                                 std::chrono::milliseconds(5),
                                                 std::chrono::milliseconds(23),
-                                                std::chrono::milliseconds(63));
+                                                std::chrono::milliseconds(64));
             const auto timerType = GENERATE(AS(Timer::TimerType),
                                             Timer::TimerType::Precise,
                                             Timer::TimerType::Coarse,
@@ -475,18 +475,18 @@ SCENARIO("Timer notifier moves timer on timer wheels until timer's timeout reach
         std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
         TimerNotifier timerNotifier(pLowResolutionClockTicker, pHighResolutionClockTicker);
 
-        WHEN("a timer with positive interval smaller than 64ms is added to timer notifier")
+        WHEN("a timer with positive interval up to 64ms is added to timer notifier")
         {
             const auto interval = GENERATE(AS(std::chrono::milliseconds),
                                            std::chrono::milliseconds(1),
                                            std::chrono::milliseconds(7),
-                                           std::chrono::milliseconds(63));
+                                           std::chrono::milliseconds(64));
             Timer timer;
             TimerNotifierTest::setTimerNotifier(timer, timerNotifier);
             timer.setSingleShot(true);
             timer.start(interval);
 
-            THEN("timer notifier moves added timer out of timer wheel when it's timeout reaches zero")
+            THEN("timer notifier moves added timer out of timer wheel when timer's timeout reaches zero")
             {
                 for (auto i = 1; i < interval.count(); ++i)
                 {
@@ -498,7 +498,7 @@ SCENARIO("Timer notifier moves timer on timer wheels until timer's timeout reach
             }
         }
 
-        // WHEN("timers with intervals in set [2^6, 2^12[ are added to timer notifier")
+        // WHEN("timers with intervals in set [2^6+1, 2^12] are added to timer notifier")
         // {
         //     FAIL("Not implemented yet");
         // }
