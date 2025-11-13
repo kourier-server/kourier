@@ -263,7 +263,7 @@ SCENARIO("TimerNotifier times out timers having zero interval when control retur
             THEN("time notifier triggers added timers when control returns to the event loop")
             {
                 REQUIRE(!timeoutSemaphore.tryAcquire());
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(timeoutSemaphore, timersWithZeroIntervalToAddToTimerNotifier, 1000000));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(timeoutSemaphore, timersWithZeroIntervalToAddToTimerNotifier, 10));
                 std::set<Timer*> expectedTimers;
                 for (auto &timer : timersWithZeroInterval)
                     expectedTimers.insert(&timer);

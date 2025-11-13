@@ -9,7 +9,7 @@
             "type": "lldb-dap",
             "request": "launch",
             "program": "${command:cmake.launchTargetPath}",
-            "args": ["-s", "TimerNotifier disables high resolution clock ticker if wheel with 64ms time span becomes empty"],
+            "args": ["-s", "TimerNotifier times out timers having zero interval when control returns to the event loop"],
             "env": [],
             "cwd": "${workspaceRoot}",
             "internalConsoleOptions": "openOnSessionStart",
