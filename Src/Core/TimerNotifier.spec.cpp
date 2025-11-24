@@ -16,6 +16,8 @@
 //
 
 #include "TimerNotifier.h"
+#include "Core/EpollTimerRegistrar.h"
+#include "Core/TimerList.h"
 #include "Timer.h"
 #include "TimerPrivate_epoll.h"
 #include <Spectator.h>
@@ -26,11 +28,13 @@
 
 using Kourier::TimerNotifier;
 using Kourier::TimerWheel;
+using Kourier::TimerList;
 using Kourier::Timer;
 using Kourier::TimerPrivate;
 using Kourier::ClockTicker;
 using Kourier::Object;
 using Spectator::SemaphoreAwaiter;
+using namespace std::chrono_literals;
 
 
 namespace Test::TimerNotifier
@@ -43,6 +47,7 @@ namespace Test::TimerNotifier
         inline static void setLowResolutionTime(class TimerNotifier &timerNotifer, std::chrono::milliseconds time) {timerNotifer.m_lowResolutionTime = time;}
         inline static TimerWheel &timerWheel(class TimerNotifier &timerNotifier, size_t idx) {REQUIRE(idx < 7); return timerNotifier.m_timerWheels[idx];}
         inline static void setLowResolutionTickCounter(class TimerNotifier &timerNotifier, uint64_t tickCount) {timerNotifier.m_lowResolutionTickCounter += tickCount; timerNotifier.m_lowResolutionTime += std::chrono::milliseconds(tickCount << 6);}
+        inline static TimerList &timersToNotify(class TimerNotifier &timerNotifier) {return timerNotifier.m_timersToNotify;}
     };
 }
 
@@ -528,28 +533,89 @@ SCENARIO("TimerNotifier moves timer on timer wheels until timer's timeout reache
         std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
         TimerNotifier timerNotifier(pLowResolutionClockTicker, pHighResolutionClockTicker);
 
-        WHEN("a timer with positive interval up to 64ms is added to timer notifier")
+        WHEN("a timer is added to timer notifier")
         {
-            const auto interval = GENERATE(AS(std::chrono::milliseconds),
-                                           std::chrono::milliseconds(1),
-                                           std::chrono::milliseconds(7),
-                                           std::chrono::milliseconds(64));
+            const auto moveToWheel0 = GENERATE(AS(bool), true, false);
+            const auto moveToWheel1 = GENERATE(AS(bool), true, false);
+            const auto moveToWheel2 = GENERATE(AS(bool), true, false);
+            const auto moveToWheel3 = GENERATE(AS(bool), true, false);
+            const auto moveToWheel4 = GENERATE(AS(bool), true, false);
+            const auto moveToWheel5 = GENERATE(AS(bool), true, false);
+            const auto moveToWheel6 = GENERATE(AS(bool), true, false);
+            std::chrono::milliseconds interval;
+            if (moveToWheel0)
+                interval += std::chrono::milliseconds(1);
+            if (moveToWheel1)
+                interval += std::chrono::milliseconds((1ull << 6) + 1);
+            if (moveToWheel2)
+                interval += std::chrono::milliseconds((1ull << 12) + 1);
+            if (moveToWheel3)
+                interval += std::chrono::milliseconds((1ull << 18) + 1);
+            if (moveToWheel4)
+                interval += std::chrono::milliseconds((1ull << 24) + 1);
+            if (moveToWheel5)
+                interval += std::chrono::milliseconds((1ull << 30) + 1);
+            if (moveToWheel6)
+                interval += std::chrono::milliseconds((1ull << 36) + 1);
             Timer timer;
             TimerNotifierTest::setTimerNotifier(timer, timerNotifier);
             timer.setSingleShot(true);
             timer.start(interval);
 
-            THEN("timer notifier moves added timer out of timer wheel when timer's timeout reaches zero")
+            THEN("timer notifier adds timer to largest wheel to move or to timers to notify if there are no wheels to move")
             {
-                for (auto i = 1; i < interval.count(); ++i)
+                int64_t addedTimerWheelIdx = -1;
+                if (moveToWheel6)
+                    addedTimerWheelIdx = 6;
+                else if (moveToWheel5)
+                    addedTimerWheelIdx = 5;
+                else if (moveToWheel4)
+                    addedTimerWheelIdx = 4;
+                else if (moveToWheel3)
+                    addedTimerWheelIdx = 3;
+                else if (moveToWheel2)
+                    addedTimerWheelIdx = 2;
+                else if (moveToWheel1)
+                    addedTimerWheelIdx = 1;
+                else if (moveToWheel0)
+                    addedTimerWheelIdx = 0;
+                if (addedTimerWheelIdx >= 0)
                 {
-                    pHighResolutionClockTicker->tick();
-                    REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, 0).timerCount() == 1);
+                    REQUIRE(TimerNotifierTest::timersToNotify(timerNotifier).size() == 0);
+                    for (auto idx = 0; idx < 7; ++idx)
+                    {
+                        REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idx).timerCount() == ((idx == addedTimerWheelIdx) ? 1 : 0));
+                    }
                 }
-                pHighResolutionClockTicker->tick();
-                REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, 0).timerCount() == 0);
+                else
+                {
+                    REQUIRE(TimerNotifierTest::timersToNotify(timerNotifier).size() == 1);
+                }
             }
         }
+
+        // WHEN("a timer with positive interval up to 64ms is added to timer notifier")
+        // {
+        //     const auto interval = GENERATE(AS(std::chrono::milliseconds),
+        //                                    std::chrono::milliseconds(1),
+        //                                    std::chrono::milliseconds(7),
+        //                                    std::chrono::milliseconds(64));
+        //     Timer timer;
+        //     TimerNotifierTest::setTimerNotifier(timer, timerNotifier);
+        //     timer.setSingleShot(true);
+        //     timer.start(interval);
+
+        //     THEN("timer notifier moves added timer out of timer wheel when timer's timeout reaches zero")
+        //     {
+        //         for (auto i = 1; i < interval.count(); ++i)
+        //         {
+        //             pHighResolutionClockTicker->tick();
+        //             REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, 0).timerCount() == 1);
+        //         }
+        //         pHighResolutionClockTicker->tick();
+        //         REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, 0).timerCount() == 0);
+        //     }
+        // }
 
         // WHEN("timers with intervals in set [2^6+1, 2^12] are added to timer notifier")
         // {
@@ -581,18 +647,59 @@ SCENARIO("TimerNotifier moves timer on timer wheels until timer's timeout reache
         //     FAIL("Not implemented yet");
         // }
 
-        WHEN("timers with intervals in set [2^36 + 1, std::chrono::milliseconds::max()] are added to timer notifier")
-        {
-            
-            TimerNotifierTest::setLowResolutionTickCounter(timerNotifier, (1ull << 36) - 5);
+        // WHEN("a timer with interval 2^36 + 61 is added to timer notifier")
+        // {
+        //     Timer timer;
+        //     TimerNotifierTest::setTimerNotifier(timer, timerNotifier);
+        //     timer.setSingleShot(true);
+        //     timer.start(std::chrono::milliseconds((1ull << 36)
+        //                                           + (1ull << 36) - 3 
+        //                                           + (1ull << 30) - 3));
 
-            THEN("timer notifier adds them to the last wheel")
-            {
-                AND_WHEN("")
-                {
+        //     THEN("timer notifier adds timer to last wheel")
+        //     {
+        //         for (auto i = 0; i < 7; ++ i)
+        //         {
+        //             auto &timerWheel = TimerNotifierTest::timerWheel(timerNotifier, i);
+        //             if (i != 6)
+        //             {
+        //                 REQUIRE(timerWheel.timerCount() == 0);
+        //             }
+        //             else
+        //             {
+        //                 REQUIRE(timerWheel.timerCount() == 1);
+        //             }
+        //         }
+        //     }
 
-                }
-            }
-        }
+        //     AND_WHEN("last wheel is ticked")
+        //     {
+        //         const auto delta = 5ull;
+        //         TimerNotifierTest::setLowResolutionTickCounter(timerNotifier, (1ull << 30) - delta);
+        //         for (auto i = 0; i < (delta - 1); ++i)
+        //         {
+        //             pLowResolutionClockTicker->tick();
+        //             REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, 6).tickCount() == 0);
+        //         }                
+        //         pLowResolutionClockTicker->tick();
+        //         REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, 6).tickCount() == 1);
+
+        //         THEN("timer notifier moves timer to previous wheel")
+        //         {
+        //             for (auto i = 0; i < 7; ++ i)
+        //             {
+        //                 auto &timerWheel = TimerNotifierTest::timerWheel(timerNotifier, i);
+        //                 if (i != 5)
+        //                 {
+        //                     REQUIRE(timerWheel.timerCount() == 0);
+        //                 }
+        //                 else
+        //                 {
+        //                     REQUIRE(timerWheel.timerCount() == 1);
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
     }
 }

@@ -96,13 +96,13 @@ void TimerNotifier::addTimer(TimerPrivate *pTimer)
                 }
                 break;
         }
-        const uint8_t wheelIdxMap[42] = {0,0,0,0,0,0,
+        const uint8_t wheelIdxMap[64] = {0,0,0,0,0,0,
                                          1,1,1,1,1,1,
                                          2,2,2,2,2,2,
                                          3,3,3,3,3,3,
                                          4,4,4,4,4,4,
                                          5,5,5,5,5,5,
-                                         6,6,6,6,6,6};
+                                         6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6};
         auto * const pTimerWheel = &(m_timerWheels[wheelIdxMap[std::countr_zero<uint64_t>(std::bit_floor<uint64_t>(std::max<uint64_t>(1ull, pTimer->timeout().count() - 1ull)))]]);
         const auto idxSlot = pTimerWheel->getSlotIdx(pTimer->timeout());
         pTimer->setExtraTimeout(pTimer->extraTimeout() + std::chrono::milliseconds((m_lowResolutionTickCounter << 6) & (pTimerWheel->resolution().count() - 1)));
@@ -133,13 +133,13 @@ void TimerNotifier::removeTimer(TimerPrivate *pTimer)
 void TimerNotifier::addAdjustedTimer(TimerPrivate *pTimer)
 {
     assert(pTimer);
-    const uint8_t wheelIdxMap[42] = {0,0,0,0,0,0,
+    const uint8_t wheelIdxMap[64] = {0,0,0,0,0,0,
                                      1,1,1,1,1,1,
                                      2,2,2,2,2,2,
                                      3,3,3,3,3,3,
                                      4,4,4,4,4,4,
                                      5,5,5,5,5,5,
-                                     6,6,6,6,6,6};
+                                     6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6};
     pTimer->m_state = TimerPrivate::State::Active;
     if (pTimer->timeout().count() == 0) [[unlikely]]
     {    
