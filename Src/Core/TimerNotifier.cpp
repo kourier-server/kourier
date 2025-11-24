@@ -19,6 +19,7 @@
 #include "EpollEventNotifier.h"
 #include "UnixUtils.h"
 #include <bit>
+#include <utility>
 #include <sys/eventfd.h>
 
 
@@ -50,8 +51,8 @@ TimerNotifier::TimerNotifier(std::shared_ptr<ClockTicker> pLowResolutionClockTic
     : EpollEventSource(EPOLLET | EPOLLIN, EpollEventNotifier::current()),
       m_eventFd(eventfd(0, EFD_NONBLOCK)),
       m_lowResolutionTime(msSinceEpoch()),
-      m_pLowResolutionClockTicker(pLowResolutionClockTicker),
-      m_pHighResolutionClockTicker(pHighResolutionClockTicker)
+      m_pLowResolutionClockTicker(std::move(pLowResolutionClockTicker)),
+      m_pHighResolutionClockTicker(std::move(pHighResolutionClockTicker))
 
 {
     if (-1 == m_eventFd)
