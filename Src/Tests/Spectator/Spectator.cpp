@@ -104,7 +104,7 @@ private:
 class TestFilter
 {
 public:
-    TestFilter(Settings settings) :
+    TestFilter(const Settings &settings) :
         m_sourceFileToRun(settings.filePathFilter()),
         m_scenarioNameToRun(settings.scenarioNameFilter()) {}
     ~TestFilter() = default;
@@ -419,22 +419,22 @@ int main(int argc, char ** argv)
                                                       << ::Spectator::TestRegistrar::totalTests()
                                                       << ::Spectator::TestRegistrar::totalAssertions()
                                                       << timeTakenInMSecs);
-    const QByteArray totalScenarios = totals[0];
-    const QByteArray totalTests = totals[1];
-    const QByteArray totalAssertions = totals[2];
-    const QByteArray totalTimeTaken = totals[3];
+    const QByteArray &totalScenarios = totals[0];
+    const QByteArray &totalTests = totals[1];
+    const QByteArray &totalAssertions = totals[2];
+    const QByteArray &totalTimeTaken = totals[3];
     const auto passed = identNumbers(QList<quint64>() << ::Spectator::TestRegistrar::passedScenarios()
                                                       << ::Spectator::TestRegistrar::passedTests()
                                                       << ::Spectator::TestRegistrar::passedAssertions());
-    const QByteArray passedScenarios = passed[0];
-    const QByteArray passedTests = passed[1];
-    const QByteArray passedAssertions = passed[2];
+    const QByteArray &passedScenarios = passed[0];
+    const QByteArray &passedTests = passed[1];
+    const QByteArray &passedAssertions = passed[2];
     const auto failed = identNumbers(QList<quint64>() << ::Spectator::TestRegistrar::failedScenarios()
                                                       << ::Spectator::TestRegistrar::failedTests()
                                                       << ::Spectator::TestRegistrar::failedAssertions());
-    const QByteArray failedScenarios = failed[0];
-    const QByteArray failedTests = failed[1];
-    const QByteArray failedAssertions = failed[2];
+    const QByteArray &failedScenarios = failed[0];
+    const QByteArray &failedTests = failed[1];
+    const QByteArray &failedAssertions = failed[2];
     outputStream << "\nTotal Scenarios : " << totalScenarios
                  << " (" << passedScenarios << " Passed, "
                  << failedScenarios << " Failed)\n";

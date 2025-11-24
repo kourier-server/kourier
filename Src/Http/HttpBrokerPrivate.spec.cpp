@@ -22,6 +22,7 @@
 #include <QDateTime>
 #include <list>
 #include <initializer_list>
+#include <memory>
 
 
 using Kourier::HttpBrokerPrivate;
@@ -139,7 +140,7 @@ SCENARIO("HttpBrokerPrivate writes status line from status codes")
         WHEN("status line is written for given status code")
         {
             IOChannelTest ioChannel;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             HttpBrokerPrivate brokerPrivate(&ioChannel, &parser);
             TestHttpBrokerPrivate broker(brokerPrivate);
             broker.doWriteStatusLine(statusCode.first);
@@ -168,7 +169,7 @@ SCENARIO("HttpBrokerPrivate writes content-length header from size")
         static_assert(std::numeric_limits<size_t>::min() == 0);
         static_assert(std::numeric_limits<size_t>::max() == 18446744073709551615ull);
         IOChannelTest ioChannel;
-        HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+        HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
         HttpBrokerPrivate brokerPrivate(&ioChannel, &parser);
         TestHttpBrokerPrivate broker(brokerPrivate);
 
@@ -199,7 +200,7 @@ SCENARIO("HttpBrokerPrivate writes chunk metadata from size")
         static_assert(std::numeric_limits<size_t>::min() == 0);
         static_assert(std::numeric_limits<size_t>::max() == 18446744073709551615ull);
         IOChannelTest ioChannel;
-        HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+        HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
         HttpBrokerPrivate brokerPrivate(&ioChannel, &parser);
         TestHttpBrokerPrivate broker(brokerPrivate);
 
@@ -251,7 +252,7 @@ SCENARIO("HttpBrokerPrivate knows how to write server header")
     GIVEN("a broker")
     {
         IOChannelTest ioChannel;
-        HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+        HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
         HttpBrokerPrivate brokerPrivate(&ioChannel, &parser);
         TestHttpBrokerPrivate broker(brokerPrivate);
 
@@ -328,14 +329,14 @@ SCENARIO("HttpServerBrokers knows how to write responses")
     GIVEN("a private broker and a status code")
     {
         IOChannelTest ioChannel;
-        HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+        HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
         HttpBrokerPrivate brokerPrivate(&ioChannel, &parser);
         bool hasWrittenResponse = false;
         Object::connect(&brokerPrivate, &HttpBrokerPrivate::wroteResponse, [&hasWrittenResponse](){hasWrittenResponse = true;});
         auto dateHeader = []() -> std::string
         {
             IOChannelTest ioChannel;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             HttpBrokerPrivate brokerPrivate(&ioChannel, &parser);
             TestHttpBrokerPrivate broker(brokerPrivate);
             broker.doWriteDateHeader();
@@ -591,7 +592,7 @@ SCENARIO("HttpServerBrokers knows how to write chunked responses")
         auto dateHeader = []() -> std::string
         {
             IOChannelTest ioChannel;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             HttpBrokerPrivate brokerPrivate(&ioChannel, &parser);
             TestHttpBrokerPrivate broker(brokerPrivate);
             broker.doWriteDateHeader();
@@ -871,7 +872,7 @@ SCENARIO("HttpServerBrokers terminates current chunked response and refuses to b
     GIVEN("a private broker")
     {
         IOChannelTest ioChannel;
-        HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+        HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
         HttpBrokerPrivate brokerPrivate(&ioChannel, &parser);
         size_t wroteResponseEmissionCounter = 0;
         Object::connect(&brokerPrivate, &HttpBrokerPrivate::wroteResponse, [&wroteResponseEmissionCounter](){++wroteResponseEmissionCounter;});
@@ -979,7 +980,7 @@ SCENARIO("HttpServerBrokers only writes chunks when a chunked response is being 
     GIVEN("a private broker")
     {
         IOChannelTest ioChannel;
-        HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+        HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
         HttpBrokerPrivate brokerPrivate(&ioChannel, &parser);
         bool hasWrittenResponse = false;
         Object::connect(&brokerPrivate, &HttpBrokerPrivate::wroteResponse, [&hasWrittenResponse](){hasWrittenResponse = true;});
@@ -1023,7 +1024,7 @@ SCENARIO("HttpServerBrokers only writes non-empty chunk data")
         auto dateHeader = []() -> std::string
         {
             IOChannelTest ioChannel;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             HttpBrokerPrivate brokerPrivate(&ioChannel, &parser);
             TestHttpBrokerPrivate broker(brokerPrivate);
             broker.doWriteDateHeader();
@@ -1096,14 +1097,14 @@ SCENARIO("HttpBrokerPrivate must be reset before writing next response")
     GIVEN("a private broker")
     {
         IOChannelTest ioChannel;
-        HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+        HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
         HttpBrokerPrivate brokerPrivate(&ioChannel, &parser);
         size_t wroteResponseEmissionCounter = 0;
         Object::connect(&brokerPrivate, &HttpBrokerPrivate::wroteResponse, [&wroteResponseEmissionCounter](){++wroteResponseEmissionCounter;});
         auto dateHeader = []() -> std::string
         {
             IOChannelTest ioChannel;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             HttpBrokerPrivate brokerPrivate(&ioChannel, &parser);
             TestHttpBrokerPrivate broker(brokerPrivate);
             broker.doWriteDateHeader();
@@ -1326,7 +1327,7 @@ SCENARIO("HttpBrokerPrivate deletes any QObject set when reseting writer")
     GIVEN("a broker with a QObject set")
     {
         IOChannelTest ioChannel;
-        HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+        HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
         HttpBrokerPrivate brokerPrivate(&ioChannel, &parser);
         auto *pObject = new QObject;
         bool hasDestroyedQObject = false;
@@ -1449,7 +1450,7 @@ SCENARIO("HttpBrokerPrivate deletes any previously set QObject when setting new 
     GIVEN("a broker with a QObject set")
     {
         IOChannelTest ioChannel;
-        HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+        HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
         auto pBrokerPrivate = std::make_unique<HttpBrokerPrivate>(&ioChannel, &parser);
         auto *pObject = new QObject;
         bool hasDestroyedQObject = false;

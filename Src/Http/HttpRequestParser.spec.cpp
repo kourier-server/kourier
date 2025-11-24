@@ -18,6 +18,7 @@
 #include "HttpRequestParser.h"
 #include "../Core/IOChannel.h"
 #include <Spectator.h>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -94,7 +95,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(requestLine);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("request is successfully parsed")
@@ -154,7 +155,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("the request is parsed byte by byte")
         {
             IOChannelTest ioChannel(std::string_view(requestLine.data(), 1));
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             for (int i = 1; i < (requestLine.size() - 1); ++i)
             {
                 ioChannel.readBuffer().write(&requestLine[i], 1);
@@ -243,7 +244,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("parser processes data from all requests at once")
         {
             IOChannelTest ioChannel(requests);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
 
             THEN("all requests are successfully parsed")
             {
@@ -318,7 +319,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             int index = 0;
             IOChannelTest ioChannel(std::string_view(requests.data(), 1));
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
 
             THEN("all requests are successfully parsed")
             {
@@ -412,7 +413,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(requestLine);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse the malformed requests")
@@ -426,7 +427,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -454,7 +455,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse the malformed requests")
@@ -468,7 +469,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -513,7 +514,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser parses the request")
@@ -528,7 +529,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -553,7 +554,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser parses the request")
@@ -568,7 +569,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -609,7 +610,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser parses the request")
@@ -624,7 +625,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -656,7 +657,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser parses the request")
@@ -671,7 +672,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -695,7 +696,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse the request")
@@ -709,7 +710,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -764,7 +765,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse the request")
@@ -778,7 +779,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -809,7 +810,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse the request")
@@ -823,7 +824,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -872,7 +873,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser parses the request")
@@ -888,7 +889,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -921,7 +922,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser parses the request")
@@ -937,7 +938,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -980,7 +981,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser parses the request")
@@ -996,7 +997,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -1032,7 +1033,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser parses the request")
@@ -1048,7 +1049,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -1073,7 +1074,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse the request")
@@ -1087,7 +1088,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -1146,7 +1147,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse the request")
@@ -1160,7 +1161,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -1194,7 +1195,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse the request")
@@ -1208,7 +1209,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -1231,7 +1232,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("the request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser parses the request")
@@ -1247,7 +1248,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -1281,7 +1282,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("the request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser parses the request")
@@ -1298,7 +1299,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -1325,7 +1326,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("the request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse the invalid request")
@@ -1339,7 +1340,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -1373,7 +1374,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("the request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse the invalid request")
@@ -1387,7 +1388,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -1420,7 +1421,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         WHEN("the request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse the request")
@@ -1434,7 +1435,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -1487,7 +1488,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         WHEN("the request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("the request is successfully parsed")
@@ -1552,7 +1553,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         WHEN("the request is parsed byte by byte")
         {
             IOChannelTest ioChannel(std::string_view(request.data(), 1));
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             for (int i = 1; i < (request.size() - 1); ++i)
             {
                 ioChannel.readBuffer().write(&request[i], 1);
@@ -1663,7 +1664,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         WHEN("parser processes data from all requests at once")
         {
             IOChannelTest ioChannel(requests);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
 
             THEN("all requests are successfully parsed")
             {
@@ -1748,7 +1749,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         {
             size_t index = 0;
             IOChannelTest ioChannel(std::string_view(requests.data(), 1));
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
 
             THEN("all requests are successfully parsed")
             {
@@ -1844,7 +1845,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         WHEN("the request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse the request")
@@ -1858,7 +1859,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -1885,7 +1886,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         WHEN("the request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("request is successfully parsed")
@@ -1913,7 +1914,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -1954,7 +1955,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         WHEN("the request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse the request")
@@ -1968,7 +1969,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -1994,7 +1995,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         WHEN("the request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse the request")
@@ -2008,7 +2009,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -2057,7 +2058,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser parses the request")
@@ -2078,7 +2079,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -2113,7 +2114,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse the request")
@@ -2127,7 +2128,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -2181,7 +2182,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse the request")
@@ -2195,7 +2196,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -2226,7 +2227,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse the request")
@@ -2240,7 +2241,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -2288,7 +2289,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser parses the request")
@@ -2310,7 +2311,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -2345,7 +2346,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse the request")
@@ -2359,7 +2360,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -2404,7 +2405,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse the request")
@@ -2418,7 +2419,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -2449,7 +2450,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse the request")
@@ -2463,7 +2464,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         {
             IOChannelTest ioChannel({});
             HttpRequestParser::ParserStatus parserStatus;
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             int i = 0;
             do
             {
@@ -2495,7 +2496,7 @@ SCENARIO("HttpRequestParser allows spaces around content-length value")
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("request is successfully parsed")
@@ -2516,7 +2517,7 @@ SCENARIO("HttpRequestParser allows spaces around content-length value")
         WHEN("the request is parsed byte by byte")
         {
             IOChannelTest ioChannel(std::string_view(request.data(), 1));
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             for (int i = 1; i < (request.size() - 1); ++i)
             {
                 ioChannel.readBuffer().write(&request[i], 1);
@@ -2555,7 +2556,7 @@ SCENARIO("HttpRequestParser only accepts digits in trimmed content-length value"
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse request")
@@ -2568,7 +2569,7 @@ SCENARIO("HttpRequestParser only accepts digits in trimmed content-length value"
         WHEN("the request is parsed byte by byte")
         {
             IOChannelTest ioChannel(std::string_view(request.data(), 1));
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             for (int i = 1; i < (request.size() - 1); ++i)
             {
                 ioChannel.readBuffer().write(&request[i], 1);
@@ -2599,7 +2600,7 @@ SCENARIO("HttpRequestParser does not accept content-length values with more than
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse request")
@@ -2612,7 +2613,7 @@ SCENARIO("HttpRequestParser does not accept content-length values with more than
         WHEN("the request is parsed byte by byte")
         {
             IOChannelTest ioChannel(std::string_view(request.data(), 1));
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             for (int i = 1; i < (request.size() - 1); ++i)
             {
                 ioChannel.readBuffer().write(&request[i], 1);
@@ -2643,7 +2644,7 @@ SCENARIO("HttpRequestParser does not accept empty content-length values or value
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse request")
@@ -2656,7 +2657,7 @@ SCENARIO("HttpRequestParser does not accept empty content-length values or value
         WHEN("the request is parsed byte by byte")
         {
             IOChannelTest ioChannel(std::string_view(request.data(), 1));
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             for (int i = 1; i < (request.size() - 1); ++i)
             {
                 ioChannel.readBuffer().write(&request[i], 1);
@@ -2695,7 +2696,7 @@ SCENARIO("HttpRequestParser only accepts multiple content-length field lines whe
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("request is successfully parsed")
@@ -2717,7 +2718,7 @@ SCENARIO("HttpRequestParser only accepts multiple content-length field lines whe
         WHEN("the request is parsed byte by byte")
         {
             IOChannelTest ioChannel(std::string_view(request.data(), 1));
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             for (int i = 1; i < (request.size() - 1); ++i)
             {
                 ioChannel.readBuffer().write(&request[i], 1);
@@ -2750,7 +2751,7 @@ SCENARIO("HttpRequestParser only accepts multiple content-length field lines whe
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse request")
@@ -2763,7 +2764,7 @@ SCENARIO("HttpRequestParser only accepts multiple content-length field lines whe
         WHEN("the request is parsed byte by byte")
         {
             IOChannelTest ioChannel(std::string_view(request.data(), 1));
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             for (int i = 1; i < (request.size() - 1); ++i)
             {
                 ioChannel.readBuffer().write(&request[i], 1);
@@ -2817,7 +2818,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and body")
         WHEN("the request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("the request is successfully parsed")
@@ -2885,7 +2886,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and body")
         WHEN("the request is parsed byte by byte")
         {
             IOChannelTest ioChannel({});
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             auto parserStatus = HttpRequestParser::ParserStatus::NeedsMoreData;
             size_t index = 0;
             while (parserStatus == HttpRequestParser::ParserStatus::NeedsMoreData)
@@ -3016,7 +3017,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and body")
         WHEN("parser processes data from all requests at once")
         {
             IOChannelTest ioChannel(requests);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
 
             THEN("all requests are successfully parsed")
             {
@@ -3107,7 +3108,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and body")
         {
             size_t index = 0;
             IOChannelTest ioChannel(std::string_view(requests.data(), 1));
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
 
             THEN("all requests are successfully parsed")
             {
@@ -3226,7 +3227,7 @@ SCENARIO("HttpRequestParser processes all available request body when parsing re
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(trimmedRequest);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser processes body data available after request metadata is parsed")
@@ -3266,7 +3267,7 @@ SCENARIO("HttpRequestParser does not allow transfer-encoding trimmed values that
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser parses request")
@@ -3285,7 +3286,7 @@ SCENARIO("HttpRequestParser does not allow transfer-encoding trimmed values that
         WHEN("the request is parsed byte by byte")
         {
             IOChannelTest ioChannel(std::string_view(request.data(), 1));
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             for (int i = 1; i < (request.size() - 1); ++i)
             {
                 ioChannel.readBuffer().write(&request[i], 1);
@@ -3325,7 +3326,7 @@ SCENARIO("HttpRequestParser does not allow transfer-encoding trimmed values that
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse request")
@@ -3338,7 +3339,7 @@ SCENARIO("HttpRequestParser does not allow transfer-encoding trimmed values that
         WHEN("the request is parsed byte by byte")
         {
             IOChannelTest ioChannel(std::string_view(request.data(), 1));
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             auto parserStatus = HttpRequestParser::ParserStatus::NeedsMoreData;
             size_t index = 0;
             while (parserStatus == HttpRequestParser::ParserStatus::NeedsMoreData)
@@ -3386,7 +3387,7 @@ SCENARIO("HttpRequestParser does not allow requests containing both transfer-enc
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse request")
@@ -3399,7 +3400,7 @@ SCENARIO("HttpRequestParser does not allow requests containing both transfer-enc
         WHEN("the request is parsed byte by byte")
         {
             IOChannelTest ioChannel(std::string_view(request.data(), 1));
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             auto parserStatus = HttpRequestParser::ParserStatus::NeedsMoreData;
             size_t index = 0;
             while (parserStatus == HttpRequestParser::ParserStatus::NeedsMoreData)
@@ -3442,7 +3443,7 @@ SCENARIO("HttpRequestParser does not allow multiple transfer-encoding entries")
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse request")
@@ -3455,7 +3456,7 @@ SCENARIO("HttpRequestParser does not allow multiple transfer-encoding entries")
         WHEN("request is parsed byte by byte")
         {
             IOChannelTest ioChannel(std::string_view(request.data(), 1));
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             auto parserStatus = HttpRequestParser::ParserStatus::NeedsMoreData;
             size_t index = 0;
             while (parserStatus == HttpRequestParser::ParserStatus::NeedsMoreData)
@@ -3523,7 +3524,7 @@ SCENARIO("HttpRequestParser parses requests with chunked bodies")
         WHEN("the request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("the request is successfully parsed")
@@ -3628,7 +3629,7 @@ SCENARIO("HttpRequestParser parses requests with chunked bodies")
         WHEN("the request is parsed byte by byte")
         {
             IOChannelTest ioChannel({});
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             auto parserStatus = HttpRequestParser::ParserStatus::NeedsMoreData;
             size_t index = 0;
             while (parserStatus == HttpRequestParser::ParserStatus::NeedsMoreData)
@@ -3808,7 +3809,7 @@ SCENARIO("HttpRequestParser parses requests with chunked bodies")
         WHEN("parser processes data from all requests at once")
         {
             IOChannelTest ioChannel(requests);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             std::string currentRequest;
             currentRequest.reserve(1024);
 
@@ -3938,7 +3939,7 @@ SCENARIO("HttpRequestParser parses requests with chunked bodies")
         {
             size_t index = 0;
             IOChannelTest ioChannel({});
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             std::string currentRequest;
             currentRequest.reserve(1024);
 
@@ -4091,7 +4092,7 @@ SCENARIO("HttpServer responds with 100-Continue status code when client sends ex
         WHEN("request metadata (request line + headers) is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             REQUIRE(ioChannel.writeBuffer().isEmpty());
             const auto parserStatus = parser.parse();
 
@@ -4108,7 +4109,7 @@ SCENARIO("HttpServer responds with 100-Continue status code when client sends ex
         WHEN("request metadata (request line + headers) is parsed byte by byte")
         {
             IOChannelTest ioChannel({});
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             REQUIRE(ioChannel.writeBuffer().isEmpty());
             for (auto i = 0; i < (request.size() - 1); ++i)
             {
@@ -4140,7 +4141,7 @@ SCENARIO("HttpServer responds with 100-Continue status code when client sends ex
         WHEN("request metadata (request line + headers) is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             REQUIRE(ioChannel.writeBuffer().isEmpty());
             const auto parserStatus = parser.parse();
 
@@ -4157,7 +4158,7 @@ SCENARIO("HttpServer responds with 100-Continue status code when client sends ex
         WHEN("request metadata (request line + headers) is parsed byte by byte")
         {
             IOChannelTest ioChannel({});
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             REQUIRE(ioChannel.writeBuffer().isEmpty());
             for (auto i = 0; i < (request.size() - 1); ++i)
             {
@@ -4189,7 +4190,7 @@ SCENARIO("HttpRequestParser allows server-wide options with * instead of absolut
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("request is successfully parsed")
@@ -4217,7 +4218,7 @@ SCENARIO("HttpRequestParser allows server-wide options with * instead of absolut
         WHEN("request is parsed byte by byte")
         {
             IOChannelTest ioChannel({});
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             size_t index = 0;
             auto parserStatus = HttpRequestParser::ParserStatus::NeedsMoreData;
             while (parserStatus == HttpRequestParser::ParserStatus::NeedsMoreData)
@@ -4273,7 +4274,7 @@ SCENARIO("HttpRequestParser allows server-wide options with * instead of absolut
         WHEN("request is parsed at once")
         {
             IOChannelTest ioChannel(request);
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             const auto parserStatus = parser.parse();
 
             THEN("parser fails to parse the malformed request")
@@ -4286,7 +4287,7 @@ SCENARIO("HttpRequestParser allows server-wide options with * instead of absolut
         WHEN("request is parsed byte by byte")
         {
             IOChannelTest ioChannel({});
-            HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+            HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
             size_t index = 0;
             auto parserStatus = HttpRequestParser::ParserStatus::NeedsMoreData;
             while (parserStatus == HttpRequestParser::ParserStatus::NeedsMoreData)
@@ -5436,7 +5437,7 @@ SCENARIO("HttpRequestParser enforces limit on chunk metadata")
 //    {
 //        std::string_view request("GET /plaintext HTTP/1.1\r\nHost: host.com\r\n\r\n");
 //        IOChannelTest ioChannel(request);
-//        HttpRequestParser parser(ioChannel, std::shared_ptr<HttpRequestLimits>(new HttpRequestLimits));
+//        HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
 
 //        WHEN("the request is parsed sequentially")
 //        {
