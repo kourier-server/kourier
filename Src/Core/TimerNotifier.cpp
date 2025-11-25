@@ -80,6 +80,8 @@ void TimerNotifier::addTimer(TimerPrivate *pTimer)
         return;
     pTimer->setExtraTimeout(std::chrono::milliseconds(0));
     pTimer->setTimeout(pTimer->interval());
+    if (pTimer->timeout().count() > maxTimeout) [[unlikely]]
+        pTimer->timeout() = std::chrono::milliseconds(maxTimeout);
     if (pTimer->timeout().count() > 0) [[likely]]
     {
         switch(pTimer->timerType())
