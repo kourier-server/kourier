@@ -544,19 +544,19 @@ SCENARIO("TimerNotifier moves timer on timer wheels until timer's timeout reache
             const auto moveToWheel6 = GENERATE(AS(bool), true, false);
             std::chrono::milliseconds interval;
             if (moveToWheel0)
-                interval += std::chrono::milliseconds(1);
+                interval += std::chrono::milliseconds((1ull << 0) << 2);
             if (moveToWheel1)
-                interval += std::chrono::milliseconds((1ull << 6) + 1);
+                interval += std::chrono::milliseconds((1ull << 6) << 2);
             if (moveToWheel2)
-                interval += std::chrono::milliseconds((1ull << 12) + 1);
+                interval += std::chrono::milliseconds((1ull << 12) << 2);
             if (moveToWheel3)
-                interval += std::chrono::milliseconds((1ull << 18) + 1);
+                interval += std::chrono::milliseconds((1ull << 18) << 2);
             if (moveToWheel4)
-                interval += std::chrono::milliseconds((1ull << 24) + 1);
+                interval += std::chrono::milliseconds((1ull << 24) << 2);
             if (moveToWheel5)
-                interval += std::chrono::milliseconds((1ull << 30) + 1);
+                interval += std::chrono::milliseconds((1ull << 30) << 2);
             if (moveToWheel6)
-                interval += std::chrono::milliseconds((1ull << 36) + 1);
+                interval += std::chrono::milliseconds((1ull << 36) << 2);
             Timer timer;
             TimerNotifierTest::setTimerNotifier(timer, timerNotifier);
             timer.setSingleShot(true);
