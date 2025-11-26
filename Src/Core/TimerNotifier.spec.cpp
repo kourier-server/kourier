@@ -25,6 +25,7 @@
 #include <chrono>
 #include <vector>
 #include <set>
+#include <stack>
 
 using Kourier::TimerNotifier;
 using Kourier::TimerWheel;
@@ -46,7 +47,7 @@ namespace Test::TimerNotifier
         inline static void setTimerNotifier(Timer &timer, class TimerNotifier &timerNotifier) {timer.d_ptr->m_pTimerNotifier = &timerNotifier;}
         inline static void setLowResolutionTime(class TimerNotifier &timerNotifer, std::chrono::milliseconds time) {timerNotifer.m_lowResolutionTime = time;}
         inline static TimerWheel &timerWheel(class TimerNotifier &timerNotifier, size_t idx) {REQUIRE(idx < 7); return timerNotifier.m_timerWheels[idx];}
-        inline static void setLowResolutionTickCounter(class TimerNotifier &timerNotifier, uint64_t tickCount) {timerNotifier.m_lowResolutionTickCounter += tickCount; timerNotifier.m_lowResolutionTime += std::chrono::milliseconds(tickCount << 6);}
+        inline static void increaseLowResolutionTickCounter(class TimerNotifier &timerNotifier, uint64_t tickCount) {timerNotifier.m_lowResolutionTickCounter += tickCount; timerNotifier.m_lowResolutionTime += std::chrono::milliseconds(tickCount << 6);}
         inline static TimerList &timersToNotify(class TimerNotifier &timerNotifier) {return timerNotifier.m_timersToNotify;}
     };
 }
@@ -498,7 +499,7 @@ SCENARIO("TimerNotifier ticks all timer wheels having a resolution that is a mul
                                                         (1ull << 36) - 64,
                                                         (1ull << 42) - 64,
                                                         (1ull << 50) - 64);
-                TimerNotifierTest::setLowResolutionTickCounter(timerNotifier, initialElapsedTime >> 6);
+                TimerNotifierTest::increaseLowResolutionTickCounter(timerNotifier, initialElapsedTime >> 6);
                 uint64_t elapsedTime = initialElapsedTime;
                 uint64_t currentWheelTickCount[7] = {0};
                 for (auto i = 0; i < 128; ++i)
@@ -585,6 +586,57 @@ SCENARIO("TimerNotifier moves timer on timer wheels until timer's timeout reache
                     for (auto idx = 0; idx < 7; ++idx)
                     {
                         REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idx).timerCount() == ((idx == addedTimerWheelIdx) ? 1 : 0));
+                    }
+
+                    AND_WHEN("all wheels that timer should be moved to are fetched")
+                    {
+                        std::stack<int64_t> idxOfWheelsToMoveTo;
+                        if (moveToWheel1)
+                            idxOfWheelsToMoveTo.push(1);
+                        if (moveToWheel2)
+                            idxOfWheelsToMoveTo.push(2);
+                        if (moveToWheel3)
+                            idxOfWheelsToMoveTo.push(3);
+                        if (moveToWheel4)
+                            idxOfWheelsToMoveTo.push(4);
+                        if (moveToWheel5)
+                            idxOfWheelsToMoveTo.push(5);
+                        if (moveToWheel6)
+                            idxOfWheelsToMoveTo.push(6);
+
+                        THEN("timer is moved to lower wheel after four ticks of the upper wheel")
+                        {
+                            while (!idxOfWheelsToMoveTo.empty())
+                            {
+                                const auto idxTopWheel = idxOfWheelsToMoveTo.top();
+                                idxOfWheelsToMoveTo.pop();
+                                TimerList expiredTimers;
+                                const uint64_t lowResolutionTicksToMoveToLowerWheel = ((1ull << (idxTopWheel * 6)) >> 4);
+                                for (auto i = 0; i < 3; ++i)
+                                {
+                                    TimerNotifierTest::increaseLowResolutionTickCounter(timerNotifier, lowResolutionTicksToMoveToLowerWheel - 1);
+                                    pLowResolutionClockTicker->tick();
+                                    REQUIRE(TimerNotifierTest::timersToNotify(timerNotifier).size() == 0);
+                                    for (auto idx = 0; idx < 7; ++idx)
+                                    {
+                                        REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idx).timerCount() == ((idx == idxTopWheel) ? 1 : 0));
+                                    }
+                                }
+                                TimerNotifierTest::increaseLowResolutionTickCounter(timerNotifier, lowResolutionTicksToMoveToLowerWheel - 1);
+                                REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idxTopWheel).timerCount() == 1);
+                                pLowResolutionClockTicker->tick();
+                                REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idxTopWheel).timerCount() == 0);
+                            }
+
+                            AND_THEN("timer is moved out of timer wheels to timers to notify")
+                            {
+                                for (auto idx = 0; idx < 7; ++idx)
+                                {
+                                    REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idx).timerCount() == 0);
+                                }
+                                REQUIRE(TimerNotifierTest::timersToNotify(timerNotifier).size() == 1);
+                            }
+                        }
                     }
                 }
                 else
