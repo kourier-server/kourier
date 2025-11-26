@@ -39,7 +39,7 @@ public:
     inline bool contains(TimerPrivate *pTimer) const {return (pTimer && pTimer->m_pTimerWheel == this);}
     bool removeTimer(TimerPrivate *pTimer);
     void tick(TimerList &expiredTimers);
-    inline size_t getSlotIdx(std::chrono::milliseconds timeout) const {return ((((uint64_t)timeout.count() - 1ull) >> m_resolutionExponent) + m_idxNextTimersToExpire) & 63;}
+    inline size_t getSlotIdx(std::chrono::milliseconds timeout) const {return (((uint64_t)timeout.count() >> m_resolutionExponent) - 1 + m_idxNextTimersToExpire) & 63;}
     inline uint64_t timerCount() const {return m_timerCount;}
     inline uint64_t tickCount() const {return m_tickCount;}
 

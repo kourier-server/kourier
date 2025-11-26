@@ -222,10 +222,10 @@ SCENARIO("Timer wheel returns expired timers on tick")
             const auto interval = timerWheel.resolution().count() * (slotIndex + 1);
             timers[0].setInterval(std::chrono::milliseconds(interval));
             timers[0].setTimeout(std::chrono::milliseconds(interval));
-            timers[1].setInterval(std::chrono::milliseconds(std::max<int64_t>(resolution.count(), interval - timerWheel.resolution().count()/2)));
-            timers[1].setTimeout(std::chrono::milliseconds(std::max<int64_t>(resolution.count(), interval - timerWheel.resolution().count()/2)));
-            timers[2].setInterval(std::chrono::milliseconds(std::max<int64_t>(resolution.count(), interval - (timerWheel.resolution().count() - 1))));
-            timers[2].setTimeout(std::chrono::milliseconds(std::max<int64_t>(resolution.count(), interval - (timerWheel.resolution().count() - 1))));
+            timers[1].setInterval(std::chrono::milliseconds(std::min<int64_t>(64 * resolution.count(), interval + timerWheel.resolution().count()/2)));
+            timers[1].setTimeout(std::chrono::milliseconds(std::min<int64_t>(64 * resolution.count(), interval + timerWheel.resolution().count()/2)));
+            timers[2].setInterval(std::chrono::milliseconds(std::min<int64_t>(64 * resolution.count(), interval + (timerWheel.resolution().count() - 1))));
+            timers[2].setTimeout(std::chrono::milliseconds(std::min<int64_t>(64 * resolution.count(), interval + (timerWheel.resolution().count() - 1))));
             for (auto &timer : timers)
             {
                 REQUIRE(!timerWheel.contains(&timer));
