@@ -648,12 +648,15 @@ SCENARIO("TimerNotifier moves timer on timer wheels until timer's timeout reache
                                         REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idx).timerCount() == 0);
                                     }
                                 }
+                                bool hasEmittedTimeout = false;
+                                Object::connect(&timer, &Timer::timeout, [&](){hasEmittedTimeout = true;});
                                 pHighResolutionClockTicker->tick();
                                 for (auto idx = 0; idx < 7; ++idx)
                                 {
                                     REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idx).timerCount() == 0);
                                 }
                                 REQUIRE(TimerNotifierTest::timersToNotify(timerNotifier).size() == 0);
+                                REQUIRE(hasEmittedTimeout);
                             }
                             else
                             {
