@@ -580,55 +580,82 @@ SCENARIO("TimerNotifier moves timer on timer wheels until timer's timeout reache
                     addedTimerWheelIdx = 1;
                 else if (moveToWheel0)
                     addedTimerWheelIdx = 0;
-                if (addedTimerWheelIdx >= 0)
+                REQUIRE(TimerNotifierTest::timersToNotify(timerNotifier).size() == ((addedTimerWheelIdx >= 0) ? 0 : 1));
+                for (auto idx = 0; idx < 7; ++idx)
                 {
-                    REQUIRE(TimerNotifierTest::timersToNotify(timerNotifier).size() == 0);
-                    for (auto idx = 0; idx < 7; ++idx)
-                    {
-                        REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idx).timerCount() == ((idx == addedTimerWheelIdx) ? 1 : 0));
-                    }
+                    REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idx).timerCount() == ((idx == addedTimerWheelIdx) ? 1 : 0));
+                }
 
-                    AND_WHEN("all wheels that timer should be moved to are fetched")
-                    {
-                        std::stack<int64_t> idxOfWheelsToMoveTo;
-                        if (moveToWheel1)
-                            idxOfWheelsToMoveTo.push(1);
-                        if (moveToWheel2)
-                            idxOfWheelsToMoveTo.push(2);
-                        if (moveToWheel3)
-                            idxOfWheelsToMoveTo.push(3);
-                        if (moveToWheel4)
-                            idxOfWheelsToMoveTo.push(4);
-                        if (moveToWheel5)
-                            idxOfWheelsToMoveTo.push(5);
-                        if (moveToWheel6)
-                            idxOfWheelsToMoveTo.push(6);
+                AND_WHEN("all wheels that timer should be moved to are fetched")
+                {
+                    std::stack<int64_t> idxOfWheelsToMoveTo;
+                    if (moveToWheel1)
+                        idxOfWheelsToMoveTo.push(1);
+                    if (moveToWheel2)
+                        idxOfWheelsToMoveTo.push(2);
+                    if (moveToWheel3)
+                        idxOfWheelsToMoveTo.push(3);
+                    if (moveToWheel4)
+                        idxOfWheelsToMoveTo.push(4);
+                    if (moveToWheel5)
+                        idxOfWheelsToMoveTo.push(5);
+                    if (moveToWheel6)
+                        idxOfWheelsToMoveTo.push(6);
 
-                        THEN("timer is moved to lower wheel after four ticks of the upper wheel")
+                    THEN("timer is moved to lower wheel after four ticks of the upper wheel")
+                    {
+                        while (!idxOfWheelsToMoveTo.empty())
                         {
-                            while (!idxOfWheelsToMoveTo.empty())
+                            const auto idxTopWheel = idxOfWheelsToMoveTo.top();
+                            idxOfWheelsToMoveTo.pop();
+                            TimerList expiredTimers;
+                            const uint64_t lowResolutionTicksToMoveToLowerWheel = ((1ull << (idxTopWheel * 6)) >> 6);
+                            for (auto i = 0; i < 3; ++i)
                             {
-                                const auto idxTopWheel = idxOfWheelsToMoveTo.top();
-                                idxOfWheelsToMoveTo.pop();
-                                TimerList expiredTimers;
-                                const uint64_t lowResolutionTicksToMoveToLowerWheel = ((1ull << (idxTopWheel * 6)) >> 4);
-                                for (auto i = 0; i < 3; ++i)
+                                TimerNotifierTest::increaseLowResolutionTickCounter(timerNotifier, lowResolutionTicksToMoveToLowerWheel - 1);
+                                pLowResolutionClockTicker->tick();
+                                REQUIRE(TimerNotifierTest::timersToNotify(timerNotifier).size() == 0);
+                                for (auto idx = 0; idx < 7; ++idx)
                                 {
-                                    TimerNotifierTest::increaseLowResolutionTickCounter(timerNotifier, lowResolutionTicksToMoveToLowerWheel - 1);
-                                    pLowResolutionClockTicker->tick();
+                                    REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idx).timerCount() == ((idx == idxTopWheel) ? 1 : 0));
+                                }
+                            }
+                            TimerNotifierTest::increaseLowResolutionTickCounter(timerNotifier, lowResolutionTicksToMoveToLowerWheel - 1);
+                            REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idxTopWheel).timerCount() == 1);
+                            pLowResolutionClockTicker->tick();
+                            REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idxTopWheel).timerCount() == 0);
+                        }
+
+                        AND_THEN("timer is moved either to lowest wheel of directly to timers to notify")
+                        {
+                            if (moveToWheel0)
+                            {
+                                REQUIRE(TimerNotifierTest::timersToNotify(timerNotifier).size() == 0);
+                                REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, 0).timerCount() == 1);
+                                for (auto idx = 1; idx < 7; ++idx)
+                                {
+                                    REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idx).timerCount() == 0);
+                                }
+                                auto * const pTimer = TimerNotifierTest::fetchTimerPrivate(&timer);
+                                REQUIRE(1 <= pTimer->timeout().count() && pTimer->timeout().count() <= 64);
+                                for (auto i = 0; i < (pTimer->timeout().count() - 1); ++i)
+                                {
+                                    pHighResolutionClockTicker->tick();
                                     REQUIRE(TimerNotifierTest::timersToNotify(timerNotifier).size() == 0);
-                                    for (auto idx = 0; idx < 7; ++idx)
+                                    REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, 0).timerCount() == 1);
+                                    for (auto idx = 1; idx < 7; ++idx)
                                     {
-                                        REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idx).timerCount() == ((idx == idxTopWheel) ? 1 : 0));
+                                        REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idx).timerCount() == 0);
                                     }
                                 }
-                                TimerNotifierTest::increaseLowResolutionTickCounter(timerNotifier, lowResolutionTicksToMoveToLowerWheel - 1);
-                                REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idxTopWheel).timerCount() == 1);
-                                pLowResolutionClockTicker->tick();
-                                REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idxTopWheel).timerCount() == 0);
+                                pHighResolutionClockTicker->tick();
+                                for (auto idx = 0; idx < 7; ++idx)
+                                {
+                                    REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idx).timerCount() == 0);
+                                }
+                                REQUIRE(TimerNotifierTest::timersToNotify(timerNotifier).size() == 0);
                             }
-
-                            AND_THEN("timer is moved out of timer wheels to timers to notify")
+                            else
                             {
                                 for (auto idx = 0; idx < 7; ++idx)
                                 {
@@ -638,10 +665,6 @@ SCENARIO("TimerNotifier moves timer on timer wheels until timer's timeout reache
                             }
                         }
                     }
-                }
-                else
-                {
-                    REQUIRE(TimerNotifierTest::timersToNotify(timerNotifier).size() == 1);
                 }
             }
         }
