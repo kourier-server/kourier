@@ -492,60 +492,47 @@ private:
 class SemaphoreAwaiter
 {
 public:
-    static bool signalSlotAwareWait(QSemaphore &semaphore, int timeoutInSecs)
+    static bool signalSlotAwareWait(QSemaphore &semaphore, int counter, QDeadlineTimer deadlineTimer)
     {
-        if (timeoutInSecs <= 0)
-            qFatal("Failed to wait for semaphore. The timeoutInSecs must be a positive integer.");
-        QDeadlineTimer deadlineTimer;
-        deadlineTimer.setRemainingTime(timeoutInSecs * 1000, Qt::PreciseTimer);
+        if (deadlineTimer.remainingTime() < 0)
+            qFatal("Failed to wait for semaphore. Deadline timer must have a non-negative remaining time.");
+        if (counter <= 0)
+            qFatal("Failed to wait for semaphore. counter must be a positive integer.");
         do
         {
             processEvents();
-            if (semaphore.tryAcquire())
-            {
-                processEvents();
+            if (semaphore.tryAcquire(counter))
                 return true;
-            }
             else
-                QCoreApplication::processEvents(QEventLoop::AllEvents | QEventLoop::WaitForMoreEvents, 1);
+                processEvents(1);
         } while (!deadlineTimer.hasExpired());
-        processEvents();
-        return semaphore.tryAcquire();
+        return semaphore.tryAcquire(counter);
+    }
+
+    static bool signalSlotAwareWait(QSemaphore &semaphore, QDeadlineTimer deadlineTimer)
+    {
+        return signalSlotAwareWait(semaphore, 1, deadlineTimer);
+    }
+
+    static bool signalSlotAwareWait(QSemaphore &semaphore, int timeoutInSecs)
+    {
+        return signalSlotAwareWait(semaphore, QDeadlineTimer(1000*timeoutInSecs));
     }
 
     static bool signalSlotAwareWait(QSemaphore &semaphore, int counter, int timeoutInSecs)
     {
-        if (timeoutInSecs <= 0)
-            qFatal("Failed to wait for semaphore. The timeoutInSecs must be a positive integer.");
-        if (counter <= 0)
-            qFatal("Failed to wait for semaphore. counter must be a positive integer.");
-        QDeadlineTimer deadlineTimer;
-        deadlineTimer.setRemainingTime(timeoutInSecs * 1000, Qt::PreciseTimer);
-        do
-        {
-            QCoreApplication::sendPostedEvents();
-            QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
-            QCoreApplication::processEvents(QEventLoop::AllEvents | QEventLoop::WaitForMoreEvents, qMax(0, deadlineTimer.remainingTime()));
-            if (semaphore.tryAcquire(counter))
-            {
-                QCoreApplication::sendPostedEvents();
-                QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
-                return true;
-            }
-        } while (!deadlineTimer.hasExpired());
-        QCoreApplication::sendPostedEvents();
-        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
-        return semaphore.tryAcquire();
+        return signalSlotAwareWait(semaphore, counter, QDeadlineTimer(1000*timeoutInSecs));
     }
 
 private:
-    static void processEvents()
+    static void processEvents(int timeInMSecs = -1)
     {
         QCoreApplication::sendPostedEvents();
         QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
-        QCoreApplication::processEvents();
-        QCoreApplication::sendPostedEvents();
-        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        if (timeInMSecs > 0)
+            QCoreApplication::processEvents(QEventLoop::AllEvents | QEventLoop::WaitForMoreEvents, timeInMSecs);
+        else
+            QCoreApplication::processEvents();
     }
 };
 

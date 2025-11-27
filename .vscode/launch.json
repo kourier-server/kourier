@@ -9,7 +9,7 @@
             "type": "lldb-dap",
             "request": "launch",
             "program": "${command:cmake.launchTargetPath}",
-            "args": ["-f", "TimerNotifier.spec.cpp"],
+            "args": ["-f", "Timer.spec.cpp"],
             "env": [],
             "cwd": "${workspaceRoot}",
             "internalConsoleOptions": "openOnSessionStart",

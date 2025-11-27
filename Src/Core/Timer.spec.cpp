@@ -22,20 +22,25 @@
 #include <QDateTime>
 #include <QSemaphore>
 #include <QElapsedTimer>
+#include <chrono>
 #include <cmath>
 #include <Spectator.h>
+#include <qdeadlinetimer.h>
+#include <qelapsedtimer.h>
+#include <qsemaphore.h>
 
 using Kourier::Timer;
 using Kourier::Object;
 using Spectator::SemaphoreAwaiter;
+using namespace std::chrono_literals;
 
-/*
-SCENARIO("Timer with non-zero interval times out after given interval but before 1024ms after given interval")
+
+SCENARIO("Timer with non-zero interval times out after given interval with 1ms of error")
 {
     GIVEN("a timer set to expire")
     {
         Timer timer;
-        const auto intervalInMSecs = GENERATE(AS(qint64), 0, 1, 180, 3500);
+        const auto intervalInMSecs = GENERATE(AS(std::chrono::milliseconds), 0ms, 3ms, 8ms);
         QSemaphore semaphore;
         QElapsedTimer elapsedTimer;
         qint64 elapsedTimeInMSecs = 0;
@@ -51,9 +56,9 @@ SCENARIO("Timer with non-zero interval times out after given interval but before
         {
             REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(semaphore, 10));
 
-            THEN("timer timeout after given interval but before 1024ms after given interval")
+            THEN("timer timeout after given interval with max error of 1ms")
             {
-                REQUIRE(intervalInMSecs <= elapsedTimeInMSecs && elapsedTimeInMSecs <= (1024 + intervalInMSecs));
+                REQUIRE(std::abs(intervalInMSecs.count() - elapsedTimeInMSecs) <= 1);
             }
         }
     }
@@ -65,7 +70,7 @@ SCENARIO("Active Timer reschedules its timeout upon changes on timer's interval"
     GIVEN("a single-shot timer with a given interval")
     {
         Timer timer;
-        const auto intervalInMSecs = GENERATE(AS(qint64), 0, 1, 180, 3500);
+        const auto intervalInMSecs = GENERATE(AS(std::chrono::milliseconds), 0ms, 3ms, 8ms);
         timer.setInterval(intervalInMSecs);
         timer.setSingleShot(true);
         qint64 expirationCount = 0;
@@ -90,25 +95,25 @@ SCENARIO("Active Timer reschedules its timeout upon changes on timer's interval"
 
                 AND_WHEN("we wait until timer expires after timer interval is changed")
                 {
-                    const auto newIntervalInMSecs = GENERATE(AS(qint64), 0, 1, 180, 3500);
+                    const auto newIntervalInMSecs = GENERATE(AS(std::chrono::milliseconds), 0ms, 3ms, 8ms);
                     elapsedTimer.start();
                     timer.setInterval(newIntervalInMSecs);
                     REQUIRE(newIntervalInMSecs == timer.interval())
                     REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(semaphore, 10));
 
-                    THEN("timer timeout after given interval but before 1024ms after given interval")
+                    THEN("timer timeout after given interval")
                     {
-                        REQUIRE(newIntervalInMSecs <= elapsedTimeInMSecs && elapsedTimeInMSecs <= (1024 + newIntervalInMSecs));
+                        REQUIRE(std::abs(newIntervalInMSecs.count() - elapsedTimeInMSecs) <= 1);
                     }
                 }
             }
         }
     }
 
-    GIVEN("a single-shot timer with an interval of 5000ms")
+    GIVEN("a single-shot timer with an interval of 5ms")
     {
         Timer timer;
-        const qint64 intervalInMSecs = 5000;
+        const auto intervalInMSecs = 5ms;
         timer.setInterval(intervalInMSecs);
         timer.setSingleShot(true);
         qint64 expirationCount = 0;
@@ -122,11 +127,11 @@ SCENARIO("Active Timer reschedules its timeout upon changes on timer's interval"
             semaphore.release();
         });
 
-        WHEN("timer is started and we wait for 4800ms")
+        WHEN("timer is started and we wait for 2ms")
         {
             elapsedTimer.start();
             timer.start();
-            QThread::msleep(3000);
+            QThread::msleep(2);
             QCoreApplication::processEvents();
 
             THEN("timer does not emit timeout")
@@ -140,9 +145,9 @@ SCENARIO("Active Timer reschedules its timeout upon changes on timer's interval"
                     REQUIRE(intervalInMSecs == timer.interval())
                     REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(semaphore, 10));
 
-                    THEN("timer timeout after given interval but before 1024ms after given interval")
+                    THEN("timer timeout after given interval with 1ms max error")
                     {
-                        REQUIRE(intervalInMSecs <= elapsedTimeInMSecs && elapsedTimeInMSecs <= (1024 + intervalInMSecs));
+                        REQUIRE(std::abs(intervalInMSecs.count() - elapsedTimeInMSecs) <= 1);
                     }
                 }
             }
@@ -151,56 +156,12 @@ SCENARIO("Active Timer reschedules its timeout upon changes on timer's interval"
 }
 
 
-SCENARIO("Active Timer reschedules its timeout if it is started again")
+SCENARIO("Active Timer reschedules it's timeout if it is started again")
 {
     GIVEN("a single-shot timer with a given interval")
     {
         Timer timer;
-        const auto intervalInMSecs = GENERATE(AS(qint64), 0, 1, 180, 3500);
-        timer.setInterval(intervalInMSecs);
-        timer.setSingleShot(true);
-        qint64 expirationCount = 0;
-        QElapsedTimer elapsedTimer;
-        qint64 elapsedTimeInMSecs = 0;
-        QSemaphore semaphore;
-        Object::connect(&timer, &Timer::timeout, [&expirationCount, &elapsedTimeInMSecs, &elapsedTimer, &semaphore]()
-                        {
-                            ++expirationCount;
-                            elapsedTimeInMSecs = elapsedTimer.elapsed();
-                            semaphore.release();
-                        });
-
-        WHEN("timer is started")
-        {
-            elapsedTimer.start();
-            timer.start();
-
-            THEN("timer does not emit timeout")
-            {
-                REQUIRE(0 == expirationCount);
-
-                AND_WHEN("we wait until timer expires after starting timer again")
-                {
-                    const auto newIntervalInMSecs = GENERATE(AS(qint64), 0, 1, 180, 3500);
-                    elapsedTimer.start();
-                    timer.start(newIntervalInMSecs);
-                    REQUIRE(newIntervalInMSecs == timer.interval())
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(semaphore, 10));
-
-                    THEN("timer timeout after given interval but before 1024ms after given interval")
-                    {
-                        REQUIRE(newIntervalInMSecs <= elapsedTimeInMSecs && elapsedTimeInMSecs <= (1024 + newIntervalInMSecs));
-                    }
-                }
-            }
-        }
-    }
-
-
-    GIVEN("a single-shot timer with an interval of 5000ms")
-    {
-        Timer timer;
-        const qint64 intervalInMSecs = 5000;
+        const auto intervalInMSecs = GENERATE(AS(std::chrono::milliseconds), 0ms, 3ms, 8ms);
         timer.setInterval(intervalInMSecs);
         timer.setSingleShot(true);
         qint64 expirationCount = 0;
@@ -214,11 +175,55 @@ SCENARIO("Active Timer reschedules its timeout if it is started again")
             semaphore.release();
         });
 
-        WHEN("timer is started and we wait for 4800ms")
+        WHEN("timer is started")
         {
             elapsedTimer.start();
             timer.start();
-            QThread::msleep(3000);
+
+            THEN("timer does not emit timeout")
+            {
+                REQUIRE(0 == expirationCount);
+
+                AND_WHEN("we wait until timer expires after starting timer again")
+                {
+                    const auto newIntervalInMSecs = GENERATE(AS(std::chrono::milliseconds), 0ms, 3ms, 8ms);
+                    elapsedTimer.start();
+                    timer.start(newIntervalInMSecs);
+                    REQUIRE(newIntervalInMSecs == timer.interval())
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(semaphore, 10));
+
+                    THEN("timer timeout after given interval")
+                    {
+                        REQUIRE(std::abs(newIntervalInMSecs.count() - elapsedTimeInMSecs) <= 1);
+                    }
+                }
+            }
+        }
+    }
+
+
+    GIVEN("a single-shot timer with an interval of 5ms")
+    {
+        Timer timer;
+        const auto intervalInMSecs = 5ms;
+        timer.setInterval(intervalInMSecs);
+        timer.setSingleShot(true);
+        qint64 expirationCount = 0;
+        QElapsedTimer elapsedTimer;
+        qint64 elapsedTimeInMSecs = 0;
+        QSemaphore semaphore;
+        Object::connect(&timer, &Timer::timeout, [&expirationCount, &elapsedTimeInMSecs, &elapsedTimer, &semaphore]()
+        {
+            ++expirationCount;
+            elapsedTimeInMSecs = elapsedTimer.elapsed();
+            semaphore.release();
+        });
+
+        WHEN("timer is started and we wait for 2ms")
+        {
+            elapsedTimer.start();
+            timer.start();
+            QThread::msleep(2);
             QCoreApplication::processEvents();
 
             THEN("timer does not emit timeout")
@@ -232,9 +237,9 @@ SCENARIO("Active Timer reschedules its timeout if it is started again")
                     REQUIRE(intervalInMSecs == timer.interval())
                     REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(semaphore, 10));
 
-                    THEN("timer timeout after given interval but before 1024ms after given interval")
+                    THEN("timer timeout after given interval")
                     {
-                        REQUIRE(intervalInMSecs <= elapsedTimeInMSecs && elapsedTimeInMSecs <= (1024 + intervalInMSecs));
+                        REQUIRE(std::abs(intervalInMSecs.count() - elapsedTimeInMSecs) <= 1);
                     }
                 }
             }
@@ -248,7 +253,7 @@ SCENARIO("Active Timer does not emit timeout if it is stopped")
     GIVEN("an active timer with a given interval")
     {
         Timer timer;
-        const auto intervalInMSecs = GENERATE(AS(qint64), 0, 1, 180, 3500);
+        const auto intervalInMSecs = GENERATE(AS(std::chrono::milliseconds), 0ms, 3ms, 8ms);
         timer.setInterval(intervalInMSecs);
         timer.setSingleShot(false);
         Object::connect(&timer, &Timer::timeout, [](){FAIL("This code is supposed to be unreachable.");});
@@ -261,7 +266,7 @@ SCENARIO("Active Timer does not emit timeout if it is stopped")
             THEN("timer does not emit timeout signal")
             {
                 QSemaphore semaphore;
-                REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(semaphore, (intervalInMSecs + 1024 + 999)/1000));
+                REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(semaphore, QDeadlineTimer(intervalInMSecs.count() + 2)));
             }
         }
     }
@@ -273,12 +278,12 @@ SCENARIO("Expired Timer does not emit timeout if it is stopped")
     GIVEN("an expired timer with a given interval")
     {
         Timer timer;
-        const auto intervalInMSecs = GENERATE(AS(qint64), 0, 1, 180, 3500);
+        const auto intervalInMSecs = GENERATE(AS(std::chrono::milliseconds), 0ms, 3ms, 8ms);
         timer.setInterval(intervalInMSecs);
         timer.setSingleShot(false);
         Object::connect(&timer, &Timer::timeout, [](){FAIL("This code is supposed to be unreachable.");});
         timer.start();
-        QThread::sleep((intervalInMSecs + 1025 + 999)/1000);
+        QThread::msleep(intervalInMSecs.count() + 2);
 
         WHEN("timer is stopped")
         {
@@ -287,7 +292,7 @@ SCENARIO("Expired Timer does not emit timeout if it is stopped")
             THEN("timer does not emit timeout signal when control returns to event loop")
             {
                 QSemaphore semaphore;
-                REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(semaphore, (intervalInMSecs + 1024 + 999)/1000));
+                REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(semaphore, QDeadlineTimer(intervalInMSecs.count() + 2)));
             }
         }
     }
@@ -299,12 +304,13 @@ SCENARIO("Expired Timer emits timeout when control returns to the event loop")
     GIVEN("a timer")
     {
         const auto isSingleShot = GENERATE(AS(bool), true, false);
-        const auto interval = GENERATE(AS(qint64), 0, 1, 350, 1240, 3822);
+        const auto interval = GENERATE(AS(std::chrono::milliseconds), 3ms, 8ms);
         const auto setInterval = GENERATE(AS(bool), true, false);
         const auto setIntervalWhenStarting = GENERATE(AS(bool), true, false);
         Timer timer;
         int timeoutEmissionCounter = 0;
-        Object::connect(&timer, &Timer::timeout, [&timeoutEmissionCounter](){++timeoutEmissionCounter;});
+        QSemaphore emittedTimeoutSemaphore;
+        Object::connect(&timer, &Timer::timeout, [&](){++timeoutEmissionCounter; emittedTimeoutSemaphore.release();});
         timer.setSingleShot(isSingleShot);
         if (setIntervalWhenStarting)
         {
@@ -320,14 +326,14 @@ SCENARIO("Expired Timer emits timeout when control returns to the event loop")
 
         WHEN("control returns to the event loop after timer expires")
         {
-            const auto timeInMSecsToExpire = interval + 1025;
+            const auto timeInMSecsToExpire = interval.count() + 2;
             QCoreApplication::processEvents();
             REQUIRE(0 == timeoutEmissionCounter);
             QThread::msleep(timeInMSecsToExpire);
 
             THEN("timer emits timeout")
             {
-                QCoreApplication::processEvents();
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, 10));
                 REQUIRE(1 == timeoutEmissionCounter);
             }
         }
@@ -335,18 +341,18 @@ SCENARIO("Expired Timer emits timeout when control returns to the event loop")
 }
 
 
-SCENARIO("Expired Timer does not emit timeout when restarted if Timer Registrar's main timer expires")
+SCENARIO("Expired Timer does not emit timeout when restarted")
 {
     GIVEN("a timer")
     {
         const auto isSingleShot = GENERATE(AS(bool), true, false);
-        const auto interval = GENERATE(AS(qint64), 1240, 3822);
+        const auto interval = GENERATE(AS(std::chrono::milliseconds), 3ms, 8ms);
         const auto setInterval = GENERATE(AS(bool), true, false);
         const auto setIntervalWhenStarting = GENERATE(AS(bool), true, false);
-        const auto expireMainTimer = GENERATE(AS(bool), true, false);
         Timer timer;
         int timeoutEmissionCounter = 0;
-        Object::connect(&timer, &Timer::timeout, [&timeoutEmissionCounter](){++timeoutEmissionCounter;});
+        QSemaphore emittedTimeoutSemaphore;
+        Object::connect(&timer, &Timer::timeout, [&](){++timeoutEmissionCounter; emittedTimeoutSemaphore.release();});
         timer.setSingleShot(isSingleShot);
         if (setIntervalWhenStarting)
         {
@@ -362,19 +368,15 @@ SCENARIO("Expired Timer does not emit timeout when restarted if Timer Registrar'
 
         WHEN("timer is restarted before control returns to the event loop")
         {
-            const auto timeInMSecsToWaitForMainTimerToExpire = (expireMainTimer ? (interval > 1024 ? interval - 512 : 512) : 0);
-            if (expireMainTimer)
-                QThread::msleep(timeInMSecsToWaitForMainTimerToExpire);
-            const auto timeInMSecsToExpire = interval + 1025 - timeInMSecsToWaitForMainTimerToExpire;
-            QCoreApplication::processEvents();
-            REQUIRE(0 == timeoutEmissionCounter);
+            const auto timeInMSecsToExpire = interval.count() + 2;
             QThread::msleep(timeInMSecsToExpire);
-            timer.start();
+            timer.start(interval);
 
-            THEN("timer does not emit timeout if main timer expires")
+            THEN("timer does not emit timeout")
             {
-                QCoreApplication::processEvents();
-                REQUIRE(timeoutEmissionCounter == (expireMainTimer ? 0 : 1));
+                const auto timeInMSecsBeforeExpire = std::max(0ll, interval.count() - 1ll);
+                REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, QDeadlineTimer(timeInMSecsBeforeExpire)));
+                REQUIRE(timeoutEmissionCounter == 0);
             }
         }
     }
@@ -385,12 +387,13 @@ SCENARIO("Single-shot Timer emits timeout only once")
 {
     GIVEN("a single shot timer")
     {
-        const auto interval = GENERATE(AS(qint64), 0, 1, 350, 1240, 3822);
+        const auto interval = GENERATE(AS(std::chrono::milliseconds), 3ms, 5ms);
         const auto setInterval = GENERATE(AS(bool), true, false);
         const auto setIntervalWhenStarting = GENERATE(AS(bool), true, false);
         Timer timer;
         int timeoutEmissionCounter = 0;
-        Object::connect(&timer, &Timer::timeout, [&timeoutEmissionCounter](){++timeoutEmissionCounter;});
+        QSemaphore emittedTimeoutSemaphore;
+        Object::connect(&timer, &Timer::timeout, [&](){++timeoutEmissionCounter; emittedTimeoutSemaphore.release();});
         timer.setSingleShot(true);
         if (setIntervalWhenStarting)
         {
@@ -406,22 +409,21 @@ SCENARIO("Single-shot Timer emits timeout only once")
 
         WHEN("control returns to the event loop after timer expires")
         {
-            const auto timeInMSecsToExpire = interval + 1025;
+            const auto timeInMSecsToExpire = interval.count() + 2;
             QCoreApplication::processEvents();
             REQUIRE(0 == timeoutEmissionCounter);
             QThread::msleep(timeInMSecsToExpire);
+            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, 10));
 
             THEN("timer emits timeout")
             {
-                QCoreApplication::processEvents();
                 REQUIRE(1 == timeoutEmissionCounter);
 
-                AND_WHEN("control returns to the event loop after timer expires again")
+                AND_WHEN("control returns to the event loop and stays there for an interval greater than the timer's interval")
                 {
-                    QThread::msleep(timeInMSecsToExpire);
-                    QCoreApplication::processEvents();
+                    REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, QDeadlineTimer(timeInMSecsToExpire)));
 
-                    THEN("timer does not emit timeout")
+                    THEN("timer does not emit timeout again")
                     {    
                         REQUIRE(1 == timeoutEmissionCounter);
                     }
@@ -432,6 +434,74 @@ SCENARIO("Single-shot Timer emits timeout only once")
 }
 
 
+SCENARIO("Timer with 0 interval expires once, despite it's single shot status")
+{
+    GIVEN("a timer with zero interval")
+    {
+        Timer timer;
+        REQUIRE(timer.interval().count() == 0);
+        const bool isSingleShot = GENERATE(AS(bool), true, false);
+        timer.setSingleShot(isSingleShot);
+
+        WHEN("timer is started")
+        {
+            bool hasEmittedTimeout = false;
+            QSemaphore emittedTimeoutSemaphore;
+            Object::connect(&timer, &Timer::timeout, [&]()
+            {
+                REQUIRE(!hasEmittedTimeout);
+                hasEmittedTimeout = true;
+                emittedTimeoutSemaphore.release();
+            });
+            timer.start();
+
+            THEN("timer emits timeout only once")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, 10));
+                REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, QDeadlineTimer(2)));
+            }
+        }
+        
+    }
+}
+
+
+SCENARIO("Precise Timer does not suffer drifts from user sleeps")
+{
+    GIVEN("a timer to expire in 3ms")
+    {
+        Timer timer;
+        QSemaphore emittedTimeoutSemaphore;
+        QElapsedTimer elapsedTimer;
+        qint64 elapsedTimeInMSecs = 0;
+        Object::connect(&timer, &Timer::timeout, [&](){elapsedTimeInMSecs = elapsedTimer.elapsed(); emittedTimeoutSemaphore.release();});
+        timer.start(3ms);
+
+        WHEN("user sleeps for 5ms before restarting the timer")
+        {
+            QThread::msleep(5);
+            elapsedTimer.start();
+            timer.start();
+
+            THEN("returning to the event loop and processing the 5ms slept does not trigger the restarted timer with 3ms interval")
+            {
+                REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, 2ms));
+
+                AND_WHEN("we wait until timer times out")
+                {
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, 10));
+
+                    THEN("timer expires in 3ms")
+                    {
+                        REQUIRE(std::abs(elapsedTimeInMSecs - 3ll) <= 1);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/*
 SCENARIO("Non single-shot Timer emits timeout repeatedly")
 {
     GIVEN("a non single shot timer")

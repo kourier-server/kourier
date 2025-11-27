@@ -97,6 +97,12 @@ void TimerNotifier::addTimer(TimerPrivate *pTimer)
                     if (currentTime > m_lowResolutionTime) [[likely]]
                         pTimer->setExtraTimeout(currentTime - m_lowResolutionTime);
                 }
+                else if (m_pHighResolutionClockTicker->isEnabled())
+                {
+                    const auto currentTime = msSinceEpoch();
+                    if (currentTime > m_highResolutionTime) [[likely]]
+                        pTimer->setExtraTimeout(currentTime - m_highResolutionTime);
+                }
                 break;
         }
         const uint8_t wheelIdxMap[64] = {0,0,0,0,0,0,
@@ -183,14 +189,11 @@ void Kourier::TimerNotifier::onLowResolutionTick()
 
 void TimerNotifier::onHighResolutionTick()
 {
+    m_highResolutionTime += std::chrono::milliseconds(1);
     TimerList expiredTimers;
     m_timerWheels[0].tick(expiredTimers);
+    processExpiredTimers(expiredTimers);
     setHighResolutionClockTickerEnabled(!m_timerWheels[0].isEmpty());
-    if (!expiredTimers.isEmpty())
-    {
-        m_timersToNotify.pushFront(expiredTimers);
-        notifyTimers();
-    }
 }
 
 void TimerNotifier::set()

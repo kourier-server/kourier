@@ -46,7 +46,12 @@ private:
     void addAdjustedTimer(TimerPrivate *pTimer);
     void onLowResolutionTick();
     void onHighResolutionTick();
-    inline void setHighResolutionClockTickerEnabled(bool enabled) {m_pHighResolutionClockTicker->setEnabled(enabled);}
+    inline void setHighResolutionClockTickerEnabled(bool enabled)
+    {
+        if (enabled && !m_pHighResolutionClockTicker->isEnabled())
+            m_highResolutionTime = msSinceEpoch();
+        m_pHighResolutionClockTicker->setEnabled(enabled);
+    }
     inline void processExpiredTimers(TimerList &expiredTimers)
     {
         while (!expiredTimers.isEmpty())
@@ -74,6 +79,7 @@ private:
 private:
     static constexpr uint64_t maxTimeout = 1ull << 42;
     std::chrono::milliseconds m_lowResolutionTime = std::chrono::milliseconds(0);
+    std::chrono::milliseconds m_highResolutionTime = std::chrono::milliseconds(0);
     uint64_t m_lowResolutionTickCounter = 0;
     TimerList m_timersToNotify;
     std::shared_ptr<ClockTicker> m_pLowResolutionClockTicker;
