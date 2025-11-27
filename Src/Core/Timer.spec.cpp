@@ -471,6 +471,7 @@ SCENARIO("Precise Timer does not suffer drifts from user sleeps")
     GIVEN("a timer to expire in 3ms")
     {
         Timer timer;
+        timer.setTimerType(Timer::TimerType::Precise);
         QSemaphore emittedTimeoutSemaphore;
         QElapsedTimer elapsedTimer;
         qint64 elapsedTimeInMSecs = 0;
