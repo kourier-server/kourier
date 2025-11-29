@@ -12,4 +12,4 @@ qt_add_library(TestResources STATIC
 
 find_package(Qt6 COMPONENTS Core Network REQUIRED)
 target_link_libraries(TestResources PRIVATE Qt::Core Qt::Network)
-target_precompile_headers(TestResources PRIVATE <QtCore> <QtNetwork>)
+# target_precompile_headers(TestResources PRIVATE <QtCore> <QtNetwork>)

@@ -18,6 +18,7 @@
 #include "TlsSocket.h"
 #include "TlsSocketPrivate_epoll.h"
 #include "UnixUtils.h"
+#include <QHostAddress>
 #include <openssl/err.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>

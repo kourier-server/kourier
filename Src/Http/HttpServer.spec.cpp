@@ -29,6 +29,7 @@
 #include <QNetworkRequest>
 #include <QNetworkReply>
 #include <QMutex>
+#include <QElapsedTimer>
 #include <memory>
 #include <string>
 #include <vector>

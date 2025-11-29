@@ -20,6 +20,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QHostInfo>
 #include <vector>
 #include <string>
 #include <map>

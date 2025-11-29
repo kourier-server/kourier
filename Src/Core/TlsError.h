@@ -18,6 +18,7 @@
 #ifndef KOURIER_TLS_ERROR_H
 #define KOURIER_TLS_ERROR_H
 
+#include <string_view>
 
 namespace Kourier
 {

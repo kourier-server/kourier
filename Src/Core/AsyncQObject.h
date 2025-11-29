@@ -18,7 +18,9 @@
 #ifndef KOURIER_ASYNC_Q_OBJECT_H
 #define KOURIER_ASYNC_Q_OBJECT_H
 
+#include <QObject>
 #include <QThread>
+#include <QAbstractEventDispatcher>
 #include <QSemaphore>
 #include <QMutexLocker>
 #include <memory>
@@ -75,7 +77,7 @@ private:
         auto *pEventDispatcher = m_thread->eventDispatcher();
         QMetaObject::Connection connection;
         if (!m_hasFinished && pEventDispatcher)
-            connection = QObject::connect(pEventDispatcher, &QObject::destroyed, [&eventDispatcherDestroyedSemaphore]{eventDispatcherDestroyedSemaphore.release();});
+            connection = QObject::connect(pEventDispatcher, &QObject::destroyed, [&eventDispatcherDestroyedSemaphore](){eventDispatcherDestroyedSemaphore.release();});
         else
             eventDispatcherDestroyedSemaphore.release();
         m_finishedMutex.unlock();

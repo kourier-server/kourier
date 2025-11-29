@@ -28,8 +28,8 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         Qt::Core
         Qt::Concurrent
         Qt::Network)
-    target_precompile_headers(KourierServer PRIVATE
-        <QtCore>
-        <QtConcurrent>
-        <QtNetwork>)
+    # target_precompile_headers(KourierServer PRIVATE
+    #     <QtCore>
+    #     <QtConcurrent>
+    #     <QtNetwork>)
 endif()

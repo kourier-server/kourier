@@ -34,6 +34,7 @@
 #include <functional>
 #include <exception>
 #include <initializer_list>
+#include <qtypes.h>
 #if __has_include(<unistd.h>)
 #include <csignal>
 #endif
@@ -462,8 +463,8 @@ public:
 
     T currentRangeValue(T minVal, T maxVal, T stepVal, QByteArrayView sourceFile, int sourceLine)
     {
-        const size_t size = (maxVal - minVal + 1)/stepVal;
-        const size_t currentIndex = ThreadLocalSectionRegistrar::currentSectionRegistrar().top().currentGeneratorIndex({sourceFile, sourceLine, size});
+        const qsizetype size = (maxVal - minVal + 1)/stepVal;
+        const qsizetype currentIndex = ThreadLocalSectionRegistrar::currentSectionRegistrar().top().currentGeneratorIndex({sourceFile, sourceLine, size});
         const auto currentValue = minVal + stepVal * currentIndex;
         return currentValue;
     }

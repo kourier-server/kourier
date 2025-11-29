@@ -20,6 +20,7 @@
 #include "../Core/NoDestroy.h"
 #include <QHostAddress>
 #include <QMutex>
+#include <QThread>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
@@ -160,7 +161,7 @@ bool QTcpServerBasedConnectionListener::start(QVariant data)
         }
         QDeadlineTimer deadlineTimer(20000);
         while(bind(socketFd, (struct sockaddr *) &addr, sizeof(addr)) && !deadlineTimer.hasExpired())
-            QThread::msleep(100);
+            QThread::msleep(5);
         if (deadlineTimer.hasExpired())
         {
             m_errorMessage = "Failed to bind receive socket";
