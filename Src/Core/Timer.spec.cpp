@@ -26,7 +26,6 @@
 #include <chrono>
 #include <cmath>
 #include <Spectator.h>
-#include <iostream>
 
 using Kourier::Timer;
 using Kourier::Object;
