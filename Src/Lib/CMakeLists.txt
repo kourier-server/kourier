@@ -123,10 +123,10 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         Qt::Concurrent
         Qt::Network
         OpenSSL::SSL)
-    # target_precompile_headers(Lib PRIVATE
-    #     <QtCore>
-    #     <QtConcurrent>
-    #     <QtNetwork>)
+    target_precompile_headers(Lib PRIVATE
+        <QtCore>
+        <QtConcurrent>
+        <QtNetwork>)
     include(GNUInstallDirs)
     target_include_directories(Lib PUBLIC "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
     install(TARGETS Lib

@@ -83,7 +83,7 @@ target_link_libraries(KourierCore PRIVATE
     Qt::Core
     Qt::Concurrent
     Qt::Network)
-# target_precompile_headers(KourierCore PRIVATE
-#     <QtCore>
-#     <QtConcurrent>
-#     <QtNetwork>)
+target_precompile_headers(KourierCore PRIVATE
+    <QtCore>
+    <QtConcurrent>
+    <QtNetwork>)

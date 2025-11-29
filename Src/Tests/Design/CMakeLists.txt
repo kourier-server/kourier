@@ -49,10 +49,10 @@ target_link_libraries(DesignTests
     Qt::Concurrent
     Qt::Network)
 target_include_directories(DesignTests PRIVATE ../Spectator ../..)
-# target_precompile_headers(DesignTests PRIVATE
-#     <Spectator.h>
-#     <QtCore>
-#     <QtConcurrent>
-#     <QtNetwork>)
+target_precompile_headers(DesignTests PRIVATE
+    <Spectator.h>
+    <QtCore>
+    <QtConcurrent>
+    <QtNetwork>)
 add_subdirectory(UnixSignalListenerTestApp)
 add_dependencies(DesignTests UnixSignalListenerTestApp)
