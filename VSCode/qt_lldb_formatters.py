@@ -435,7 +435,6 @@ class QUrlProvider:
 
 
 def __lldb_init_module(debugger, dict):
-    print("Loading Qt formatters")
     debugger.HandleCommand('type summary add QByteArray -F qt_lldb_formatters.QByteArrayProvider.provide_summary')
     debugger.HandleCommand('type synthetic add QByteArray --python-class qt_lldb_formatters.QByteArrayProvider')
     debugger.HandleCommand('type summary add QString -F qt_lldb_formatters.QStringProvider.provide_summary')
@@ -473,3 +472,4 @@ def __lldb_init_module(debugger, dict):
     debugger.HandleCommand('type summary add "QUrl" -F qt_lldb_formatters.QUrlProvider.provide_summary')
     debugger.HandleCommand('type synthetic add "QUrl" --python-class qt_lldb_formatters.QUrlProvider')
     debugger.HandleCommand("settings set target.prefer-dynamic-value no-dynamic-values")
+    print("Loaded Qt formatters")

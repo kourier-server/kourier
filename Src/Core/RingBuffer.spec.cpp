@@ -174,7 +174,8 @@ SCENARIO("RingBuffer allows setting capacity after creation")
 
         WHEN("capacity is set to a positive value smaller than buffer's size")
         {
-            const auto newCapacity = GENERATE_RANGE(AS(size_t), 1, initialDataSize - 1);
+            REQUIRE(3 < initialDataSize);
+            const auto newCapacity = GENERATE(AS(size_t), 1, 3, initialDataSize - 1);
             const bool succeeded = ringBuffer.setCapacity(newCapacity);
 
             THEN("buffer fails to change its capacity")
@@ -192,7 +193,11 @@ SCENARIO("RingBuffer allows setting capacity after creation")
 
         WHEN("capacity is set to a positive value equal to or greater than buffer's size but smaller than buffer's default capacity")
         {
-            const auto newCapacity = GENERATE_RANGE(AS(size_t), initialDataSize, RingBuffer::defaultCapacity() - 1);
+            REQUIRE((initialDataSize + 3) < RingBuffer::defaultCapacity());
+            const auto newCapacity = GENERATE(AS(size_t), initialDataSize,
+                                                          initialDataSize + 1,
+                                                          initialDataSize + 3,
+                                                          RingBuffer::defaultCapacity() - 1);
             const bool succeeded = ringBuffer.setCapacity(newCapacity);
 
             THEN("buffer changes its capacity and adjust its availableFreeSize")
@@ -211,7 +216,9 @@ SCENARIO("RingBuffer allows setting capacity after creation")
 
         WHEN("capacity is set to a positive value equal to or greater than buffer's default capacity")
         {
-            const auto newCapacity = GENERATE_RANGE(AS(size_t), RingBuffer::defaultCapacity(), RingBuffer::defaultCapacity() + 16);
+            const auto newCapacity = GENERATE(AS(size_t), RingBuffer::defaultCapacity(),
+                                                          RingBuffer::defaultCapacity() + 1,
+                                                          RingBuffer::defaultCapacity() + 5);
             const bool succeeded = ringBuffer.setCapacity(newCapacity);
 
             THEN("buffer changes its capacity keep its availableFreeSize")
@@ -269,7 +276,8 @@ SCENARIO("RingBuffer allows setting capacity after creation")
 
         WHEN("capacity is set to a positive value smaller than buffer's size")
         {
-            const auto newCapacity = GENERATE_RANGE(AS(size_t), 1, initialDataSize - 1);
+            REQUIRE(3 < initialDataSize);
+            const auto newCapacity = GENERATE(AS(size_t), 1, 3, initialDataSize - 1);
             const bool succeeded = ringBuffer.setCapacity(newCapacity);
 
             THEN("buffer fails to change its capacity")
@@ -287,7 +295,10 @@ SCENARIO("RingBuffer allows setting capacity after creation")
 
         WHEN("capacity is set to a positive value equal to or greater than buffer's default capacity")
         {
-            const auto newCapacity = GENERATE_RANGE(AS(size_t), RingBuffer::defaultCapacity(), RingBuffer::defaultCapacity() + 16);
+            const auto newCapacity = GENERATE(AS(size_t), RingBuffer::defaultCapacity(),
+                                                          RingBuffer::defaultCapacity() + 1,
+                                                          RingBuffer::defaultCapacity() + 3,
+                                                          RingBuffer::defaultCapacity() + 16);
             const bool succeeded = ringBuffer.setCapacity(newCapacity);
 
             THEN("buffer changes its capacity keep its availableFreeSize")
@@ -339,7 +350,8 @@ SCENARIO("Ring buffers can be cleared at any time")
         REQUIRE(ringBuffer.isEmpty());
         REQUIRE(ringBuffer.size() == 0);
         REQUIRE(ringBuffer.availableFreeSize() == RingBuffer::defaultCapacity());
-        const auto initialDataSize = GENERATE_RANGE(AS(size_t), 1, RingBuffer::defaultCapacity());
+        REQUIRE(18 < RingBuffer::defaultCapacity());
+        const auto initialDataSize = GENERATE(AS(size_t), 1, 3, 18, RingBuffer::defaultCapacity());
         static const auto initialData = []() -> std::string
         {
             std::string tmp(RingBuffer::defaultCapacity(), ' ');
@@ -377,7 +389,10 @@ SCENARIO("Ring buffers can be cleared at any time")
         REQUIRE(ringBuffer.isEmpty());
         REQUIRE(ringBuffer.size() == 0);
         REQUIRE(ringBuffer.availableFreeSize() == RingBuffer::defaultCapacity());
-        const auto initialDataSize = GENERATE_RANGE(AS(size_t), RingBuffer::defaultCapacity() + 1, 2 * RingBuffer::defaultCapacity());
+        const auto initialDataSize = GENERATE(AS(size_t), RingBuffer::defaultCapacity() + 1,
+                                                          RingBuffer::defaultCapacity() + 3,
+                                                          RingBuffer::defaultCapacity() + 18,
+                                                          2 * RingBuffer::defaultCapacity());
         std::string initialData(initialDataSize, ' ');
         for (auto &ch : initialData)
             ch = QRandomGenerator64::global()->bounded(0, 256);
@@ -428,7 +443,12 @@ SCENARIO("Ring buffers can be cleared at any time")
         REQUIRE(ringBuffer.isEmpty());
         REQUIRE(ringBuffer.size() == 0);
         REQUIRE(ringBuffer.availableFreeSize() == (2 * RingBuffer::defaultCapacity()));
-        const auto initialDataSize = GENERATE_RANGE(AS(size_t), 1, 2 * RingBuffer::defaultCapacity());
+        const auto initialDataSize = GENERATE(AS(size_t), 1, 3,
+                                                          RingBuffer::defaultCapacity() - 1,
+                                                          RingBuffer::defaultCapacity(),
+                                                          RingBuffer::defaultCapacity() + 7,
+                                                          2 * RingBuffer::defaultCapacity() - 1,
+                                                          2 * RingBuffer::defaultCapacity());
         static const auto initialData = []() -> std::string
         {
             std::string tmp(2 * RingBuffer::defaultCapacity(), ' ');
@@ -496,7 +516,8 @@ SCENARIO("Empty ring buffers can be reset back to their initial default capacity
         REQUIRE(ringBuffer.isEmpty());
         REQUIRE(ringBuffer.size() == 0);
         REQUIRE(ringBuffer.availableFreeSize() == RingBuffer::defaultCapacity());
-        const auto initialDataSize = GENERATE_RANGE(AS(size_t), 1, RingBuffer::defaultCapacity());
+        REQUIRE(18 < RingBuffer::defaultCapacity());
+        const auto initialDataSize = GENERATE(AS(size_t), 1, 3, 18, RingBuffer::defaultCapacity());
         static const auto initialData = []() -> std::string
         {
             std::string tmp(RingBuffer::defaultCapacity(), ' ');
@@ -539,7 +560,10 @@ SCENARIO("Empty ring buffers can be reset back to their initial default capacity
         REQUIRE(ringBuffer.readAll().empty());
         REQUIRE(ringBuffer.peekAll().empty());
         REQUIRE(ringBuffer.availableFreeSize() == RingBuffer::defaultCapacity());
-        const auto initialDataSize = GENERATE_RANGE(AS(size_t), RingBuffer::defaultCapacity() + 1, 2 * RingBuffer::defaultCapacity());
+        const auto initialDataSize = GENERATE(AS(size_t), RingBuffer::defaultCapacity() + 1,
+                                                          RingBuffer::defaultCapacity() + 18,
+                                                          2 * RingBuffer::defaultCapacity() - 1,
+                                                          2 * RingBuffer::defaultCapacity());
         std::string initialData(initialDataSize, ' ');
         for (auto &ch : initialData)
             ch = QRandomGenerator64::global()->bounded(0, 256);
@@ -591,7 +615,12 @@ SCENARIO("Empty ring buffers can be reset back to their initial default capacity
         REQUIRE(ringBuffer.isEmpty());
         REQUIRE(ringBuffer.size() == 0);
         REQUIRE(ringBuffer.availableFreeSize() == (2 * RingBuffer::defaultCapacity()));
-        const auto initialDataSize = GENERATE_RANGE(AS(size_t), 1, 2 * RingBuffer::defaultCapacity());
+        const auto initialDataSize = GENERATE(AS(size_t), 1, 3,
+                                                          RingBuffer::defaultCapacity() - 1,
+                                                          RingBuffer::defaultCapacity(),
+                                                          RingBuffer::defaultCapacity() + 1,
+                                                          2 * RingBuffer::defaultCapacity() - 1,
+                                                          2 * RingBuffer::defaultCapacity());
         static const auto initialData = []() -> std::string
         {
             std::string tmp(2 * RingBuffer::defaultCapacity(), ' ');
@@ -628,344 +657,55 @@ SCENARIO("Empty ring buffers can be reset back to their initial default capacity
 
 SCENARIO("RingBuffer supports data IO")
 {
-    GIVEN("a ring buffer")
+    GIVEN("an empty ring buffer")
     {
-        const auto capacity = GENERATE(AS(size_t), RingBuffer::defaultCapacity(),
-                                       2 * RingBuffer::defaultCapacity(),
-                                       0,
-                                       300,
-                                       64);
-        RingBuffer ringBuffer(capacity);
+        RingBuffer ringBuffer;
         REQUIRE(ringBuffer.isEmpty());
-        REQUIRE(ringBuffer.size() == 0);
-        REQUIRE(ringBuffer.capacity() == capacity);
-        REQUIRE(ringBuffer.availableFreeSize() == ((capacity == 0) ? RingBuffer::defaultCapacity() : std::min(capacity, RingBuffer::defaultCapacity())));
-        const auto initialDataSize = GENERATE(AS(size_t), 16, 17, 23, 32);
-        const auto dataSizeToChangeAfterEachIteration = GENERATE(AS(size_t), 16, 1, 5);
-        const auto popFrontInsteadOfReading = GENERATE(AS(bool), true, false);
-        const auto enlargeAvailableFreeSize = GENERATE(AS(bool), true, false);
-        if (enlargeAvailableFreeSize && ((capacity == 0) || (capacity >= (RingBuffer::defaultCapacity() + 16))))
+
+        WHEN("data is written and read from the buffer without exceeding buffer capacity")
         {
-            std::string tmpData(RingBuffer::defaultCapacity() + 16, ' ');
-            for (auto &ch : tmpData)
+            const auto capacity = GENERATE(AS(size_t), 0,
+                                                       RingBuffer::defaultCapacity() + 21,
+                                                       2 * RingBuffer::defaultCapacity());
+            if (capacity > 0)
+            {
+                ringBuffer.setCapacity(capacity);
+                const std::string dataToForceBufferToEnlarge(capacity, ' ');
+                ringBuffer.write(dataToForceBufferToEnlarge);
+                ringBuffer.popFront(dataToForceBufferToEnlarge.size());
+                REQUIRE(ringBuffer.isEmpty());
+            }
+            const auto initialCapacity = ringBuffer.availableFreeSize();
+            std::string currentData(31, ' ');
+            for (auto &ch : currentData)
                 ch = QRandomGenerator64::global()->bounded(0, 256);
-            REQUIRE(tmpData.size() == ringBuffer.write(tmpData.data(), tmpData.size()));
-            REQUIRE(!ringBuffer.isEmpty());
-            REQUIRE(ringBuffer.size() == tmpData.size());
-            REQUIRE(ringBuffer.capacity() == capacity);
-            REQUIRE(tmpData == ringBuffer.peekAll());
-            REQUIRE(tmpData.size() == ringBuffer.popFront(tmpData.size()));
-            REQUIRE(ringBuffer.isEmpty());
-            REQUIRE(ringBuffer.size() == 0);
-            REQUIRE(ringBuffer.capacity() == capacity);
-            REQUIRE(ringBuffer.availableFreeSize() > RingBuffer::defaultCapacity());
-        }
+            ringBuffer.write(currentData);
+            size_t writtenDataSize = currentData.size();
 
-        WHEN("data is continuously added and removed from buffer")
-        {
-            THEN("buffer handles data IO correctly")
+            THEN("buffer wraps data in buffer and keeps buffer capacity")
             {
-                std::string expectedDataInBuffer = [initialDataSize]() -> std::string
+                while (writtenDataSize < (2 * initialCapacity))
                 {
-                    std::string tmp(initialDataSize, ' ');
-                    for (auto &ch : tmp)
-                        ch = QRandomGenerator::global()->bounded(0, 256);
-                    return tmp;
-                }();
-                expectedDataInBuffer.reserve(10*capacity);
-                const auto previousAvailableFreeSize = ringBuffer.availableFreeSize();
-                REQUIRE(initialDataSize == ringBuffer.write(expectedDataInBuffer.data(), expectedDataInBuffer.size()));
-                REQUIRE(!ringBuffer.isEmpty());
-                REQUIRE(ringBuffer.size() == expectedDataInBuffer.size());
-                REQUIRE(ringBuffer.capacity() == capacity);
-                REQUIRE(ringBuffer.availableFreeSize() == (previousAvailableFreeSize - expectedDataInBuffer.size()));
-                REQUIRE(expectedDataInBuffer == ringBuffer.peekAll());
-                size_t addedData = expectedDataInBuffer.size();
-                const auto sizeToAdd = 10 * ((capacity > 0) ? capacity : std::min<size_t>(RingBuffer::defaultCapacity(), capacity));
-                do
-                {
-                    const auto previousAvailableFreeSize = ringBuffer.availableFreeSize();
-                    if (popFrontInsteadOfReading)
-                    {
-                        REQUIRE(dataSizeToChangeAfterEachIteration == ringBuffer.popFront(dataSizeToChangeAfterEachIteration));
-                    }
-                    else
-                    {
-                        std::string tmp(dataSizeToChangeAfterEachIteration, ' ');
-                        REQUIRE(tmp.size() == ringBuffer.read(tmp.data(), tmp.size()));
-                        REQUIRE(expectedDataInBuffer.starts_with(tmp));
-                    }
-                    REQUIRE(ringBuffer.isEmpty() == (dataSizeToChangeAfterEachIteration == expectedDataInBuffer.size()));
-                    REQUIRE(ringBuffer.size() == (expectedDataInBuffer.size() - dataSizeToChangeAfterEachIteration));
-                    REQUIRE(ringBuffer.capacity() == capacity);
-                    REQUIRE(ringBuffer.availableFreeSize() == (previousAvailableFreeSize + dataSizeToChangeAfterEachIteration));
-                    expectedDataInBuffer.erase(0, dataSizeToChangeAfterEachIteration);
-                    std::string randomDataToAdd(dataSizeToChangeAfterEachIteration, ' ');
-                    for (auto &ch : randomDataToAdd)
-                        ch = QRandomGenerator::global()->bounded(0, 256);
-                    expectedDataInBuffer.append(randomDataToAdd);
-                    REQUIRE(dataSizeToChangeAfterEachIteration == ringBuffer.write(randomDataToAdd.data(), randomDataToAdd.size()));
-                    REQUIRE(!ringBuffer.isEmpty());
-                    REQUIRE(ringBuffer.size() == expectedDataInBuffer.size());
-                    REQUIRE(ringBuffer.capacity() == capacity);
-                    REQUIRE(ringBuffer.availableFreeSize() == previousAvailableFreeSize);
-                    REQUIRE(expectedDataInBuffer == ringBuffer.peekAll());
-                    for (auto pos = 0; pos < expectedDataInBuffer.size(); ++pos)
-                    {
-                        for (auto count = (expectedDataInBuffer.size() - pos); count > 0; --count)
-                        {
-                            REQUIRE(std::string_view(expectedDataInBuffer.data() + pos, count) == ringBuffer.slice(pos, count));
-                        }
-                    }
-                    for (auto i = 0; i < expectedDataInBuffer.size(); ++i)
-                    {
-                        REQUIRE(expectedDataInBuffer[i] == ringBuffer.peekChar(i));
-                    }
-                    addedData += dataSizeToChangeAfterEachIteration;
-                }
-                while (addedData < sizeToAdd);
-            }
-        }
-    }
-
-    GIVEN("a ring buffer with data at the beginning")
-    {
-        const auto dataSize = GENERATE_RANGE(AS(size_t), 1, RingBuffer::defaultCapacity());
-
-        WHEN("data is peek/read from buffer")
-        {
-            THEN("read operation fetches data correctly")
-            {
-                static const std::string dataToWrite = []() -> std::string
-                {
-                    std::string tmp(RingBuffer::defaultCapacity(), ' ');
-                    for (auto &ch : tmp)
-                        ch = QRandomGenerator::global()->bounded(0, 256);
-                    return tmp;
-                }();
-
-                for (auto i = 1; i <= dataSize; ++i)
-                {
-                    RingBuffer ringBuffer(RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.isEmpty());
-                    REQUIRE(ringBuffer.size() == 0);
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == RingBuffer::defaultCapacity());
-                    REQUIRE(dataSize == ringBuffer.write(dataToWrite.data(), dataSize));
-                    REQUIRE(!ringBuffer.isEmpty());
-                    REQUIRE(ringBuffer.size() == dataSize);
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == (RingBuffer::defaultCapacity() - dataSize));
-                    const auto expectedData = std::string_view(dataToWrite.data(), i);
-                    for (auto pos = 0; pos < expectedData.size(); ++pos)
-                    {
-                        for (auto count = (expectedData.size() - pos); count > 0; --count)
-                        {
-                            REQUIRE(std::string_view(expectedData.data() + pos, count) == ringBuffer.slice(pos, count));
-                        }
-                    }
-                    for (auto i = 0; i < expectedData.size(); ++i)
-                    {
-                        REQUIRE(expectedData[i] == ringBuffer.peekChar(i));
-                    }
-                    std::string readData(i, ' ');
-                    REQUIRE(i == ringBuffer.read(readData.data(), readData.size()));
-                    REQUIRE(readData == expectedData);
-                    REQUIRE(ringBuffer.isEmpty() == (i == dataSize));
-                    REQUIRE(ringBuffer.size() == (dataSize - i));
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == (RingBuffer::defaultCapacity() - dataSize + i));
-                }
-            }
-        }
-    }
-
-    GIVEN("a ring buffer with data at the end")
-    {
-        const auto dataGap = GENERATE_RANGE(AS(size_t), 1, RingBuffer::defaultCapacity() - 1);
-        const auto dataSize = RingBuffer::defaultCapacity() - dataGap;
-
-        WHEN("data is peek/read from buffer")
-        {
-            THEN("read operation fetches data correctly")
-            {
-                static const std::string dataToWrite = []() -> std::string
-                {
-                    std::string tmp(RingBuffer::defaultCapacity(), ' ');
-                    for (auto &ch : tmp)
-                        ch = QRandomGenerator::global()->bounded(0, 256);
-                    return tmp;
-                }();
-
-                for (auto i = 1; i <= dataSize; ++i)
-                {
-                    RingBuffer ringBuffer(RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.isEmpty());
-                    REQUIRE(ringBuffer.size() == 0);
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == RingBuffer::defaultCapacity());
-                    REQUIRE(dataToWrite.size() == ringBuffer.write(dataToWrite.data(), dataToWrite.size()));
-                    REQUIRE(!ringBuffer.isEmpty());
-                    REQUIRE(ringBuffer.size() == dataToWrite.size());
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == 0);
-                    REQUIRE(dataToWrite == ringBuffer.peekAll());
-                    REQUIRE(dataGap == ringBuffer.popFront(dataGap));
-                    REQUIRE(!ringBuffer.isEmpty());
-                    REQUIRE(ringBuffer.size() == dataSize);
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == dataGap);
-                    REQUIRE(std::string_view(dataToWrite.data() + dataGap, dataSize) == ringBuffer.peekAll());
-                    const auto expectedData = std::string_view(dataToWrite.data() + dataGap, i);
-                    for (auto pos = 0; pos < expectedData.size(); ++pos)
-                    {
-                        for (auto count = (expectedData.size() - pos); count > 0; --count)
-                        {
-                            REQUIRE(std::string_view(expectedData.data() + pos, count) == ringBuffer.slice(pos, count));
-                        }
-                    }
-                    for (auto i = 0; i < expectedData.size(); ++i)
-                    {
-                        REQUIRE(expectedData[i] == ringBuffer.peekChar(i));
-                    }
-                    std::string readData(i, ' ');
-                    REQUIRE(i == ringBuffer.read(readData.data(), readData.size()));
-                    REQUIRE(readData == expectedData);
-                    REQUIRE(ringBuffer.isEmpty() == (i == dataSize));
-                    REQUIRE(ringBuffer.size() == (dataSize - i));
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == (dataGap + i));
-                }
-            }
-        }
-    }
-
-    GIVEN("a ring buffer with data in the middle")
-    {
-        const auto dataGap = GENERATE_RANGE(AS(size_t), 1, 2*RingBuffer::defaultCapacity()/3 - 1);
-        const auto dataSize = RingBuffer::defaultCapacity()/3;
-
-        WHEN("data is peek/read from buffer")
-        {
-            THEN("read operation fetches data correctly")
-            {
-                static const std::string dataToWrite = []() -> std::string
-                {
-                    std::string tmp(RingBuffer::defaultCapacity(), ' ');
-                    for (auto &ch : tmp)
-                        ch = QRandomGenerator::global()->bounded(0, 256);
-                    return tmp;
-                }();
-
-                for (auto i = 1; i <= dataSize; ++i)
-                {
-                    RingBuffer ringBuffer(RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.isEmpty());
-                    REQUIRE(ringBuffer.size() == 0);
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == RingBuffer::defaultCapacity());
-                    REQUIRE((dataGap + dataSize) == ringBuffer.write(dataToWrite.data(), dataGap + dataSize));
-                    REQUIRE(!ringBuffer.isEmpty());
-                    REQUIRE(ringBuffer.size() == (dataGap + dataSize));
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == (RingBuffer::defaultCapacity() - dataGap - dataSize));
-                    REQUIRE(dataGap == ringBuffer.popFront(dataGap));
-                    REQUIRE(!ringBuffer.isEmpty());
-                    REQUIRE(ringBuffer.size() == dataSize);
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == (RingBuffer::defaultCapacity() - dataSize));
-                    REQUIRE(std::string_view(dataToWrite.data() + dataGap, dataSize) == ringBuffer.peekAll());
-                    const auto expectedData = std::string_view(dataToWrite.data() + dataGap, i);
-                    for (auto pos = 0; pos < expectedData.size(); ++pos)
-                    {
-                        for (auto count = (expectedData.size() - pos); count > 0; --count)
-                        {
-                            REQUIRE(std::string_view(expectedData.data() + pos, count) == ringBuffer.slice(pos, count));
-                        }
-                    }
-                    for (auto i = 0; i < expectedData.size(); ++i)
-                    {
-                        REQUIRE(expectedData[i] == ringBuffer.peekChar(i));
-                    }
-                    std::string readData(i, ' ');
-                    REQUIRE(i == ringBuffer.read(readData.data(), readData.size()));
-                    REQUIRE(readData == expectedData);
-                    REQUIRE(ringBuffer.isEmpty() == (i == dataSize));
-                    REQUIRE(ringBuffer.size() == (dataSize - i));
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == (RingBuffer::defaultCapacity() - dataSize + i));
-                }
-            }
-        }
-    }
-
-    GIVEN("a ring buffer with splitted data")
-    {
-        WHEN("data is peek/read from buffer")
-        {
-            THEN("read operation fetches data correctly")
-            {
-                static const std::string dataToWrite = []() -> std::string
-                {
-                    std::string tmp(RingBuffer::defaultCapacity(), ' ');
-                    for (auto &ch : tmp)
-                        ch = QRandomGenerator::global()->bounded(0, 256);
-                    return tmp;
-                }();
-
-                for (auto pos = 1; pos < (RingBuffer::defaultCapacity() - 1); ++pos)
-                {
-                    for (auto size = 1; size < (RingBuffer::defaultCapacity() - pos); ++size)
-                    {
-                        for (auto dataToRead = 1; dataToRead <= (RingBuffer::defaultCapacity() - size); ++dataToRead)
-                        {
-                            RingBuffer ringBuffer(RingBuffer::defaultCapacity());
-                            REQUIRE(ringBuffer.isEmpty());
-                            REQUIRE(ringBuffer.size() == 0);
-                            REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                            REQUIRE(ringBuffer.availableFreeSize() == RingBuffer::defaultCapacity());
-                            REQUIRE((pos + size) == ringBuffer.write(dataToWrite.data(), pos + size));
-                            REQUIRE(!ringBuffer.isEmpty());
-                            REQUIRE(ringBuffer.size() == (pos + size));
-                            REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                            REQUIRE(ringBuffer.availableFreeSize() == (RingBuffer::defaultCapacity() - pos - size));
-                            REQUIRE((dataToWrite.size() - (pos + size)) == ringBuffer.write(dataToWrite.data(), dataToWrite.size() - (pos + size)));
-                            REQUIRE(!ringBuffer.isEmpty());
-                            REQUIRE(ringBuffer.size() == RingBuffer::defaultCapacity());
-                            REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                            REQUIRE(ringBuffer.availableFreeSize() == 0);
-                            REQUIRE((pos + size) == ringBuffer.popFront(pos + size));
-                            REQUIRE(!ringBuffer.isEmpty());
-                            REQUIRE(ringBuffer.size() == (RingBuffer::defaultCapacity() - (pos + size)));
-                            REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                            REQUIRE(ringBuffer.availableFreeSize() == (pos + size));
-                            REQUIRE(pos == ringBuffer.write(dataToWrite.data() + dataToWrite.size() - (pos + size), pos));
-                            REQUIRE(!ringBuffer.isEmpty());
-                            REQUIRE(ringBuffer.size() == (RingBuffer::defaultCapacity() - size));
-                            REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                            REQUIRE(ringBuffer.availableFreeSize() == size);
-                            REQUIRE(std::string_view(dataToWrite.data(), RingBuffer::defaultCapacity() - size) == ringBuffer.peekAll());
-                            const auto expectedData = std::string_view(dataToWrite.data(), dataToRead);
-                            for (auto pos = 0; pos < expectedData.size(); ++pos)
-                            {
-                                for (auto count = (expectedData.size() - pos); count > 0; --count)
-                                {
-                                    REQUIRE(std::string_view(expectedData.data() + pos, count) == ringBuffer.slice(pos, count));
-                                }
-                            }
-                            for (auto i = 0; i < expectedData.size(); ++i)
-                            {
-                                REQUIRE(expectedData[i] == ringBuffer.peekChar(i));
-                            }
-                            std::string readData(dataToRead, ' ');
-                            REQUIRE(dataToRead == ringBuffer.read(readData.data(), readData.size()));
-                            REQUIRE(readData == expectedData);
-                            REQUIRE(ringBuffer.isEmpty() == (dataToRead == (RingBuffer::defaultCapacity() - size)));
-                            REQUIRE(ringBuffer.size() == (RingBuffer::defaultCapacity() - size - dataToRead));
-                            REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                            REQUIRE(ringBuffer.availableFreeSize() == (size + dataToRead));
-                        }
-                    }
+                    // Writing data
+                    uint64_t dataToWrite = 0;
+                    QRandomGenerator64::global()->fillRange(&dataToWrite, 1);
+                    currentData.append((char*)&dataToWrite, sizeof(dataToWrite));
+                    ringBuffer.write((char*)&dataToWrite, sizeof(dataToWrite));
+                    writtenDataSize += sizeof(dataToWrite);
+                    REQUIRE(ringBuffer.peekAll() == currentData);
+                    // Reading Data
+                    static constexpr size_t readDataSize = 8;
+                    char peekData[readDataSize] = {0};
+                    for (auto i = 0; i < readDataSize; ++i)
+                        peekData[i] = ringBuffer.peekChar(i);
+                    REQUIRE(currentData.starts_with(std::string_view(peekData, readDataSize)));
+                    char dataToRead[readDataSize] = {0};
+                    ringBuffer.read(dataToRead, readDataSize);
+                    REQUIRE(currentData.starts_with(std::string_view(dataToRead, readDataSize)));
+                    currentData.erase(0, readDataSize);
+                    REQUIRE(ringBuffer.peekAll() == currentData);
+                    // Capacity does not change
+                    REQUIRE((ringBuffer.availableFreeSize() + ringBuffer.size()) == initialCapacity);
                 }
             }
         }
@@ -1228,349 +968,55 @@ private:
 
 SCENARIO("RingBuffer supports data IO through data source/sink")
 {
-    GIVEN("a ring buffer")
+    GIVEN("an empty ring buffer")
     {
-        const auto capacity = GENERATE(AS(size_t), RingBuffer::defaultCapacity(),
-                                       2 * RingBuffer::defaultCapacity(),
-                                       0,
-                                       300,
-                                       64);
-        RingBuffer ringBuffer(capacity);
+        RingBuffer ringBuffer;
         REQUIRE(ringBuffer.isEmpty());
-        REQUIRE(ringBuffer.size() == 0);
-        REQUIRE(ringBuffer.capacity() == capacity);
-        REQUIRE(ringBuffer.availableFreeSize() == ((capacity == 0) ? RingBuffer::defaultCapacity() : std::min(capacity, RingBuffer::defaultCapacity())));
-        const auto initialDataSize = GENERATE(AS(size_t), 16, 17, 23, 32);
-        const auto dataSizeToChangeAfterEachIteration = GENERATE(AS(size_t), 16, 1, 5);
-        const auto enlargeAvailableFreeSize = GENERATE(AS(bool), true, false);
-        if (enlargeAvailableFreeSize && ((capacity == 0) || (capacity >= (RingBuffer::defaultCapacity() + 16))))
+
+        WHEN("data is written and read from the buffer without exceeding buffer capacity")
         {
-            std::string tmpData(RingBuffer::defaultCapacity() + 16, ' ');
-            for (auto &ch : tmpData)
+            const auto capacity = GENERATE(AS(size_t), 0,
+                                                       RingBuffer::defaultCapacity() + 21,
+                                                       2 * RingBuffer::defaultCapacity());
+            if (capacity > 0)
+            {
+                ringBuffer.setCapacity(capacity);
+                const std::string dataToForceBufferToEnlarge(capacity, ' ');
+                ringBuffer.write(dataToForceBufferToEnlarge);
+                ringBuffer.popFront(dataToForceBufferToEnlarge.size());
+                REQUIRE(ringBuffer.isEmpty());
+            }
+            const auto initialCapacity = ringBuffer.availableFreeSize();
+            std::string currentData(31, ' ');
+            for (auto &ch : currentData)
                 ch = QRandomGenerator64::global()->bounded(0, 256);
-            REQUIRE(tmpData.size() == ringBuffer.write(tmpData.data(), tmpData.size()));
-            REQUIRE(!ringBuffer.isEmpty());
-            REQUIRE(ringBuffer.size() == tmpData.size());
-            REQUIRE(ringBuffer.capacity() == capacity);
-            REQUIRE(tmpData == ringBuffer.peekAll());
-            REQUIRE(tmpData.size() == ringBuffer.popFront(tmpData.size()));
-            REQUIRE(ringBuffer.isEmpty());
-            REQUIRE(ringBuffer.size() == 0);
-            REQUIRE(ringBuffer.capacity() == capacity);
-            REQUIRE(ringBuffer.availableFreeSize() > RingBuffer::defaultCapacity());
-        }
+            ringBuffer.write(currentData);
+            size_t writtenDataSize = currentData.size();
 
-        WHEN("data is continuously added and removed from buffer through data source/sink")
-        {
-            THEN("buffer handles data IO correctly")
+            THEN("buffer wraps data in buffer and keeps buffer capacity")
             {
-                RingBufferDataSourceTest initialData(initialDataSize);
-                REQUIRE(initialData.dataAvailable() == initialDataSize);
-                REQUIRE(initialData.fetchedSize() == 0);
-                std::string expectedDataInBuffer;
-                expectedDataInBuffer.reserve(10*capacity);
-                expectedDataInBuffer.append(initialData.data());
-                const auto previousAvailableFreeSize = ringBuffer.availableFreeSize();
-                REQUIRE(initialData.dataAvailable() == ringBuffer.write(initialData));
-                REQUIRE(initialData.dataAvailable() == 0);
-                REQUIRE(initialData.fetchedSize() == initialDataSize);
-                REQUIRE(!ringBuffer.isEmpty());
-                REQUIRE(ringBuffer.size() == expectedDataInBuffer.size());
-                REQUIRE(ringBuffer.capacity() == capacity);
-                REQUIRE(ringBuffer.availableFreeSize() == (previousAvailableFreeSize - expectedDataInBuffer.size()));
-                REQUIRE(expectedDataInBuffer == ringBuffer.peekAll());
-                size_t addedData = expectedDataInBuffer.size();
-                const auto sizeToAdd = 10 * ((capacity > 0) ? capacity : std::min<size_t>(RingBuffer::defaultCapacity(), capacity));
-                do
+                while (writtenDataSize < (2 * initialCapacity))
                 {
-                    const auto previousAvailableFreeSize = ringBuffer.availableFreeSize();
-                    RingBufferDataSinkTest dataSink(dataSizeToChangeAfterEachIteration);
-                    REQUIRE(dataSink.capacity() == dataSizeToChangeAfterEachIteration);
-                    REQUIRE(dataSizeToChangeAfterEachIteration == ringBuffer.read(dataSink));
-                    REQUIRE(dataSink.capacity() == 0);
-                    REQUIRE(!dataSink.data().empty());
-                    REQUIRE(expectedDataInBuffer.starts_with(dataSink.data()));
-                    REQUIRE(ringBuffer.isEmpty() == (dataSizeToChangeAfterEachIteration == expectedDataInBuffer.size()));
-                    REQUIRE(ringBuffer.size() == (expectedDataInBuffer.size() - dataSizeToChangeAfterEachIteration));
-                    REQUIRE(ringBuffer.capacity() == capacity);
-                    REQUIRE(ringBuffer.availableFreeSize() == (previousAvailableFreeSize + dataSizeToChangeAfterEachIteration));
-                    expectedDataInBuffer.erase(0, dataSizeToChangeAfterEachIteration);
-                    RingBufferDataSourceTest dataSource(dataSizeToChangeAfterEachIteration);
-                    expectedDataInBuffer.append(dataSource.data());
-                    REQUIRE(dataSource.dataAvailable() == dataSizeToChangeAfterEachIteration);
-                    REQUIRE(dataSource.fetchedSize() == 0);
-                    REQUIRE(dataSizeToChangeAfterEachIteration == ringBuffer.write(dataSource));
-                    REQUIRE(dataSource.dataAvailable() == 0);
-                    REQUIRE(dataSource.fetchedSize() == dataSizeToChangeAfterEachIteration);
-                    REQUIRE(!ringBuffer.isEmpty());
-                    REQUIRE(ringBuffer.size() == expectedDataInBuffer.size());
-                    REQUIRE(ringBuffer.capacity() == capacity);
-                    REQUIRE(ringBuffer.availableFreeSize() == previousAvailableFreeSize);
-                    REQUIRE(expectedDataInBuffer == ringBuffer.peekAll());
-                    for (auto pos = 0; pos < expectedDataInBuffer.size(); ++pos)
-                    {
-                        for (auto count = (expectedDataInBuffer.size() - pos); count > 0; --count)
-                        {
-                            REQUIRE(std::string_view(expectedDataInBuffer.data() + pos, count) == ringBuffer.slice(pos, count));
-                        }
-                    }
-                    for (auto i = 0; i < expectedDataInBuffer.size(); ++i)
-                    {
-                        REQUIRE(expectedDataInBuffer[i] == ringBuffer.peekChar(i));
-                    }
-                    addedData += dataSizeToChangeAfterEachIteration;
-                }
-                while (addedData < sizeToAdd);
-            }
-        }
-    }
-
-    GIVEN("a ring buffer with data at the beginning")
-    {
-        const auto dataSize = GENERATE_RANGE(AS(size_t), 1, RingBuffer::defaultCapacity());
-
-        WHEN("data is read from buffer to data sink")
-        {
-            THEN("read operation fetches data correctly")
-            {
-                static const std::string dataToWrite = []() -> std::string
-                {
-                    std::string tmp(RingBuffer::defaultCapacity(), ' ');
-                    for (auto &ch : tmp)
-                        ch = QRandomGenerator::global()->bounded(0, 256);
-                    return tmp;
-                }();
-
-                for (auto i = 1; i <= dataSize; ++i)
-                {
-                    RingBuffer ringBuffer(RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.isEmpty());
-                    REQUIRE(ringBuffer.size() == 0);
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == RingBuffer::defaultCapacity());
-                    REQUIRE(dataSize == ringBuffer.write(dataToWrite.data(), dataSize));
-                    REQUIRE(!ringBuffer.isEmpty());
-                    REQUIRE(ringBuffer.size() == dataSize);
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == (RingBuffer::defaultCapacity() - dataSize));
-                    const auto expectedData = std::string_view(dataToWrite.data(), i);
-                    for (auto pos = 0; pos < expectedData.size(); ++pos)
-                    {
-                        for (auto count = (expectedData.size() - pos); count > 0; --count)
-                        {
-                            REQUIRE(std::string_view(expectedData.data() + pos, count) == ringBuffer.slice(pos, count));
-                        }
-                    }
-                    for (auto i = 0; i < expectedData.size(); ++i)
-                    {
-                        REQUIRE(expectedData[i] == ringBuffer.peekChar(i));
-                    }
-                    RingBufferDataSinkTest readData(i);
-                    REQUIRE(readData.capacity() == i);
-                    REQUIRE(readData.capacity() == ringBuffer.read(readData));
-                    REQUIRE(readData.capacity() == 0);
-                    REQUIRE(readData.data() == expectedData);
-                    REQUIRE(ringBuffer.isEmpty() == (i == dataSize));
-                    REQUIRE(ringBuffer.size() == (dataSize - i));
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == (RingBuffer::defaultCapacity() - dataSize + i));
-                }
-            }
-        }
-    }
-
-    GIVEN("a ring buffer with data at the end")
-    {
-        const auto dataGap = GENERATE_RANGE(AS(size_t), 1, RingBuffer::defaultCapacity() - 1);
-        const auto dataSize = RingBuffer::defaultCapacity() - dataGap;
-
-        WHEN("data is read from buffer to data sink")
-        {
-            THEN("read operation fetches data correctly")
-            {
-                static const std::string dataToWrite = []() -> std::string
-                {
-                    std::string tmp(RingBuffer::defaultCapacity(), ' ');
-                    for (auto &ch : tmp)
-                        ch = QRandomGenerator::global()->bounded(0, 256);
-                    return tmp;
-                }();
-
-                for (auto i = 1; i <= dataSize; ++i)
-                {
-                    RingBuffer ringBuffer(RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.isEmpty());
-                    REQUIRE(ringBuffer.size() == 0);
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == RingBuffer::defaultCapacity());
-                    REQUIRE(dataToWrite.size() == ringBuffer.write(dataToWrite.data(), dataToWrite.size()));
-                    REQUIRE(!ringBuffer.isEmpty());
-                    REQUIRE(ringBuffer.size() == dataToWrite.size());
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == 0);
-                    REQUIRE(dataToWrite == ringBuffer.peekAll());
-                    REQUIRE(dataGap == ringBuffer.popFront(dataGap));
-                    REQUIRE(!ringBuffer.isEmpty());
-                    REQUIRE(ringBuffer.size() == dataSize);
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == dataGap);
-                    REQUIRE(std::string_view(dataToWrite.data() + dataGap, dataSize) == ringBuffer.peekAll());
-                    const auto expectedData = std::string_view(dataToWrite.data() + dataGap, i);
-                    for (auto pos = 0; pos < expectedData.size(); ++pos)
-                    {
-                        for (auto count = (expectedData.size() - pos); count > 0; --count)
-                        {
-                            REQUIRE(std::string_view(expectedData.data() + pos, count) == ringBuffer.slice(pos, count));
-                        }
-                    }
-                    for (auto i = 0; i < expectedData.size(); ++i)
-                    {
-                        REQUIRE(expectedData[i] == ringBuffer.peekChar(i));
-                    }
-                    RingBufferDataSinkTest readData(i);
-                    REQUIRE(readData.capacity() == i);
-                    REQUIRE(readData.capacity() == ringBuffer.read(readData));
-                    REQUIRE(readData.capacity() == 0);
-                    REQUIRE(readData.data() == expectedData);
-                    REQUIRE(ringBuffer.isEmpty() == (i == dataSize));
-                    REQUIRE(ringBuffer.size() == (dataSize - i));
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == (RingBuffer::defaultCapacity() - dataSize + i));
-                }
-            }
-        }
-    }
-
-    GIVEN("a ring buffer with data at the middle")
-    {
-        const auto dataGap = GENERATE_RANGE(AS(size_t), 1, 2*RingBuffer::defaultCapacity()/3 - 1);
-        const auto dataSize = RingBuffer::defaultCapacity()/3;
-
-        WHEN("data is read from buffer to data sink")
-        {
-            THEN("read operation fetches data correctly")
-            {
-                static const std::string dataToWrite = []() -> std::string
-                {
-                    std::string tmp(RingBuffer::defaultCapacity(), ' ');
-                    for (auto &ch : tmp)
-                        ch = QRandomGenerator::global()->bounded(0, 256);
-                    return tmp;
-                }();
-
-                for (auto i = 1; i <= dataSize; ++i)
-                {
-                    RingBuffer ringBuffer(RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.isEmpty());
-                    REQUIRE(ringBuffer.size() == 0);
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == RingBuffer::defaultCapacity());
-                    REQUIRE((dataGap + dataSize) == ringBuffer.write(dataToWrite.data(), dataGap + dataSize));
-                    REQUIRE(!ringBuffer.isEmpty());
-                    REQUIRE(ringBuffer.size() == (dataGap + dataSize));
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == (RingBuffer::defaultCapacity() - dataGap - dataSize));
-                    REQUIRE(dataGap == ringBuffer.popFront(dataGap));
-                    REQUIRE(!ringBuffer.isEmpty());
-                    REQUIRE(ringBuffer.size() == dataSize);
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == (RingBuffer::defaultCapacity() - dataSize));
-                    REQUIRE(std::string_view(dataToWrite.data() + dataGap, dataSize) == ringBuffer.peekAll());
-                    const auto expectedData = std::string_view(dataToWrite.data() + dataGap, i);
-                    for (auto pos = 0; pos < expectedData.size(); ++pos)
-                    {
-                        for (auto count = (expectedData.size() - pos); count > 0; --count)
-                        {
-                            REQUIRE(std::string_view(expectedData.data() + pos, count) == ringBuffer.slice(pos, count));
-                        }
-                    }
-                    for (auto i = 0; i < expectedData.size(); ++i)
-                    {
-                        REQUIRE(expectedData[i] == ringBuffer.peekChar(i));
-                    }
-                    RingBufferDataSinkTest readData(i);
-                    REQUIRE(readData.capacity() == i);
-                    REQUIRE(readData.capacity() == ringBuffer.read(readData));
-                    REQUIRE(readData.capacity() == 0);
-                    REQUIRE(readData.data() == expectedData);
-                    REQUIRE(ringBuffer.isEmpty() == (i == dataSize));
-                    REQUIRE(ringBuffer.size() == (dataSize - i));
-                    REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                    REQUIRE(ringBuffer.availableFreeSize() == (RingBuffer::defaultCapacity() - dataSize + i));
-                }
-            }
-        }
-    }
-
-    GIVEN("a ring buffer with splitted data")
-    {
-        WHEN("data is read from buffer to data sink")
-        {
-            THEN("read operation fetches data correctly")
-            {
-                static const std::string dataToWrite = []() -> std::string
-                {
-                    std::string tmp(RingBuffer::defaultCapacity(), ' ');
-                    for (auto &ch : tmp)
-                        ch = QRandomGenerator::global()->bounded(0, 256);
-                    return tmp;
-                }();
-
-                for (auto pos = 1; pos < (RingBuffer::defaultCapacity() - 1); ++pos)
-                {
-                    for (auto size = 1; size < (RingBuffer::defaultCapacity() - pos); ++size)
-                    {
-                        for (auto dataToRead = 1; dataToRead <= (RingBuffer::defaultCapacity() - size); ++dataToRead)
-                        {
-                            RingBuffer ringBuffer(RingBuffer::defaultCapacity());
-                            REQUIRE(ringBuffer.isEmpty());
-                            REQUIRE(ringBuffer.size() == 0);
-                            REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                            REQUIRE(ringBuffer.availableFreeSize() == RingBuffer::defaultCapacity());
-                            REQUIRE((pos + size) == ringBuffer.write(dataToWrite.data(), pos + size));
-                            REQUIRE(!ringBuffer.isEmpty());
-                            REQUIRE(ringBuffer.size() == (pos + size));
-                            REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                            REQUIRE(ringBuffer.availableFreeSize() == (RingBuffer::defaultCapacity() - pos - size));
-                            REQUIRE((dataToWrite.size() - (pos + size)) == ringBuffer.write(dataToWrite.data(), dataToWrite.size() - (pos + size)));
-                            REQUIRE(!ringBuffer.isEmpty());
-                            REQUIRE(ringBuffer.size() == RingBuffer::defaultCapacity());
-                            REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                            REQUIRE(ringBuffer.availableFreeSize() == 0);
-                            REQUIRE((pos + size) == ringBuffer.popFront(pos + size));
-                            REQUIRE(!ringBuffer.isEmpty());
-                            REQUIRE(ringBuffer.size() == (RingBuffer::defaultCapacity() - (pos + size)));
-                            REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                            REQUIRE(ringBuffer.availableFreeSize() == (pos + size));
-                            REQUIRE(pos == ringBuffer.write(dataToWrite.data() + dataToWrite.size() - (pos + size), pos));
-                            REQUIRE(!ringBuffer.isEmpty());
-                            REQUIRE(ringBuffer.size() == (RingBuffer::defaultCapacity() - size));
-                            REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                            REQUIRE(ringBuffer.availableFreeSize() == size);
-                            REQUIRE(std::string_view(dataToWrite.data(), RingBuffer::defaultCapacity() - size) == ringBuffer.peekAll());
-                            const auto expectedData = std::string_view(dataToWrite.data(), dataToRead);
-                            for (auto pos = 0; pos < expectedData.size(); ++pos)
-                            {
-                                for (auto count = (expectedData.size() - pos); count > 0; --count)
-                                {
-                                    REQUIRE(std::string_view(expectedData.data() + pos, count) == ringBuffer.slice(pos, count));
-                                }
-                            }
-                            for (auto i = 0; i < expectedData.size(); ++i)
-                            {
-                                REQUIRE(expectedData[i] == ringBuffer.peekChar(i));
-                            }
-                            RingBufferDataSinkTest readData(dataToRead);
-                            REQUIRE(readData.capacity() == dataToRead);
-                            REQUIRE(readData.capacity() == ringBuffer.read(readData));
-                            REQUIRE(readData.capacity() == 0);
-                            REQUIRE(readData.data() == expectedData);
-                            REQUIRE(ringBuffer.isEmpty() == (dataToRead == (RingBuffer::defaultCapacity() - size)));
-                            REQUIRE(ringBuffer.size() == (RingBuffer::defaultCapacity() - size - dataToRead));
-                            REQUIRE(ringBuffer.capacity() == RingBuffer::defaultCapacity());
-                            REQUIRE(ringBuffer.availableFreeSize() == (size + dataToRead));
-                        }
-                    }
+                    // Writing data
+                    static constexpr size_t writeDataSize = 8;
+                    RingBufferDataSourceTest dataSource(writeDataSize);
+                    currentData.append(dataSource.data());
+                    ringBuffer.write(dataSource);
+                    writtenDataSize += sizeof(writeDataSize);
+                    REQUIRE(ringBuffer.peekAll() == currentData);
+                    // Reading Data
+                    static constexpr size_t readDataSize = 8;
+                    char peekData[readDataSize] = {0};
+                    for (auto i = 0; i < readDataSize; ++i)
+                        peekData[i] = ringBuffer.peekChar(i);
+                    REQUIRE(currentData.starts_with(std::string_view(peekData, readDataSize)));
+                    RingBufferDataSinkTest dataSink(readDataSize);
+                    ringBuffer.read(dataSink);
+                    REQUIRE(currentData.starts_with(dataSink.data()));
+                    currentData.erase(0, readDataSize);
+                    REQUIRE(ringBuffer.peekAll() == currentData);
+                    // Capacity does not change
+                    REQUIRE((ringBuffer.availableFreeSize() + ringBuffer.size()) == initialCapacity);
                 }
             }
         }
