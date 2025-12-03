@@ -22,6 +22,7 @@
 #include "TimerPrivate_epoll.h"
 #include <Spectator.h>
 #include <QSemaphore>
+#include <QDeadlineTimer>
 #include <chrono>
 #include <vector>
 #include <set>
@@ -167,18 +168,17 @@ SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms
 
         WHEN("high resolution clock ticker ticks after starting timer with 5ms interval")
         {
-            pHighResolutionClockTicker->setEnabled(true);
             Timer timer;
             timer.setSingleShot(true);
             TimerNotifierTest::setTimerNotifier(timer, timerNotifier);
-            bool hasTimedOut = false;
-            Object::connect(&timer, &Timer::timeout, [&](){hasTimedOut = true;});
+            QSemaphore emittedTimeoutSemaphore;
+            Object::connect(&timer, &Timer::timeout, [&](){emittedTimeoutSemaphore.release();});
             timer.start(std::chrono::milliseconds(5));
             pHighResolutionClockTicker->tick();
 
             THEN("timer notifier does not trigger timer nor disable high resolution clock ticker")
             {
-                REQUIRE(!hasTimedOut);
+                REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, QDeadlineTimer(1)));
                 REQUIRE(pHighResolutionClockTicker->isEnabled());
 
                 AND_WHEN("high resolution clock ticker ticks more three times")
@@ -188,7 +188,7 @@ SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms
 
                     THEN("timer notifier does not trigger timer nor disable high resolution clock ticker")
                     {
-                        REQUIRE(!hasTimedOut);
+                        REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, QDeadlineTimer(1)));
                         REQUIRE(pHighResolutionClockTicker->isEnabled());
 
                         AND_WHEN("high resolution clock ticker ticks one more time")
@@ -197,8 +197,9 @@ SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms
 
                             THEN("timer notifier triggers timer and disables high resolution clock ticker")
                             {
-                                REQUIRE(hasTimedOut);
+                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, 10));
                                 REQUIRE(!pHighResolutionClockTicker->isEnabled());
+                                REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, QDeadlineTimer(1)));
                             }
                         }
                     }
@@ -648,15 +649,16 @@ SCENARIO("TimerNotifier moves timer on timer wheels until timer's timeout reache
                                         REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idx).timerCount() == 0);
                                     }
                                 }
-                                bool hasEmittedTimeout = false;
-                                Object::connect(&timer, &Timer::timeout, [&](){hasEmittedTimeout = true;});
+                                QSemaphore emittedTimeoutSemaphore;
+                                Object::connect(&timer, &Timer::timeout, [&](){emittedTimeoutSemaphore.release();});
                                 pHighResolutionClockTicker->tick();
                                 for (auto idx = 0; idx < 7; ++idx)
                                 {
                                     REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idx).timerCount() == 0);
                                 }
+                                REQUIRE(TimerNotifierTest::timersToNotify(timerNotifier).size() == 1);
+                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, QDeadlineTimer(1)));
                                 REQUIRE(TimerNotifierTest::timersToNotify(timerNotifier).size() == 0);
-                                REQUIRE(hasEmittedTimeout);
                             }
                             else
                             {
