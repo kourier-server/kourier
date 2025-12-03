@@ -9,7 +9,7 @@
             "type": "lldb-dap",
             "request": "launch",
             "program": "${command:cmake.launchTargetPath}",
-            "args": ["-f", "HttpConnectionHandler.spec.cpp"],
+            "args": ["-f", "UnixSignalListener.spec.cpp"],
             "env": [],
             "cwd": "${workspaceRoot}",
             "internalConsoleOptions": "openOnSessionStart",

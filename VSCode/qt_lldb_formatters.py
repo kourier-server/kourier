@@ -36,12 +36,15 @@ class QByteArrayProvider:
         pointer = valobj.GetChildMemberWithName("d").GetChildMemberWithName("ptr").GetValueAsUnsigned()
         length = valobj.GetChildMemberWithName("d").GetChildMemberWithName("size").GetValueAsSigned()
         if pointer == 0:
-            return False
+            return ''
         if length == 0:
             return '""'
         error = lldb.SBError()
         string_data = valobj.process.ReadMemory(pointer, length, error)
-        return string_data
+        if error.Success():
+            return string_data
+        else:
+            return ''
     
 
 class QStringProvider:
@@ -80,12 +83,15 @@ class QStringProvider:
         pointer = valobj.GetChildMemberWithName("d").GetChildMemberWithName("ptr").GetValueAsUnsigned()
         length = 2*valobj.GetChildMemberWithName("d").GetChildMemberWithName("size").GetValueAsSigned()
         if pointer == 0:
-            return False
+            return ''
         if length == 0:
             return '""'
         error = lldb.SBError()
         string_data = valobj.process.ReadMemory(pointer, length, error)
-        return string_data.decode("utf-16").encode("utf-8")
+        if error.Success():
+            return string_data.decode("utf-16").encode("utf-8")
+        else:
+            return ''
     
 
 class QSequentialContainerProvider:
@@ -472,4 +478,5 @@ def __lldb_init_module(debugger, dict):
     debugger.HandleCommand('type summary add "QUrl" -F qt_lldb_formatters.QUrlProvider.provide_summary')
     debugger.HandleCommand('type synthetic add "QUrl" --python-class qt_lldb_formatters.QUrlProvider')
     debugger.HandleCommand("settings set target.prefer-dynamic-value no-dynamic-values")
+    debugger.HandleCommand("settings set target.process.follow-fork-mode parent")
     print("Loaded Qt formatters")
