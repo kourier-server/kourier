@@ -24,6 +24,8 @@
 #include <Spectator.h>
 #include <QSemaphore>
 #include <QElapsedTimer>
+#include <chrono>
+#include <QDeadlineTimer>
 #include <utility>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -1072,12 +1074,12 @@ SCENARIO("HttpRequestHandler calls error handler on error")
         const auto clientPort = clientSocket->localPort();
         auto pHttpRequestRouter = std::make_shared<HttpRequestRouter>();
         REQUIRE(pHttpRequestRouter->addRoute(HttpRequest::Method::GET, "/hello", [](const HttpRequest &request, HttpBroker &broker){broker.writeResponse("Hello World!");}));
-        const int requestTimeoutInSecs = 1;
-        const int idleTimeoutInSecs = 3;
+        const std::chrono::milliseconds requestTimeoutInMSecs(2);
+        const std::chrono::milliseconds idleTimeoutInMSecs(2);
         auto pErrorHandler = std::make_shared<ErrorHandlerTest>();
         auto pHttpRequestLimits = std::make_shared<HttpRequestLimits>();
         pHttpRequestLimits->maxUrlSize = 32;
-        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, pHttpRequestLimits, pHttpRequestRouter, requestTimeoutInSecs, idleTimeoutInSecs, pErrorHandler);
+        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, pHttpRequestLimits, pHttpRequestRouter, requestTimeoutInMSecs, idleTimeoutInMSecs, pErrorHandler);
         const auto sendReceiveCountPriorResuming = GENERATE(AS(int), 0, 1, 3);
         QSemaphore receivedResponseSemaphore;
         std::string receivedResponses;
@@ -1103,13 +1105,13 @@ SCENARIO("HttpRequestHandler calls error handler on error")
             QElapsedTimer elapsedTimer;
             elapsedTimer.start();
             receivedResponses.clear();
-            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(receivedResponseSemaphore, idleTimeoutInSecs + 2));
+            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(receivedResponseSemaphore, QDeadlineTimer(idleTimeoutInMSecs.count() + 2)));
             const auto elapsedTime = elapsedTimer.elapsed();
 
             THEN("server sends to client a response with a 408 Request Timeout status code before "
                  "closing the connection, and calls error handler with client IP and RequestTimeoutError error code")
             {
-                REQUIRE((idleTimeoutInSecs * 1000) <= elapsedTime && elapsedTime <= (idleTimeoutInSecs * 1000 + 1024));
+                REQUIRE(std::abs(idleTimeoutInMSecs.count() - elapsedTime) <= 1);
                 REQUIRE(receivedResponses.starts_with("HTTP/1.1 408 Request Timeout\r\n"));
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(disconnectedSemaphore, 1));
                 REQUIRE(pErrorHandler->hasHandled());
@@ -1125,13 +1127,13 @@ SCENARIO("HttpRequestHandler calls error handler on error")
             QElapsedTimer elapsedTimer;
             elapsedTimer.start();
             receivedResponses.clear();
-            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(receivedResponseSemaphore, idleTimeoutInSecs + 2));
+            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(receivedResponseSemaphore, QDeadlineTimer(idleTimeoutInMSecs.count() + 2)));
             const auto elapsedTime = elapsedTimer.elapsed();
 
             THEN("server sends to client a response with a 408 Request Timeout status code before "
                  "closing the connection, and calls error handler with client IP and RequestTimeoutError error code")
             {
-                REQUIRE((requestTimeoutInSecs * 1000) <= elapsedTime && elapsedTime <= (requestTimeoutInSecs * 1000 + 1024));
+                REQUIRE(std::abs(requestTimeoutInMSecs.count() - elapsedTime) <= 1);
                 REQUIRE(receivedResponses.starts_with("HTTP/1.1 408 Request Timeout\r\n"));
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(disconnectedSemaphore, 1));
                 REQUIRE(pErrorHandler->hasHandled());
