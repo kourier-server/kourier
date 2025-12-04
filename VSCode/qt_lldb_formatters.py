@@ -479,4 +479,5 @@ def __lldb_init_module(debugger, dict):
     debugger.HandleCommand('type synthetic add "QUrl" --python-class qt_lldb_formatters.QUrlProvider')
     debugger.HandleCommand("settings set target.prefer-dynamic-value no-dynamic-values")
     debugger.HandleCommand("settings set target.process.follow-fork-mode parent")
+    debugger.HandleCommand("settings set symbols.load-on-demand true")
     print("Loaded Qt formatters")
