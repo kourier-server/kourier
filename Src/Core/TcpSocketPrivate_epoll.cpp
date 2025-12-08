@@ -42,8 +42,10 @@ TcpSocketPrivate::TcpSocketPrivate() :
     m_tcpSocketDataSink(m_socketDescriptor)
 {
     m_connectTimer.setSingleShot(true);
+    m_connectTimer.setInterval(connectTimeoutInMSecs);
     Object::connect(&m_connectTimer, &Timer::timeout, this, &TcpSocketPrivate::onConnectTimeout);
     m_disconnectTimer.setSingleShot(true);
+    m_disconnectTimer.setInterval(disconnectTimeoutInMSecs);
     Object::connect(&m_disconnectTimer, &Timer::timeout, this, &TcpSocketPrivate::onDisconnectTimeout);
     static constinit NoDestroy<std::atomic_flag> sigPipeDisabler;
     if (!sigPipeDisabler().test_and_set())
@@ -381,7 +383,7 @@ void TcpSocketPrivate::connectToHost()
         } while (-1 == result && EINTR == errno);
         if (result == 0 || EINPROGRESS == errno)
         {
-            m_connectTimer.start(connectTimeoutInMSecs);
+            m_connectTimer.start();
             q->setReadChannelNotificationEnabled(true);
             q->setWriteChannelNotificationEnabled(true);
             setEnabled(true);
@@ -426,7 +428,7 @@ void TcpSocketPrivate::disconnectFromPeer()
             q->setReadChannelNotificationEnabled(false);
             setEventTypes(eventTypes() & ~EPOLLIN);
             m_state = TcpSocket::State::Disconnecting;
-            m_disconnectTimer.start(disconnectTimeoutInMSecs);
+            m_disconnectTimer.start();
             if (q->m_writeBuffer.isEmpty())
             {
                 q->setWriteChannelNotificationEnabled(false);
@@ -856,6 +858,18 @@ void TcpSocket::setSocketOption(SocketOption option, int value)
 {
     Q_D(TcpSocket);
     d->setSocketOption(option, value);
+}
+
+void TcpSocket::setConnectTimeout(std::chrono::milliseconds timeout)
+{
+    Q_D(TcpSocket);
+    d->setConnectTimeout(timeout);
+}
+
+void TcpSocket::setDisconnectTimeout(std::chrono::milliseconds timeout)
+{
+    Q_D(TcpSocket);
+    d->setDisconnectTimeout(timeout);
 }
 
 Signal TcpSocket::connected() KOURIER_SIGNAL(&TcpSocket::connected)

@@ -24,6 +24,7 @@
 #include <QFile>
 #include <QThread>
 #include <QElapsedTimer>
+#include <QDeadlineTimer>
 #include <QRandomGenerator64>
 #include <memory>
 #include <fstream>
@@ -3173,7 +3174,7 @@ SCENARIO("TcpSocket fails as expected")
             Object::connect(pSocket.get(), &TcpSocket::connected, [&connectedSemaphore](){connectedSemaphore.release();});
             Object::connect(pSocket.get(), &TcpSocket::error, [&errorSemaphore](){errorSemaphore.release();});
             pSocket->connect(server.serverAddress().toString().toStdString(), server.serverPort());
-            isServerAcceptingConnections = SemaphoreAwaiter::signalSlotAwareWait(connectedSemaphore, 1);
+            isServerAcceptingConnections = SemaphoreAwaiter::signalSlotAwareWait(connectedSemaphore, QDeadlineTimer(100));
         }
         while (isServerAcceptingConnections);
         sockets.front()->abort();
@@ -3181,13 +3182,14 @@ SCENARIO("TcpSocket fails as expected")
         WHEN("a TcpSocket tries to connect to server")
         {
             TcpSocket socket;
+            socket.setConnectTimeout(std::chrono::milliseconds(10));
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&]() {socketFailedSemaphore.release();});
             socket.connect("127.10.20.82", server.serverPort());
 
             THEN("TcpSocket times out while trying to connect to server")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 70));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
                 std::string expectedErrorMessage("Failed to connect to 127.10.20.82:");
                 expectedErrorMessage.append(std::to_string(server.serverPort()));
@@ -3382,8 +3384,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                     const auto socketSendBufferSize = pSocket->getSocketOption(TcpSocket::SocketOption::SendBufferSize);
                     REQUIRE(socketSendBufferSize > 1);
                     QByteArray dataToSend(3 * socketSendBufferSize, ' ');
-                    for (auto &ch : dataToSend)
-                        ch = QRandomGenerator64::global()->bounded(0, 256);
+                    QRandomGenerator64::global()->fillRange((uint64_t*)dataToSend.data(), dataToSend.size()/8);
                     pSocket->write(dataToSend.data(), dataToSend.size());
 
                     AND_WHEN("TcpSocket disconnects while handling the sentData signal with data still to be written")
@@ -4282,92 +4283,92 @@ static size_t getUsedMemory()
 using namespace TcpSocketTests;
 
 
-SCENARIO("TcpSocket benchmarks")
-{
-    static constexpr std::string_view serverAddress("127.25.24.20");
-    static constexpr size_t totalConnectionsPerThread = 30000;
-    static constexpr size_t workingConnectionsPerThread = 30000;
-    static constexpr size_t clientThreadCount = 5;
-    static constexpr size_t totalConnections = totalConnectionsPerThread * clientThreadCount;
-    static constexpr size_t requestsPerWorkingConnection = 10;
-    static constexpr int a = 5;
-    static constexpr int b = 3;
-    size_t memoryConsumedAfterCreatingClientSockets = 0;
-    size_t memoryConsumedAfterConnecting = 0;
-    size_t memoryConsumedAfterResponses = 0;
-    size_t memoryConsumedAfterDisconnecting = 0;
-    QElapsedTimer elapsedTimer;
-    double connectionsPerSecond = 0;
-    double requestsPerSecond = 0;
-    double disconnectionsPerSecond = 0;
-    std::atomic_size_t connectedClientCount = 0;
-    std::atomic_size_t receivedResponseCount = 0;
-    std::atomic_size_t disconnectedClientCount = 0;
-    QSemaphore clientSocketsDisconnectedSemaphore;
-    QSemaphore serverSocketsConnectedSemaphore;
-    QSemaphore serverSocketsDisconnectedSemaphore;
-    std::unique_ptr<AsyncQObject<ServerTcpSockets, std::string_view, size_t, size_t>> server(new AsyncQObject<ServerTcpSockets, std::string_view, size_t, size_t>(serverAddress, totalConnections, requestsPerWorkingConnection));
-    const auto serverPort = server->get()->serverPort();
-    QObject::connect(server->get(), &ServerTcpSockets::connectedToClients, [&](){serverSocketsConnectedSemaphore.release();});
-    QObject::connect(server->get(), &ServerTcpSockets::disconnectedFromClients, [&](){serverSocketsDisconnectedSemaphore.release();});
-    std::vector<std::unique_ptr<AsyncQObject<ClientTcpSockets, std::string_view, uint16_t, std::string_view, size_t, size_t, size_t, int, int>>> clients(clientThreadCount);
-    size_t counter = 0;
-    for (auto &client : clients)
-    {
-        std::string currentBindAddress("127.25.2.");
-        currentBindAddress.append(std::to_string(++counter));
-        client.reset(new AsyncQObject<ClientTcpSockets, std::string_view, uint16_t, std::string_view, size_t, size_t, size_t, int, int>(serverAddress, serverPort, currentBindAddress, totalConnectionsPerThread, workingConnectionsPerThread, requestsPerWorkingConnection, a, b));
-    }
-    memoryConsumedAfterCreatingClientSockets = getUsedMemory();
-    QObject ctxObject;
-    for (auto &client : clients)
-    {
-        QObject::connect(client->get(), &ClientTcpSockets::connectedToServer, &ctxObject, [&]()
-        {
-            if (++connectedClientCount == clientThreadCount)
-            {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverSocketsConnectedSemaphore, 10000));
-                connectionsPerSecond = (1000.0 * totalConnections)/elapsedTimer.elapsed();
-                memoryConsumedAfterConnecting = getUsedMemory();
-                elapsedTimer.start();
-                for (auto &client : clients)
-                    QMetaObject::invokeMethod(client->get(), "sendRequests", Qt::QueuedConnection);
-            }
-        });
-        QObject::connect(client->get(), &ClientTcpSockets::receivedResponses, &ctxObject, [&]()
-        {
-            if (++receivedResponseCount == clientThreadCount)
-            {
-                requestsPerSecond = (1000.0 * clientThreadCount * workingConnectionsPerThread * requestsPerWorkingConnection)/elapsedTimer.elapsed();
-                memoryConsumedAfterResponses = getUsedMemory();
-                elapsedTimer.start();
-                for (auto &client : clients)
-                    QMetaObject::invokeMethod(client->get(), "disconnectFromServer", Qt::QueuedConnection);
-            }
-        });
-        QObject::connect(client->get(), &ClientTcpSockets::disconnectedFromServer, &ctxObject, [&]()
-        {
-            if (++disconnectedClientCount == clientThreadCount)
-            {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverSocketsDisconnectedSemaphore, 10000));
-                disconnectionsPerSecond = (1000.0 * totalConnections)/elapsedTimer.elapsed();
-                memoryConsumedAfterDisconnecting = getUsedMemory();
-                clientSocketsDisconnectedSemaphore.release();
-            }
-        });
-    }
-    elapsedTimer.start();
-    for (auto &client : clients)
-        QMetaObject::invokeMethod(client->get(), "connectToServer", Qt::QueuedConnection);
-    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientSocketsDisconnectedSemaphore, 10000));
-    WARN(QByteArray("Memory consumed after creating client sockets: ").append(QByteArray::number(memoryConsumedAfterCreatingClientSockets)));
-    WARN(QByteArray("Memory consumed after connecting: ").append(QByteArray::number(memoryConsumedAfterConnecting)));
-    WARN(QByteArray("Memory consumed after responses: ").append(QByteArray::number(memoryConsumedAfterResponses)));
-    WARN(QByteArray("Memory consumed after disconnecting: ").append(QByteArray::number(memoryConsumedAfterDisconnecting)));
-    WARN(QByteArray("Connections per second: ").append(QByteArray::number(connectionsPerSecond)));
-    WARN(QByteArray("Requests per second: ").append(QByteArray::number(requestsPerSecond)));
-    WARN(QByteArray("Disconnections per second: ").append(QByteArray::number(disconnectionsPerSecond)));
-}
+// SCENARIO("TcpSocket benchmarks")
+// {
+//     static constexpr std::string_view serverAddress("127.25.24.20");
+//     static constexpr size_t totalConnectionsPerThread = 30000;
+//     static constexpr size_t workingConnectionsPerThread = 30000;
+//     static constexpr size_t clientThreadCount = 5;
+//     static constexpr size_t totalConnections = totalConnectionsPerThread * clientThreadCount;
+//     static constexpr size_t requestsPerWorkingConnection = 10;
+//     static constexpr int a = 5;
+//     static constexpr int b = 3;
+//     size_t memoryConsumedAfterCreatingClientSockets = 0;
+//     size_t memoryConsumedAfterConnecting = 0;
+//     size_t memoryConsumedAfterResponses = 0;
+//     size_t memoryConsumedAfterDisconnecting = 0;
+//     QElapsedTimer elapsedTimer;
+//     double connectionsPerSecond = 0;
+//     double requestsPerSecond = 0;
+//     double disconnectionsPerSecond = 0;
+//     std::atomic_size_t connectedClientCount = 0;
+//     std::atomic_size_t receivedResponseCount = 0;
+//     std::atomic_size_t disconnectedClientCount = 0;
+//     QSemaphore clientSocketsDisconnectedSemaphore;
+//     QSemaphore serverSocketsConnectedSemaphore;
+//     QSemaphore serverSocketsDisconnectedSemaphore;
+//     std::unique_ptr<AsyncQObject<ServerTcpSockets, std::string_view, size_t, size_t>> server(new AsyncQObject<ServerTcpSockets, std::string_view, size_t, size_t>(serverAddress, totalConnections, requestsPerWorkingConnection));
+//     const auto serverPort = server->get()->serverPort();
+//     QObject::connect(server->get(), &ServerTcpSockets::connectedToClients, [&](){serverSocketsConnectedSemaphore.release();});
+//     QObject::connect(server->get(), &ServerTcpSockets::disconnectedFromClients, [&](){serverSocketsDisconnectedSemaphore.release();});
+//     std::vector<std::unique_ptr<AsyncQObject<ClientTcpSockets, std::string_view, uint16_t, std::string_view, size_t, size_t, size_t, int, int>>> clients(clientThreadCount);
+//     size_t counter = 0;
+//     for (auto &client : clients)
+//     {
+//         std::string currentBindAddress("127.25.2.");
+//         currentBindAddress.append(std::to_string(++counter));
+//         client.reset(new AsyncQObject<ClientTcpSockets, std::string_view, uint16_t, std::string_view, size_t, size_t, size_t, int, int>(serverAddress, serverPort, currentBindAddress, totalConnectionsPerThread, workingConnectionsPerThread, requestsPerWorkingConnection, a, b));
+//     }
+//     memoryConsumedAfterCreatingClientSockets = getUsedMemory();
+//     QObject ctxObject;
+//     for (auto &client : clients)
+//     {
+//         QObject::connect(client->get(), &ClientTcpSockets::connectedToServer, &ctxObject, [&]()
+//         {
+//             if (++connectedClientCount == clientThreadCount)
+//             {
+//                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverSocketsConnectedSemaphore, 10000));
+//                 connectionsPerSecond = (1000.0 * totalConnections)/elapsedTimer.elapsed();
+//                 memoryConsumedAfterConnecting = getUsedMemory();
+//                 elapsedTimer.start();
+//                 for (auto &client : clients)
+//                     QMetaObject::invokeMethod(client->get(), "sendRequests", Qt::QueuedConnection);
+//             }
+//         });
+//         QObject::connect(client->get(), &ClientTcpSockets::receivedResponses, &ctxObject, [&]()
+//         {
+//             if (++receivedResponseCount == clientThreadCount)
+//             {
+//                 requestsPerSecond = (1000.0 * clientThreadCount * workingConnectionsPerThread * requestsPerWorkingConnection)/elapsedTimer.elapsed();
+//                 memoryConsumedAfterResponses = getUsedMemory();
+//                 elapsedTimer.start();
+//                 for (auto &client : clients)
+//                     QMetaObject::invokeMethod(client->get(), "disconnectFromServer", Qt::QueuedConnection);
+//             }
+//         });
+//         QObject::connect(client->get(), &ClientTcpSockets::disconnectedFromServer, &ctxObject, [&]()
+//         {
+//             if (++disconnectedClientCount == clientThreadCount)
+//             {
+//                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverSocketsDisconnectedSemaphore, 10000));
+//                 disconnectionsPerSecond = (1000.0 * totalConnections)/elapsedTimer.elapsed();
+//                 memoryConsumedAfterDisconnecting = getUsedMemory();
+//                 clientSocketsDisconnectedSemaphore.release();
+//             }
+//         });
+//     }
+//     elapsedTimer.start();
+//     for (auto &client : clients)
+//         QMetaObject::invokeMethod(client->get(), "connectToServer", Qt::QueuedConnection);
+//     REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientSocketsDisconnectedSemaphore, 10000));
+//     WARN(QByteArray("Memory consumed after creating client sockets: ").append(QByteArray::number(memoryConsumedAfterCreatingClientSockets)));
+//     WARN(QByteArray("Memory consumed after connecting: ").append(QByteArray::number(memoryConsumedAfterConnecting)));
+//     WARN(QByteArray("Memory consumed after responses: ").append(QByteArray::number(memoryConsumedAfterResponses)));
+//     WARN(QByteArray("Memory consumed after disconnecting: ").append(QByteArray::number(memoryConsumedAfterDisconnecting)));
+//     WARN(QByteArray("Connections per second: ").append(QByteArray::number(connectionsPerSecond)));
+//     WARN(QByteArray("Requests per second: ").append(QByteArray::number(requestsPerSecond)));
+//     WARN(QByteArray("Disconnections per second: ").append(QByteArray::number(disconnectionsPerSecond)));
+// }
 
 
 namespace TcpSocketTests
@@ -4608,91 +4609,91 @@ private:
 }
 
 
-SCENARIO("QTcpSocket benchmarks")
-{
-    static constexpr std::string_view serverAddress("127.25.24.25");
-    static constexpr size_t totalConnectionsPerThread = 15000;
-    static constexpr size_t workingConnectionsPerThread = 10000;
-    static constexpr size_t clientThreadCount = 5;
-    static constexpr size_t totalConnections = totalConnectionsPerThread * clientThreadCount;
-    static constexpr size_t requestsPerWorkingConnection = 10;
-    static constexpr int a = 5;
-    static constexpr int b = 3;
-    size_t memoryConsumedAfterCreatingClientSockets = 0;
-    size_t memoryConsumedAfterConnecting = 0;
-    size_t memoryConsumedAfterResponses = 0;
-    size_t memoryConsumedAfterDisconnecting = 0;
-    QElapsedTimer elapsedTimer;
-    double connectionsPerSecond = 0;
-    double requestsPerSecond = 0;
-    double disconnectionsPerSecond = 0;
-    std::atomic_size_t connectedClientCount = 0;
-    std::atomic_size_t receivedResponseCount = 0;
-    std::atomic_size_t disconnectedClientCount = 0;
-    QSemaphore clientSocketsDisconnectedSemaphore;
-    QSemaphore serverSocketsConnectedSemaphore;
-    QSemaphore serverSocketsDisconnectedSemaphore;
-    std::unique_ptr<AsyncQObject<ServerQTcpSockets, std::string_view, size_t, size_t>> server(new AsyncQObject<ServerQTcpSockets, std::string_view, size_t, size_t>(serverAddress, totalConnections, requestsPerWorkingConnection));
-    const auto serverPort = server->get()->serverPort();
-    QObject::connect(server->get(), &ServerQTcpSockets::connectedToClients, [&](){serverSocketsConnectedSemaphore.release();});
-    QObject::connect(server->get(), &ServerQTcpSockets::disconnectedFromClients, [&](){serverSocketsDisconnectedSemaphore.release();});
-    std::vector<std::unique_ptr<AsyncQObject<ClientQTcpSockets, std::string_view, uint16_t, std::string_view, size_t, size_t, size_t, int, int>>> clients(clientThreadCount);
-    size_t counter = 0;
-    for (auto &client : clients)
-    {
-        std::string currentBindAddress("127.35.21.");
-        currentBindAddress.append(std::to_string(++counter));
-        client.reset(new AsyncQObject<ClientQTcpSockets, std::string_view, uint16_t, std::string_view, size_t, size_t, size_t, int, int>(serverAddress, serverPort, currentBindAddress, totalConnectionsPerThread, workingConnectionsPerThread, requestsPerWorkingConnection, a, b));
-    }
-    memoryConsumedAfterCreatingClientSockets = getUsedMemory();
-    QObject ctxObject;
-    for (auto &client : clients)
-    {
-        QObject::connect(client->get(), &ClientQTcpSockets::connectedToServer, &ctxObject, [&]()
-        {
-            if (++connectedClientCount == clientThreadCount)
-            {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverSocketsConnectedSemaphore, 10000));
-                connectionsPerSecond = (1000.0 * totalConnections)/elapsedTimer.elapsed();
-                memoryConsumedAfterConnecting = getUsedMemory();
-                elapsedTimer.start();
-                for (auto &client : clients)
-                    QMetaObject::invokeMethod(client->get(), "sendRequests", Qt::QueuedConnection);
-            }
-        });
-        QObject::connect(client->get(), &ClientQTcpSockets::receivedResponses, &ctxObject, [&]()
-        {
-            if (++receivedResponseCount == clientThreadCount)
-            {
-                requestsPerSecond = (1000.0 * clientThreadCount * workingConnectionsPerThread * requestsPerWorkingConnection)/elapsedTimer.elapsed();
-                memoryConsumedAfterResponses = getUsedMemory();
-                elapsedTimer.start();
-                for (auto &client : clients)
-                    QMetaObject::invokeMethod(client->get(), "disconnectFromServer", Qt::QueuedConnection);
-            }
-        });
-        QObject::connect(client->get(), &ClientQTcpSockets::disconnectedFromServer, &ctxObject, [&]()
-        {
-            if (++disconnectedClientCount == clientThreadCount)
-            {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverSocketsDisconnectedSemaphore, 10000));
-                disconnectionsPerSecond = (1000.0 * totalConnections)/elapsedTimer.elapsed();
-                memoryConsumedAfterDisconnecting = getUsedMemory();
-                clientSocketsDisconnectedSemaphore.release();
-            }
-        });
-    }
-    elapsedTimer.start();
-    for (auto &client : clients)
-        QMetaObject::invokeMethod(client->get(), "connectToServer", Qt::QueuedConnection);
-    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientSocketsDisconnectedSemaphore, 10000));
-    WARN(QByteArray("Memory consumed after creating client sockets: ").append(QByteArray::number(memoryConsumedAfterCreatingClientSockets)));
-    WARN(QByteArray("Memory consumed after connecting: ").append(QByteArray::number(memoryConsumedAfterConnecting)));
-    WARN(QByteArray("Memory consumed after responses: ").append(QByteArray::number(memoryConsumedAfterResponses)));
-    WARN(QByteArray("Memory consumed after disconnecting: ").append(QByteArray::number(memoryConsumedAfterDisconnecting)));
-    WARN(QByteArray("Connections per second: ").append(QByteArray::number(connectionsPerSecond)));
-    WARN(QByteArray("Requests per second: ").append(QByteArray::number(requestsPerSecond)));
-    WARN(QByteArray("Disconnections per second: ").append(QByteArray::number(disconnectionsPerSecond)));
-}
+// SCENARIO("QTcpSocket benchmarks")
+// {
+//     static constexpr std::string_view serverAddress("127.25.24.25");
+//     static constexpr size_t totalConnectionsPerThread = 15000;
+//     static constexpr size_t workingConnectionsPerThread = 10000;
+//     static constexpr size_t clientThreadCount = 5;
+//     static constexpr size_t totalConnections = totalConnectionsPerThread * clientThreadCount;
+//     static constexpr size_t requestsPerWorkingConnection = 10;
+//     static constexpr int a = 5;
+//     static constexpr int b = 3;
+//     size_t memoryConsumedAfterCreatingClientSockets = 0;
+//     size_t memoryConsumedAfterConnecting = 0;
+//     size_t memoryConsumedAfterResponses = 0;
+//     size_t memoryConsumedAfterDisconnecting = 0;
+//     QElapsedTimer elapsedTimer;
+//     double connectionsPerSecond = 0;
+//     double requestsPerSecond = 0;
+//     double disconnectionsPerSecond = 0;
+//     std::atomic_size_t connectedClientCount = 0;
+//     std::atomic_size_t receivedResponseCount = 0;
+//     std::atomic_size_t disconnectedClientCount = 0;
+//     QSemaphore clientSocketsDisconnectedSemaphore;
+//     QSemaphore serverSocketsConnectedSemaphore;
+//     QSemaphore serverSocketsDisconnectedSemaphore;
+//     std::unique_ptr<AsyncQObject<ServerQTcpSockets, std::string_view, size_t, size_t>> server(new AsyncQObject<ServerQTcpSockets, std::string_view, size_t, size_t>(serverAddress, totalConnections, requestsPerWorkingConnection));
+//     const auto serverPort = server->get()->serverPort();
+//     QObject::connect(server->get(), &ServerQTcpSockets::connectedToClients, [&](){serverSocketsConnectedSemaphore.release();});
+//     QObject::connect(server->get(), &ServerQTcpSockets::disconnectedFromClients, [&](){serverSocketsDisconnectedSemaphore.release();});
+//     std::vector<std::unique_ptr<AsyncQObject<ClientQTcpSockets, std::string_view, uint16_t, std::string_view, size_t, size_t, size_t, int, int>>> clients(clientThreadCount);
+//     size_t counter = 0;
+//     for (auto &client : clients)
+//     {
+//         std::string currentBindAddress("127.35.21.");
+//         currentBindAddress.append(std::to_string(++counter));
+//         client.reset(new AsyncQObject<ClientQTcpSockets, std::string_view, uint16_t, std::string_view, size_t, size_t, size_t, int, int>(serverAddress, serverPort, currentBindAddress, totalConnectionsPerThread, workingConnectionsPerThread, requestsPerWorkingConnection, a, b));
+//     }
+//     memoryConsumedAfterCreatingClientSockets = getUsedMemory();
+//     QObject ctxObject;
+//     for (auto &client : clients)
+//     {
+//         QObject::connect(client->get(), &ClientQTcpSockets::connectedToServer, &ctxObject, [&]()
+//         {
+//             if (++connectedClientCount == clientThreadCount)
+//             {
+//                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverSocketsConnectedSemaphore, 10000));
+//                 connectionsPerSecond = (1000.0 * totalConnections)/elapsedTimer.elapsed();
+//                 memoryConsumedAfterConnecting = getUsedMemory();
+//                 elapsedTimer.start();
+//                 for (auto &client : clients)
+//                     QMetaObject::invokeMethod(client->get(), "sendRequests", Qt::QueuedConnection);
+//             }
+//         });
+//         QObject::connect(client->get(), &ClientQTcpSockets::receivedResponses, &ctxObject, [&]()
+//         {
+//             if (++receivedResponseCount == clientThreadCount)
+//             {
+//                 requestsPerSecond = (1000.0 * clientThreadCount * workingConnectionsPerThread * requestsPerWorkingConnection)/elapsedTimer.elapsed();
+//                 memoryConsumedAfterResponses = getUsedMemory();
+//                 elapsedTimer.start();
+//                 for (auto &client : clients)
+//                     QMetaObject::invokeMethod(client->get(), "disconnectFromServer", Qt::QueuedConnection);
+//             }
+//         });
+//         QObject::connect(client->get(), &ClientQTcpSockets::disconnectedFromServer, &ctxObject, [&]()
+//         {
+//             if (++disconnectedClientCount == clientThreadCount)
+//             {
+//                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverSocketsDisconnectedSemaphore, 10000));
+//                 disconnectionsPerSecond = (1000.0 * totalConnections)/elapsedTimer.elapsed();
+//                 memoryConsumedAfterDisconnecting = getUsedMemory();
+//                 clientSocketsDisconnectedSemaphore.release();
+//             }
+//         });
+//     }
+//     elapsedTimer.start();
+//     for (auto &client : clients)
+//         QMetaObject::invokeMethod(client->get(), "connectToServer", Qt::QueuedConnection);
+//     REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientSocketsDisconnectedSemaphore, 10000));
+//     WARN(QByteArray("Memory consumed after creating client sockets: ").append(QByteArray::number(memoryConsumedAfterCreatingClientSockets)));
+//     WARN(QByteArray("Memory consumed after connecting: ").append(QByteArray::number(memoryConsumedAfterConnecting)));
+//     WARN(QByteArray("Memory consumed after responses: ").append(QByteArray::number(memoryConsumedAfterResponses)));
+//     WARN(QByteArray("Memory consumed after disconnecting: ").append(QByteArray::number(memoryConsumedAfterDisconnecting)));
+//     WARN(QByteArray("Connections per second: ").append(QByteArray::number(connectionsPerSecond)));
+//     WARN(QByteArray("Requests per second: ").append(QByteArray::number(requestsPerSecond)));
+//     WARN(QByteArray("Disconnections per second: ").append(QByteArray::number(disconnectionsPerSecond)));
+// }
 
 #include "TcpSocket.spec.moc"

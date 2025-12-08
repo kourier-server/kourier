@@ -19,6 +19,7 @@
 #define KOURIER_TCP_SOCKET_H
 
 #include "IOChannel.h"
+#include <chrono>
 
 
 namespace Kourier
@@ -58,6 +59,8 @@ public:
     enum class SocketOption {LowDelay, KeepAlive, SendBufferSize, ReceiveBufferSize};
     int getSocketOption(SocketOption option) const;
     void setSocketOption(SocketOption option, int value);
+    void setConnectTimeout(std::chrono::milliseconds timeout);
+    void setDisconnectTimeout(std::chrono::milliseconds timeout);
     Signal connected();
     Signal disconnected();
     Signal error();

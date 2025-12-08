@@ -58,6 +58,8 @@ public:
     void setWriteEnabled(bool enabled);
     int getSocketOption(TcpSocket::SocketOption option) const;
     void setSocketOption(TcpSocket::SocketOption option, int value);
+    void setConnectTimeout(std::chrono::milliseconds timeout) {m_connectTimer.setInterval(timeout);}
+    void setDisconnectTimeout(std::chrono::milliseconds timeout) {m_disconnectTimer.setInterval(timeout);}
 
 private:
     void connectToHost();

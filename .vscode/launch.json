@@ -9,7 +9,7 @@
             "type": "lldb-dap",
             "request": "launch",
             "program": "${command:cmake.launchTargetPath}",
-            "args": ["-f", "HttpBrokerPrivate.spec.cpp"],
+            "args": ["-f", "TcpSocket.spec.cpp"],
             "env": [],
             "cwd": "${workspaceRoot}",
             "internalConsoleOptions": "openOnSessionStart",
