@@ -203,7 +203,7 @@ class QHashProvider:
                     offset = offsets.GetChildAtIndex(i).GetValueAsUnsigned()
                     if offset != 255:
                         pCurrentEntryAddress = pEntriesAddress + offset * nodeSize
-                        node = self.valobj.CreateValueFromAddress("", pCurrentEntryAddress, nodeType)
+                        node = self.valobj.CreateValueFromAddress("[" + str(count) + "]", pCurrentEntryAddress, nodeType)
                         self.nodes[count] = node
                         count += 1
 
@@ -284,7 +284,7 @@ class QMultiHashProvider:
                     offset = offsets.GetChildAtIndex(i).GetValueAsUnsigned()
                     if offset != 255:
                         pCurrentEntryAddress = pEntriesAddress + offset * nodeSize
-                        node = self.valobj.CreateValueFromAddress("", pCurrentEntryAddress, nodeType)
+                        node = self.valobj.CreateValueFromAddress("[" + str(count) + "]", pCurrentEntryAddress, nodeType)
                         self.nodes[count] = node
                         count += 1
 

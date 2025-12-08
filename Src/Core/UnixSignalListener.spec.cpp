@@ -25,7 +25,7 @@
 using Spectator::SemaphoreAwaiter;
 
 
-SCENARIO("Listens to UNIX signals")
+SCENARIO("UnixSignalListener listens to UNIX signals")
 {
     GIVEN("UnixSignalListenerTestApp is running")
     {
