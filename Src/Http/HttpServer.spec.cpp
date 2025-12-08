@@ -30,6 +30,7 @@
 #include <QNetworkReply>
 #include <QMutex>
 #include <QElapsedTimer>
+#include <QDeadlineTimer>
 #include <memory>
 #include <string>
 #include <vector>
@@ -60,8 +61,8 @@ SCENARIO("HttpServer sets default values for its options")
             const auto option = GENERATE(AS(HttpServer::ServerOption),
                                          HttpServer::ServerOption::WorkerCount,
                                          HttpServer::ServerOption::TcpServerBacklogSize,
-                                         HttpServer::ServerOption::IdleTimeoutInSecs,
-                                         HttpServer::ServerOption::RequestTimeoutInSecs,
+                                         HttpServer::ServerOption::IdleTimeoutInMSecs,
+                                         HttpServer::ServerOption::RequestTimeoutInMSecs,
                                          HttpServer::ServerOption::MaxUrlSize,
                                          HttpServer::ServerOption::MaxHeaderNameSize,
                                          HttpServer::ServerOption::MaxHeaderValueSize,
@@ -780,8 +781,8 @@ SCENARIO("HttpServer sends HTTP status 408 Request Timeout response, closes conn
         HttpServer server;
         REQUIRE(server.addRoute(HttpRequest::Method::GET, "/", [](const HttpRequest&, HttpBroker &broker){broker.writeResponse({"Hello World!"});}));
         REQUIRE(server.connectionCount() == 0);
-        const int64_t idleTimeoutInSecs = 1;
-        server.setServerOption(HttpServer::ServerOption::IdleTimeoutInSecs, idleTimeoutInSecs);
+        const int64_t idleTimeoutInMSecs = 10;
+        server.setServerOption(HttpServer::ServerOption::IdleTimeoutInMSecs, idleTimeoutInMSecs);
         const auto setHandler = GENERATE(AS(bool), true, false);
         std::shared_ptr<CustomErrorHandler> pErrorHandler;
         if (setHandler)
@@ -840,7 +841,7 @@ SCENARIO("HttpServer sends HTTP status 408 Request Timeout response, closes conn
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, 10));
                 const auto elapsedTime = elapsedTimer.elapsed();
-                REQUIRE((0.95*1000*idleTimeoutInSecs) <= elapsedTime && elapsedTime <= (1.05*1000*idleTimeoutInSecs + 1024));
+                REQUIRE(std::abs(idleTimeoutInMSecs - elapsedTime) <= 5);
                 REQUIRE(clientSocket.readAll().starts_with("HTTP/1.1 408 Request Timeout\r\n"));
                 if (setHandler)
                 {
@@ -872,8 +873,8 @@ SCENARIO("HttpServer sends HTTP status 408 Request Timeout response, closes conn
         HttpServer server;
         REQUIRE(server.addRoute(HttpRequest::Method::GET, "/", [](const HttpRequest&, HttpBroker &broker){broker.writeResponse({"Hello World!"});}));
         REQUIRE(server.connectionCount() == 0);
-        const int64_t requestTimeoutInSecs = 1;
-        server.setServerOption(HttpServer::ServerOption::RequestTimeoutInSecs, requestTimeoutInSecs);
+        const int64_t requestTimeoutInMSecs = 10;
+        server.setServerOption(HttpServer::ServerOption::RequestTimeoutInMSecs, requestTimeoutInMSecs);
         const auto setHandler = GENERATE(AS(bool), true, false);
         std::shared_ptr<CustomErrorHandler> pErrorHandler;
         if (setHandler)
@@ -933,7 +934,7 @@ SCENARIO("HttpServer sends HTTP status 408 Request Timeout response, closes conn
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, 10));
                 const auto elapsedTime = elapsedTimer.elapsed();
-                REQUIRE((0.95*1000*requestTimeoutInSecs) <= elapsedTime && elapsedTime <= (1.05*1000*requestTimeoutInSecs + 1024));
+                REQUIRE(std::abs(requestTimeoutInMSecs - elapsedTime) <= 5);
                 REQUIRE(clientSocket.readAll().starts_with("HTTP/1.1 408 Request Timeout\r\n"));
                 if (setHandler)
                 {
@@ -1738,8 +1739,8 @@ SCENARIO("HttpServer does not timeout after a complete request is received")
     GIVEN("a running server with request and idle timeouts and a connected client")
     {
         HttpServer server;
-        server.setServerOption(HttpServer::ServerOption::RequestTimeoutInSecs, 1);
-        server.setServerOption(HttpServer::ServerOption::IdleTimeoutInSecs, 1);
+        server.setServerOption(HttpServer::ServerOption::RequestTimeoutInMSecs, 10);
+        server.setServerOption(HttpServer::ServerOption::IdleTimeoutInMSecs, 10);
         REQUIRE(server.addRoute(HttpRequest::Method::GET, "/", [](const HttpRequest&, HttpBroker &broker)
         {
             broker.setQObject(new QObject);
@@ -1769,7 +1770,7 @@ SCENARIO("HttpServer does not timeout after a complete request is received")
 
             THEN("server keeps awaiting for handler to respond without timing out")
             {
-                REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, 3));
+                REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, QDeadlineTimer(15)));
                 server.stop();
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStoppedSemaphore, 10));
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, 10));

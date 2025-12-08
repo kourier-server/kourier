@@ -25,34 +25,6 @@ namespace Kourier
 HttpConnectionHandler::HttpConnectionHandler(TcpSocket &socket,
                                              std::shared_ptr<HttpRequestLimits> pHttpRequestLimits,
                                              std::shared_ptr<HttpRequestRouter> pHttpRequestRouter,
-                                             int requestTimeoutInSecs,
-                                             int idleTimeoutInSecs,
-                                             std::shared_ptr<ErrorHandler> pErrorHandler) :
-    m_pSocket(&socket),
-    m_requestTimeoutInMSecs(1000*requestTimeoutInSecs),
-    m_idleTimeoutInMSecs(1000*idleTimeoutInSecs),
-    m_requestParser(socket, pHttpRequestLimits),
-    m_pHttpRequestRouter(pHttpRequestRouter),
-    m_pErrorHandler(pErrorHandler),
-    m_brokerPrivate(&socket, &m_requestParser),
-    m_broker(&m_brokerPrivate)
-{
-    m_timer.setSingleShot(true);
-    Object::connect(&m_timer, &Timer::timeout, this, &HttpConnectionHandler::onTimeout);
-    Object::connect(m_pSocket.get(), &TcpSocket::receivedData, this, &HttpConnectionHandler::onReceivedData);
-    if (m_idleTimeoutInMSecs.count() > 0)
-    {
-        m_isInIdleTimeout = true;
-        m_timer.start(m_idleTimeoutInMSecs);
-    }
-    Object::connect(m_pSocket.get(), &TcpSocket::disconnected, this, &HttpConnectionHandler::onDisconnected);
-    Object::connect(m_pSocket.get(), &TcpSocket::error, this, &HttpConnectionHandler::onDisconnected);
-    Object::connect(&m_brokerPrivate, &HttpBrokerPrivate::wroteResponse, this, &HttpConnectionHandler::onWroteResponse);
-}
-
-HttpConnectionHandler::HttpConnectionHandler(TcpSocket &socket,
-                                             std::shared_ptr<HttpRequestLimits> pHttpRequestLimits,
-                                             std::shared_ptr<HttpRequestRouter> pHttpRequestRouter,
                                              std::chrono::milliseconds requestTimeoutInMSecs,
                                              std::chrono::milliseconds idleTimeoutInMSecs,
                                              std::shared_ptr<ErrorHandler> pErrorHandler) :

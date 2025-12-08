@@ -35,8 +35,8 @@ bool HttpServerOptions::setOption(HttpServer::ServerOption option, int64_t value
     {
         case HttpServer::ServerOption::WorkerCount:
         case HttpServer::ServerOption::TcpServerBacklogSize:
-        case HttpServer::ServerOption::IdleTimeoutInSecs:
-        case HttpServer::ServerOption::RequestTimeoutInSecs:
+        case HttpServer::ServerOption::IdleTimeoutInMSecs:
+        case HttpServer::ServerOption::RequestTimeoutInMSecs:
             break;
         case HttpServer::ServerOption::MaxUrlSize:
         case HttpServer::ServerOption::MaxHeaderNameSize:
@@ -75,8 +75,8 @@ bool HttpServerOptions::setOption(HttpServer::ServerOption option, int64_t value
             }
             else
                 break;
-        case HttpServer::ServerOption::IdleTimeoutInSecs:
-        case HttpServer::ServerOption::RequestTimeoutInSecs:
+        case HttpServer::ServerOption::IdleTimeoutInMSecs:
+        case HttpServer::ServerOption::RequestTimeoutInMSecs:
             if (value > std::numeric_limits<int>::max())
             {
                 m_errorMessage = std::string("Failed to set timeout. Maximum possible value is ").append(std::to_string(std::numeric_limits<int>::max())).append(".");
@@ -139,9 +139,9 @@ int64_t HttpServerOptions::defaultOptionValue(HttpServer::ServerOption option)
             return QThread::idealThreadCount();
         case HttpServer::ServerOption::TcpServerBacklogSize:
             return 1 << 12;
-        case HttpServer::ServerOption::IdleTimeoutInSecs:
+        case HttpServer::ServerOption::IdleTimeoutInMSecs:
             return 0;
-        case HttpServer::ServerOption::RequestTimeoutInSecs:
+        case HttpServer::ServerOption::RequestTimeoutInMSecs:
             return 0;
         case HttpServer::ServerOption::MaxUrlSize:
             return HttpRequestLimits().maxUrlSize;
@@ -177,8 +177,8 @@ int64_t HttpServerOptions::maxOptionValue(HttpServer::ServerOption option)
         case HttpServer::ServerOption::WorkerCount:
             return QThread::idealThreadCount();
         case HttpServer::ServerOption::TcpServerBacklogSize:
-        case HttpServer::ServerOption::IdleTimeoutInSecs:
-        case HttpServer::ServerOption::RequestTimeoutInSecs:
+        case HttpServer::ServerOption::IdleTimeoutInMSecs:
+        case HttpServer::ServerOption::RequestTimeoutInMSecs:
             return std::numeric_limits<int>::max();
         case HttpServer::ServerOption::MaxHeaderNameSize:
         case HttpServer::ServerOption::MaxTrailerNameSize:

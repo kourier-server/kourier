@@ -38,8 +38,8 @@ SCENARIO("HttpServerOptions returns default option values")
             const auto option = GENERATE(AS(HttpServer::ServerOption),
                                          HttpServer::ServerOption::WorkerCount,
                                          HttpServer::ServerOption::TcpServerBacklogSize,
-                                         HttpServer::ServerOption::IdleTimeoutInSecs,
-                                         HttpServer::ServerOption::RequestTimeoutInSecs,
+                                         HttpServer::ServerOption::IdleTimeoutInMSecs,
+                                         HttpServer::ServerOption::RequestTimeoutInMSecs,
                                          HttpServer::ServerOption::MaxUrlSize,
                                          HttpServer::ServerOption::MaxHeaderNameSize,
                                          HttpServer::ServerOption::MaxHeaderValueSize,
@@ -73,8 +73,8 @@ SCENARIO("HttpServerOptions does not accept negative values")
             const auto option = GENERATE(AS(HttpServer::ServerOption),
                                          HttpServer::ServerOption::WorkerCount,
                                          HttpServer::ServerOption::TcpServerBacklogSize,
-                                         HttpServer::ServerOption::IdleTimeoutInSecs,
-                                         HttpServer::ServerOption::RequestTimeoutInSecs,
+                                         HttpServer::ServerOption::IdleTimeoutInMSecs,
+                                         HttpServer::ServerOption::RequestTimeoutInMSecs,
                                          HttpServer::ServerOption::MaxUrlSize,
                                          HttpServer::ServerOption::MaxHeaderNameSize,
                                          HttpServer::ServerOption::MaxHeaderValueSize,
@@ -109,8 +109,8 @@ SCENARIO("HttpServerOptions sets maximum option values for request limits and ma
         {
             const auto option = GENERATE(AS(std::pair<HttpServer::ServerOption, bool>),
                                          {HttpServer::ServerOption::WorkerCount, false},
-                                         {HttpServer::ServerOption::IdleTimeoutInSecs, false},
-                                         {HttpServer::ServerOption::RequestTimeoutInSecs, false},
+                                         {HttpServer::ServerOption::IdleTimeoutInMSecs, false},
+                                         {HttpServer::ServerOption::RequestTimeoutInMSecs, false},
                                          {HttpServer::ServerOption::MaxUrlSize, true},
                                          {HttpServer::ServerOption::MaxHeaderNameSize, true},
                                          {HttpServer::ServerOption::MaxHeaderValueSize, true},
@@ -242,31 +242,31 @@ SCENARIO("HttpServerOptions does not allow timeout values greater than 1 << 31")
 
         WHEN("a value grater than 1 << 31 is set for request timeout")
         {
-            const auto requestTimeoutInSecs = GENERATE(AS(int64_t), (size_t(1) << 31) + 1, (size_t(1) << 31) + 1024, size_t(1) << 58);
+            const auto requestTimeoutInMSecs = GENERATE(AS(int64_t), (size_t(1) << 31) + 1, (size_t(1) << 31) + 1024, size_t(1) << 58);
             REQUIRE(serverOptions.errorMessage().empty());
-            const auto succeeded = serverOptions.setOption(HttpServer::ServerOption::RequestTimeoutInSecs, requestTimeoutInSecs);
+            const auto succeeded = serverOptions.setOption(HttpServer::ServerOption::RequestTimeoutInMSecs, requestTimeoutInMSecs);
 
             THEN("HttpServerOptions fails to set request timeout")
             {
                 REQUIRE(!succeeded);
                 REQUIRE(!serverOptions.errorMessage().empty());
-                REQUIRE(HttpServerOptions::defaultOptionValue(HttpServer::ServerOption::RequestTimeoutInSecs) == serverOptions.getOption(HttpServer::ServerOption::RequestTimeoutInSecs));
-                REQUIRE(serverOptions.getOption(HttpServer::ServerOption::RequestTimeoutInSecs) == 0);
+                REQUIRE(HttpServerOptions::defaultOptionValue(HttpServer::ServerOption::RequestTimeoutInMSecs) == serverOptions.getOption(HttpServer::ServerOption::RequestTimeoutInMSecs));
+                REQUIRE(serverOptions.getOption(HttpServer::ServerOption::RequestTimeoutInMSecs) == 0);
             }
         }
 
         WHEN("a value grater than 1 << 31 is set for idle timeout")
         {
-            const auto idleTimeoutInSecs = GENERATE(AS(int64_t), (size_t(1) << 31) + 1, (size_t(1) << 31) + 1024, size_t(1) << 58);
+            const auto idleTimeoutInMSecs = GENERATE(AS(int64_t), (size_t(1) << 31) + 1, (size_t(1) << 31) + 1024, size_t(1) << 58);
             REQUIRE(serverOptions.errorMessage().empty());
-            const auto succeeded = serverOptions.setOption(HttpServer::ServerOption::IdleTimeoutInSecs, idleTimeoutInSecs);
+            const auto succeeded = serverOptions.setOption(HttpServer::ServerOption::IdleTimeoutInMSecs, idleTimeoutInMSecs);
 
             THEN("HttpServerOptions fails to set idle timeout")
             {
                 REQUIRE(!succeeded);
                 REQUIRE(!serverOptions.errorMessage().empty());
-                REQUIRE(HttpServerOptions::defaultOptionValue(HttpServer::ServerOption::IdleTimeoutInSecs) == serverOptions.getOption(HttpServer::ServerOption::IdleTimeoutInSecs));
-                REQUIRE(serverOptions.getOption(HttpServer::ServerOption::IdleTimeoutInSecs) == 0);
+                REQUIRE(HttpServerOptions::defaultOptionValue(HttpServer::ServerOption::IdleTimeoutInMSecs) == serverOptions.getOption(HttpServer::ServerOption::IdleTimeoutInMSecs));
+                REQUIRE(serverOptions.getOption(HttpServer::ServerOption::IdleTimeoutInMSecs) == 0);
             }
         }
     }

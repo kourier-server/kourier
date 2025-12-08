@@ -42,12 +42,6 @@ public:
     HttpConnectionHandler(TcpSocket &socket,
                           std::shared_ptr<HttpRequestLimits> pHttpRequestLimits,
                           std::shared_ptr<HttpRequestRouter> pHttpRequestRouter,
-                          int requestTimeoutInSecs,
-                          int idleTimeoutInSecs,
-                          std::shared_ptr<ErrorHandler> pErrorHandler = {});
-    HttpConnectionHandler(TcpSocket &socket,
-                          std::shared_ptr<HttpRequestLimits> pHttpRequestLimits,
-                          std::shared_ptr<HttpRequestRouter> pHttpRequestRouter,
                           std::chrono::milliseconds requestTimeoutInMSecs,
                           std::chrono::milliseconds idleTimeoutInMSecs,
                           std::shared_ptr<ErrorHandler> pErrorHandler = {});

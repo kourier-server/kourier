@@ -18,6 +18,7 @@
 #include "HttpConnectionHandlerFactory.h"
 #include "HttpConnectionHandler.h"
 #include "../Core/TlsSocket.h"
+#include <chrono>
 
 
 namespace Kourier
@@ -42,8 +43,8 @@ HttpConnectionHandlerFactory::HttpConnectionHandlerFactory(const HttpServerOptio
                                                .maxChunkMetadataSize = static_cast<size_t>(m_httpServerOptions.getOption(HttpServer::ServerOption::MaxChunkMetadataSize)),
                                                .maxRequestSize = static_cast<size_t>(m_httpServerOptions.getOption(HttpServer::ServerOption::MaxRequestSize)),
                                                .maxBodySize = static_cast<size_t>(m_httpServerOptions.getOption(HttpServer::ServerOption::MaxBodySize))}),
-    m_requestTimeoutInSecs(static_cast<int>(m_httpServerOptions.getOption(HttpServer::ServerOption::RequestTimeoutInSecs))),
-    m_idleTimeoutInSecs(static_cast<int>(m_httpServerOptions.getOption(HttpServer::ServerOption::IdleTimeoutInSecs))),
+    m_requestTimeoutInMSecs(static_cast<int>(m_httpServerOptions.getOption(HttpServer::ServerOption::RequestTimeoutInMSecs))),
+    m_idleTimeoutInMSecs(static_cast<int>(m_httpServerOptions.getOption(HttpServer::ServerOption::IdleTimeoutInMSecs))),
     m_isEncrypted(m_tlsConfiguration != TlsConfiguration())
 
 {
@@ -61,8 +62,8 @@ ConnectionHandler *HttpConnectionHandlerFactory::create(qintptr socketDescriptor
         return new HttpConnectionHandler(*pSocket,
                                          m_pHttpRequestLimits,
                                          m_pHttpRequestRouter,
-                                         m_requestTimeoutInSecs,
-                                         m_idleTimeoutInSecs,
+                                         std::chrono::milliseconds(m_requestTimeoutInMSecs),
+                                         std::chrono::milliseconds(m_idleTimeoutInMSecs),
                                          m_pErrorHandler);
 }
 

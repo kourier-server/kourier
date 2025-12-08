@@ -49,8 +49,8 @@ private:
     const std::shared_ptr<HttpRequestLimits> m_pHttpRequestLimits;
     const std::shared_ptr<HttpRequestRouter> m_pHttpRequestRouter;
     const std::shared_ptr<ErrorHandler> m_pErrorHandler;
-    const int m_requestTimeoutInSecs;
-    const int m_idleTimeoutInSecs;
+    const int m_requestTimeoutInMSecs;
+    const int m_idleTimeoutInMSecs;
     const bool m_isEncrypted;
 };
 

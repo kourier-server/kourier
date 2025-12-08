@@ -43,8 +43,8 @@ public:
     {
         WorkerCount,
         TcpServerBacklogSize,
-        IdleTimeoutInSecs,
-        RequestTimeoutInSecs,
+        IdleTimeoutInMSecs,
+        RequestTimeoutInMSecs,
         MaxUrlSize,
         MaxHeaderNameSize,
         MaxHeaderValueSize,

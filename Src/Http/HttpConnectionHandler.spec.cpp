@@ -45,6 +45,7 @@ using Kourier::ErrorHandler;
 using Kourier::TcpSocket;
 using Kourier::Object;
 using Spectator::SemaphoreAwaiter;
+using namespace std::chrono_literals;
 
 static std::pair<TcpSocket*, TcpSocket*> createConnectedSocketPair()
 {
@@ -100,7 +101,7 @@ SCENARIO("HttpConnectionHandler calls handler mapped to request path")
         REQUIRE(pHttpRequestRouter->addRoute(method, "/a", [](const HttpRequest &, HttpBroker&){calledRoute = "/a"; handlerSemaphore.release();}));
         REQUIRE(pHttpRequestRouter->addRoute(method, "/a/path", [](const HttpRequest &, HttpBroker&){calledRoute = "/a/path"; handlerSemaphore.release();}));
         REQUIRE(pHttpRequestRouter->addRoute(method, "/another/path", [](const HttpRequest &, HttpBroker&){calledRoute = "/another/path"; handlerSemaphore.release();}));
-        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0, 0);
+        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0ms, 0ms);
 
         WHEN("client sends a request")
         {
@@ -171,7 +172,7 @@ SCENARIO("HttpConnectionHandler sends pending request data through broker")
             });
             handlerSemaphore.release();
         }));
-        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0, 0);
+        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0ms, 0ms);
 
         WHEN("client sends a partial request containing at least the request metadata (request line + headers)")
         {
@@ -260,7 +261,7 @@ SCENARIO("HttpConnectionHandler processes next request after response for curren
         };
         REQUIRE(pHttpRequestRouter->addRoute(HttpRequest::Method::GET, "/path1", pHandlerFcn));
         REQUIRE(pHttpRequestRouter->addRoute(HttpRequest::Method::POST, "/path2", pHandlerFcn));
-        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0, 0);
+        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0ms, 0ms);
 
         WHEN("client writes two complete requests")
         {
@@ -327,7 +328,7 @@ SCENARIO("HttpConnectionHandler allows request handling code to respond before r
         };
         REQUIRE(pHttpRequestRouter->addRoute(HttpRequest::Method::POST, "/", pHandlerFcn));
         REQUIRE(pHttpRequestRouter->addRoute(HttpRequest::Method::GET, "/another", pHandlerFcn));
-        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0, 0);
+        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0ms, 0ms);
 
         WHEN("client writes part of the first request containing at least the request metadata (request line + headers)")
         {
@@ -401,7 +402,7 @@ SCENARIO("HttpConnectionHandler processes all requests in buffer without the nee
         REQUIRE(pHttpRequestRouter->addRoute(HttpRequest::Method::POST, "/1", pHandlerFcn));
         REQUIRE(pHttpRequestRouter->addRoute(HttpRequest::Method::POST, "/2", pHandlerFcn));
         REQUIRE(pHttpRequestRouter->addRoute(HttpRequest::Method::POST, "/3", pHandlerFcn));
-        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0, 0);
+        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0ms, 0ms);
 
         WHEN("three requests are written")
         {
@@ -443,7 +444,7 @@ SCENARIO("HttpConnectionHandler sends 100-continue before calling handler when r
         static thread_local std::string calledRoute;
         static thread_local QSemaphore handlerSemaphore;
         REQUIRE(pHttpRequestRouter->addRoute(HttpRequest::Method::POST, "/send_large_data", [](const HttpRequest &, HttpBroker &broker){broker.writeResponse(); handlerSemaphore.release();}));
-        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0, 0);
+        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0ms, 0ms);
         QSemaphore responseSemaphore;
         std::string response;
         Object::connect(clientSocket.get(), &TcpSocket::receivedData, [&]()
@@ -494,7 +495,7 @@ SCENARIO("HttpConnectionHandler supports server-wide options requests")
         static thread_local std::string calledRoute;
         static thread_local QSemaphore handlerSemaphore;
         REQUIRE(pHttpRequestRouter->addRoute(HttpRequest::Method::OPTIONS, "*", [](const HttpRequest &, HttpBroker&){handlerSemaphore.release();}));
-        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0, 0);
+        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0ms, 0ms);
 
         WHEN("client sends a server-wide request")
         {
@@ -522,7 +523,7 @@ SCENARIO("HttpConnectionHandler allows request handling code to close http conne
         static thread_local std::string calledRoute;
         static thread_local QSemaphore handlerSemaphore;
         REQUIRE(pHttpRequestRouter->addRoute(HttpRequest::Method::GET, "/", [](const HttpRequest &, HttpBroker &broker){broker.closeConnectionAfterResponding(); broker.writeResponse(); handlerSemaphore.release();}));
-        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0, 0);
+        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0ms, 0ms);
         QSemaphore responseSemaphore;
         std::string response;
         Object::connect(clientSocket.get(), &TcpSocket::receivedData, [&]()
@@ -573,7 +574,7 @@ SCENARIO("HttpConnectionHandler closes connection if handler function does not s
         };
         REQUIRE(pHttpRequestRouter->addRoute(HttpRequest::Method::GET, "/", pHandlerFcn));
         REQUIRE(pHttpRequestRouter->addRoute(HttpRequest::Method::GET, "/chunked", pHandlerFcn));
-        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0, 0);
+        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0ms, 0ms);
         QSemaphore finishedSemaphore;
         Object::connect(&httpConnectionHandler, &HttpConnectionHandler::finished, [&](ConnectionHandler *pHandler)
         {
@@ -639,7 +640,7 @@ SCENARIO("HttpConnectionHandler allows request handling code to know how much da
             handlerSemaphore.release();
         };
         REQUIRE(pHttpRequestRouter->addRoute(HttpRequest::Method::GET, "/", pHandlerFcn));
-        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0, 0);
+        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0ms, 0ms);
         QSemaphore responseSemaphore;
         Object::connect(clientSocket.get(), &TcpSocket::receivedData, [&](){responseSemaphore.release();});
 
@@ -694,7 +695,7 @@ SCENARIO("HttpConnectionHandler informs request handling code whenever data is s
             handlerSemaphore.release();
         };
         REQUIRE(pHttpRequestRouter->addRoute(HttpRequest::Method::GET, "/", pHandlerFcn));
-        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0, 0);
+        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0ms, 0ms);
         QSemaphore responseSemaphore;
         Object::connect(clientSocket.get(), &TcpSocket::receivedData, [&](){responseSemaphore.release();});
 
@@ -750,7 +751,7 @@ SCENARIO("HttpConnectionHandler informs if received body data is the last one")
             handlerSemaphore.release();
         };
         REQUIRE(pHttpRequestRouter->addRoute(HttpRequest::Method::POST, "/", pHandlerFcn));
-        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0, 0);
+        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0ms, 0ms);
 
         WHEN("client sends request metadata")
         {
@@ -871,7 +872,7 @@ SCENARIO("HttpConnectionHandler informs if last chunk in chunked request contain
             handlerSemaphore.release();
         };
         REQUIRE(pHttpRequestRouter->addRoute(HttpRequest::Method::POST, "/", pHandlerFcn));
-        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0, 0);
+        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0ms, 0ms);
 
         WHEN("client sends request metadata")
         {
@@ -1012,7 +1013,7 @@ SCENARIO("HttpRequest knows client IP/port")
         clientPort = 0;
         static thread_local QSemaphore handlerSemaphore;
         REQUIRE(pHttpRequestRouter->addRoute(HttpRequest::Method::GET, "/", [](const HttpRequest &request, HttpBroker &broker){clientIp = request.peerAddress(); clientPort = request.peerPort(); broker.writeResponse(); handlerSemaphore.release();}));
-        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0, 0);
+        HttpConnectionHandler httpConnectionHandler(*tcpSockets.second, std::make_shared<HttpRequestLimits>(), pHttpRequestRouter, 0ms, 0ms);
 
         WHEN("client writes a request")
         {
