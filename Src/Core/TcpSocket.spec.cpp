@@ -26,6 +26,7 @@
 #include <QElapsedTimer>
 #include <QDeadlineTimer>
 #include <QRandomGenerator64>
+#include <QHostInfo>
 #include <memory>
 #include <fstream>
 #include <netinet/in.h>
@@ -82,2882 +83,678 @@ const static QByteArray largeData = []
 using namespace TcpSocketTests;
 
 
-SCENARIO("TcpSocket interacts with client peer")
+SCENARIO("TcpSocket connects to server by host address")
 {
-    GIVEN("a listening server")
+    GIVEN("a running server")
+    {
+        const auto serverAddress = GENERATE(AS(QHostAddress), QHostAddress("127.10.20.30"), QHostAddress("::1"));
+        TcpServer server;
+        REQUIRE(server.listen(serverAddress));
+        std::unique_ptr<TcpSocket> serverPeer;
+        QSemaphore serverPeerConnectedSemaphore;
+        QSemaphore serverPeerDisconnectedSemaphore;
+        QSemaphore serverPeerReceivedPingSemaphore;
+        QByteArray serverPeerReceivedData;
+        Object::connect(&server, &TcpServer::newConnection, [&](TcpSocket *pNewSocket)
+            {
+                REQUIRE(!serverPeer);
+                serverPeer.reset(pNewSocket);
+                Object::connect(serverPeer.get(), &TcpSocket::disconnected, [&]{serverPeerDisconnectedSemaphore.release();});
+                Object::connect(serverPeer.get(), &TcpSocket::receivedData, [&]()
+                    {
+                        serverPeerReceivedData.append(serverPeer->readAll());
+                        if (serverPeerReceivedData == "PING")
+                        {
+                            serverPeer->write("PONG");
+                            serverPeer->disconnectFromPeer();
+                            serverPeerReceivedPingSemaphore.release();
+                        }
+                        else if (serverPeerReceivedData.size() >= 4)
+                        {
+                            FAIL("Server peer expects a single PING message.");
+                        }
+                    });
+                serverPeerConnectedSemaphore.release();
+            });
+
+        WHEN("TcpSocket connects to running server by address and port")
+        {
+            TcpSocket clientPeer;
+            QSemaphore clientPeerConnectedSemaphore;
+            QSemaphore clientPeerDisconnectedSemaphore;
+            QSemaphore clientPeerReceivedPongSemaphore;
+            QByteArray clientPeerReceivedData;
+            Object::connect(&clientPeer, &TcpSocket::connected, [&]{clientPeerConnectedSemaphore.release();});
+            Object::connect(&clientPeer, &TcpSocket::disconnected, [&]{clientPeerDisconnectedSemaphore.release();});
+            Object::connect(&clientPeer, &TcpSocket::receivedData, [&]()
+                {
+                    clientPeerReceivedData.append(clientPeer.readAll());
+                    if (clientPeerReceivedData == "PONG")
+                        clientPeerReceivedPongSemaphore.release();
+                    else if (clientPeerReceivedData.size() >= 4)
+                    {
+                        FAIL("Client peer expects a single PONG message.");
+                    }
+                });
+            clientPeer.connect(serverAddress.toString().toStdString(), server.serverPort());
+
+            THEN("server connects to client and client emits the connected signal")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+
+                AND_WHEN("client peer sends a ping message to the server peer")
+                {
+                    clientPeer.write("PING");
+
+                    THEN("server peer responds with a PONG message and closes the connection")
+                    {
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerReceivedPingSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerReceivedPongSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+SCENARIO("TcpSocket connects to server by host name")
+{
+    GIVEN("a running server")
+    {
+        std::string_view hostName("localhost-ips.test.kourier.io");
+        TcpServer server;
+        const auto serverAddress = GENERATE(AS(QHostAddress),
+                                               QHostAddress("127.10.20.50"),
+                                               QHostAddress("127.10.20.60"),
+                                               QHostAddress("127.10.20.70"),
+                                               QHostAddress("127.10.20.80"),
+                                               QHostAddress("127.10.20.90"),
+                                               QHostAddress("::1"));
+        REQUIRE(server.listen(serverAddress));
+        std::unique_ptr<TcpSocket> serverPeer;
+        QSemaphore serverPeerConnectedSemaphore;
+        QSemaphore serverPeerDisconnectedSemaphore;
+        QSemaphore serverPeerReceivedPingSemaphore;
+        QByteArray serverPeerReceivedData;
+        Object::connect(&server, &TcpServer::newConnection, [&](TcpSocket *pNewSocket)
+            {
+                REQUIRE(!serverPeer);
+                serverPeer.reset(pNewSocket);
+                Object::connect(serverPeer.get(), &TcpSocket::disconnected, [&]{serverPeerDisconnectedSemaphore.release();});
+                Object::connect(serverPeer.get(), &TcpSocket::receivedData, [&]()
+                    {
+                        serverPeerReceivedData.append(serverPeer->readAll());
+                        if (serverPeerReceivedData == "PING")
+                        {
+                            serverPeer->write("PONG");
+                            serverPeer->disconnectFromPeer();
+                            serverPeerReceivedPingSemaphore.release();
+                        }
+                        else if (serverPeerReceivedData.size() >= 4)
+                        {
+                            FAIL("Server peer expects a single PING message.");
+                        }
+                    });
+                serverPeerConnectedSemaphore.release();
+            });
+
+        WHEN("TcpSocket connects to running server by hostname")
+        {
+            TcpSocket clientPeer;
+            QSemaphore clientPeerConnectedSemaphore;
+            QSemaphore clientPeerDisconnectedSemaphore;
+            QSemaphore clientPeerReceivedPongSemaphore;
+            QByteArray clientPeerReceivedData;
+            Object::connect(&clientPeer, &TcpSocket::connected, [&]{clientPeerConnectedSemaphore.release();});
+            Object::connect(&clientPeer, &TcpSocket::disconnected, [&]{clientPeerDisconnectedSemaphore.release();});
+            Object::connect(&clientPeer, &TcpSocket::receivedData, [&]()
+                {
+                    clientPeerReceivedData.append(clientPeer.readAll());
+                    if (clientPeerReceivedData == "PONG")
+                        clientPeerReceivedPongSemaphore.release();
+                    else if (clientPeerReceivedData.size() >= 4)
+                    {
+                        FAIL("Client peer expects a single PONG message.");
+                    }
+                });
+            clientPeer.connect(hostName, server.serverPort());
+
+            THEN("server connects to client and client emits the connected signal")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+
+                AND_WHEN("client peer sends a ping message to the server peer")
+                {
+                    clientPeer.write("PING");
+
+                    THEN("server peer responds with a PONG message and closes the connection")
+                    {
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerReceivedPingSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerReceivedPongSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+SCENARIO("TcpSocket allows binding to an address/port prior to connecting to server")
+{
+    GIVEN("a running server")
+    {
+        const auto serverAddress = GENERATE(AS(QHostAddress), QHostAddress("127.10.20.50"), QHostAddress("::1"));
+        TcpServer server;
+        REQUIRE(server.listen(serverAddress));
+        std::unique_ptr<TcpSocket> serverPeer;
+        QSemaphore serverPeerConnectedSemaphore;
+        QSemaphore serverPeerDisconnectedSemaphore;
+        QSemaphore serverPeerReceivedPingSemaphore;
+        QByteArray serverPeerReceivedData;
+        Object::connect(&server, &TcpServer::newConnection, [&](TcpSocket *pNewSocket)
+            {
+                REQUIRE(!serverPeer);
+                serverPeer.reset(pNewSocket);
+                Object::connect(serverPeer.get(), &TcpSocket::disconnected, [&]{serverPeerDisconnectedSemaphore.release();});
+                Object::connect(serverPeer.get(), &TcpSocket::receivedData, [&]()
+                    {
+                        serverPeerReceivedData.append(serverPeer->readAll());
+                        if (serverPeerReceivedData == "PING")
+                        {
+                            serverPeer->write("PONG");
+                            serverPeer->disconnectFromPeer();
+                            serverPeerReceivedPingSemaphore.release();
+                        }
+                        else if (serverPeerReceivedData.size() >= 4)
+                        {
+                            FAIL("Server peer expects a single PING message.");
+                        }
+                    });
+                serverPeerConnectedSemaphore.release();
+            });
+
+        WHEN("TcpSocket binds to address/port prior to connecting to running server")
+        {
+            const auto bindWithExplicitPort = GENERATE(AS(bool), true, false);
+            const static QHostAddress bindIpv4Address("127.4.8.12");
+            const static QHostAddress bindIpv6Address("::1");
+            const auto bindAddress = (serverAddress.protocol() == QHostAddress::IPv6Protocol) ? bindIpv6Address : bindIpv4Address;
+            constexpr static auto fetchAvailablePort = [](QHostAddress address) -> uint16_t
+            {
+                QTcpSocket socket;
+                REQUIRE(socket.bind(address));
+                const auto availablePort = socket.localPort();
+                socket.abort();
+                return availablePort;
+            };
+            const auto bindPort = bindWithExplicitPort ? fetchAvailablePort(bindAddress) : 0;
+            TcpSocket clientPeer;
+            clientPeer.setBindAddressAndPort(bindAddress.toString().toStdString(), bindPort);
+            QSemaphore clientPeerConnectedSemaphore;
+            QSemaphore clientPeerDisconnectedSemaphore;
+            QSemaphore clientPeerReceivedPongSemaphore;
+            QByteArray clientPeerReceivedData;
+            Object::connect(&clientPeer, &TcpSocket::connected, [&]{clientPeerConnectedSemaphore.release();});
+            Object::connect(&clientPeer, &TcpSocket::disconnected, [&]{clientPeerDisconnectedSemaphore.release();});
+            Object::connect(&clientPeer, &TcpSocket::receivedData, [&]()
+                {
+                    clientPeerReceivedData.append(clientPeer.readAll());
+                    if (clientPeerReceivedData == "PONG")
+                        clientPeerReceivedPongSemaphore.release();
+                    else if (clientPeerReceivedData.size() >= 4)
+                    {
+                        FAIL("Client peer expects a single PONG message.");
+                    }
+                });
+            const auto connectByName = GENERATE(AS(bool), true, false);
+            if (connectByName)
+                clientPeer.connect("localhost-ips.test.kourier.io", server.serverPort());
+            else
+                clientPeer.connect(serverAddress.toString().toStdString(), server.serverPort());
+
+            THEN("server connects to client and client emits the connected signal")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                REQUIRE(clientPeer.localAddress() == bindAddress.toString().toStdString());
+                if (bindPort != 0)
+                {
+                    REQUIRE(clientPeer.localPort() == bindPort);
+                }
+
+                AND_WHEN("client peer sends a ping message to the server peer")
+                {
+                    clientPeer.write("PING");
+
+                    THEN("server peer responds with a PONG message and closes the connection")
+                    {
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerReceivedPingSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerReceivedPongSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+SCENARIO("TcpSocket allows OS-level socket options to be set")
+{
+    GIVEN("two TcpSockets configured after connecting to each other")
     {
         TcpServer server;
-        QSemaphore socketConnectedSemaphore;
-        QSemaphore socketFailedSemaphore;
-        QSemaphore socketDisconnectedSemaphore;
-        QSemaphore socketReceivedDataFromPeerSemaphore;
-        QByteArray socketReceivedData;
-        std::unique_ptr<TcpSocket> pSocket;
+        REQUIRE(server.listen(QHostAddress::LocalHost));
+        std::unique_ptr<TcpSocket> pServerPeer;
+        QSemaphore serverPeerConnectedSemaphore;
+        QSemaphore serverPeerDisconnectedSemaphore;
+        QSemaphore serverPeerReceivedPingSemaphore;
+        QByteArray receivedServerPeerData;
         Object::connect(&server, &TcpServer::newConnection, [&](TcpSocket *pNewSocket)
-        {
-            pSocket.reset(pNewSocket);
-            Object::connect(pSocket.get(), &TcpSocket::error, [&]() {socketFailedSemaphore.release();});
-            Object::connect(pSocket.get(), &TcpSocket::disconnected, [&socketDisconnectedSemaphore](){socketDisconnectedSemaphore.release();});
-            Object::connect(pSocket.get(), &TcpSocket::receivedData, [&]()
             {
-                QByteArray readData;
-                readData.resize(pSocket->dataAvailable());
-                pSocket->read(readData.data(), readData.size());
-                socketReceivedData.append(readData);
-                socketReceivedDataFromPeerSemaphore.release();
+                REQUIRE(!pServerPeer);
+                pServerPeer.reset(pNewSocket);
+                Object::connect(pServerPeer.get(), &TcpSocket::disconnected, [&]{serverPeerDisconnectedSemaphore.release();});
+                Object::connect(pServerPeer.get(), &TcpSocket::receivedData, [&]()
+                    {
+                        receivedServerPeerData.append(pServerPeer->readAll());
+                        if (receivedServerPeerData == "PING")
+                        {
+                            pServerPeer->write("PONG");
+                            pServerPeer->disconnectFromPeer();
+                            serverPeerReceivedPingSemaphore.release();
+                        }
+                        else if (receivedServerPeerData.size() >= 4)
+                        {
+                            FAIL("Server peer expects a single PING message.");
+                        }
+                    });
+                serverPeerConnectedSemaphore.release();
             });
-            socketConnectedSemaphore.release();
-        });
-        const auto serverAddress = GENERATE(AS(QHostAddress),
-                                            QHostAddress("127.10.20.50"),
-                                            QHostAddress("::1"));
-        REQUIRE(server.listen(serverAddress, 0));
-        const auto serverPort = server.serverPort();
-        REQUIRE(serverPort >= 1024);
-
-        WHEN("peer connects to host")
-        {
-            QSemaphore peerConnectedSemaphore;
-            QSemaphore peerFailedSemaphore;
-            QSemaphore peerDisconnectedSemaphore;
-            QSemaphore peerReceivedDataFromTcpSocketSemaphore;
-            QByteArray peerReceivedData;
-            std::unique_ptr<QTcpSocket> pPeerSocket(new QTcpSocket);
-            QObject::connect(pPeerSocket.get(), &QTcpSocket::errorOccurred, [&](QAbstractSocket::SocketError error) {peerFailedSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QTcpSocket::connected, [&peerConnectedSemaphore](){peerConnectedSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QTcpSocket::disconnected, [&peerDisconnectedSemaphore](){peerDisconnectedSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QTcpSocket::readyRead, [&]()
-            {
-                peerReceivedData.append(pPeerSocket->readAll());
-                peerReceivedDataFromTcpSocketSemaphore.release();
-            });
-            pPeerSocket->connectToHost(serverAddress, serverPort);
-
-            THEN("server emits newConnection with a connected socket")
-            {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
-                REQUIRE(pSocket->state() == TcpSocket::State::Connected);
-
-                AND_THEN("connecting peer socket emits connected")
+        std::unique_ptr<TcpSocket> pClientPeer(new TcpSocket);
+        QSemaphore clientPeerConnectedSemaphore;
+        QSemaphore clientPeerDisconnectedSemaphore;
+        QSemaphore clientPeerReceivedPongSemaphore;
+        QByteArray receivedClientPeerData;
+        Object::connect(pClientPeer.get(), &TcpSocket::connected, [&]{clientPeerConnectedSemaphore.release();});
+        Object::connect(pClientPeer.get(), &TcpSocket::disconnected, [&]{clientPeerDisconnectedSemaphore.release();});
+        Object::connect(pClientPeer.get(), &TcpSocket::receivedData, [&]()
                 {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
-                    REQUIRE(pPeerSocket->localAddress() == QHostAddress(QString::fromStdString(std::string(pSocket->peerAddress()))));
-                    REQUIRE(pPeerSocket->localPort() == pSocket->peerPort());
-                    REQUIRE(pPeerSocket->peerAddress() == QHostAddress(QString::fromStdString(std::string(pSocket->localAddress()))));
-                    REQUIRE(pPeerSocket->peerPort() == pSocket->localPort());
-
-                    AND_THEN("socket is constructed with LowDelay option set")
+                    receivedClientPeerData.append(pClientPeer->readAll());
+                    if (receivedClientPeerData == "PONG")
+                        clientPeerReceivedPongSemaphore.release();
+                    else if (receivedClientPeerData.size() >= 4)
                     {
-                        const auto defaultLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                        REQUIRE(defaultLowDelayOption == 1);
-
-                        AND_WHEN("LowDelay option is set to 0")
-                        {
-                            pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, 0);
-
-                            THEN("LowDelay option becomes unset")
-                            {
-                                const auto setLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                                REQUIRE(setLowDelayOption == 0);
-
-                                AND_WHEN("LowDelay option is enabled again")
-                                {
-                                    pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, 1);
-
-                                    THEN("LowDelay option becomes set")
-                                    {
-                                        const auto setLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                                        REQUIRE(setLowDelayOption == 1);
-                                    }
-                                }
-
-                                AND_WHEN("LowDelay option is set to a value other than 0 or 1")
-                                {
-                                    const auto value = GENERATE(AS(int), -3, 2, 5, 117);
-                                    pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, value);
-
-                                    THEN("LowDelay option is set")
-                                    {
-                                        const auto setLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                                        REQUIRE(setLowDelayOption == 1);
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("LowDelay option is set to 1")
-                        {
-                            pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, 1);
-
-                            THEN("LowDelay option stays set")
-                            {
-                                const auto setLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                                REQUIRE(setLowDelayOption == 1);
-                            }
-                        }
-
-                        AND_WHEN("LowDelay option is set to a value other than 0 or 1")
-                        {
-                            const auto value = GENERATE(AS(int), -3, 2, 5, 117);
-                            pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, value);
-
-                            THEN("LowDelay option stays set")
-                            {
-                                const auto setLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                                REQUIRE(setLowDelayOption == 1);
-                            }
-                        }
+                        FAIL("Client peer expects a single PONG message.");
                     }
-
-                    AND_THEN("socket is constructed with KeepAlive option unset")
-                    {
-                        const auto defaultKeepAliveOption = pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive);
-                        REQUIRE(defaultKeepAliveOption == 0);
-
-                        AND_WHEN("KeepAlive option is set to 1")
-                        {
-                            pSocket->setSocketOption(TcpSocket::SocketOption::KeepAlive, 1);
-
-                            THEN("KeepAlive option becomes set")
-                            {
-                                const auto setKeepAliveOption = pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive);
-                                REQUIRE(setKeepAliveOption == 1);
-
-                                AND_WHEN("KeepAlive option is set to 0")
-                                {
-                                    pSocket->setSocketOption(TcpSocket::SocketOption::KeepAlive, 0);
-
-                                    THEN("KeepAlive option becomes unset")
-                                    {
-                                        const auto setKeepAliveOption = pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive);
-                                        REQUIRE(setKeepAliveOption == 0);
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("KeepAlive option is set to 0")
-                        {
-                            pSocket->setSocketOption(TcpSocket::SocketOption::KeepAlive, 0);
-
-                            THEN("KeepAlive option stays unset")
-                            {
-                                const auto setKeepAliveOption = pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive);
-                                REQUIRE(setKeepAliveOption == 0);
-                            }
-                        }
-
-                        AND_WHEN("KeepAlive option is set to a value other than 0 or 1")
-                        {
-                            const auto value = GENERATE(AS(int), -3, 2, 5, 117);
-                            pSocket->setSocketOption(TcpSocket::SocketOption::KeepAlive, value);
-
-                            THEN("KeepAlive option is set")
-                            {
-                                const auto setKeepAliveOption = pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive);
-                                REQUIRE(setKeepAliveOption == 1);
-                            }
-                        }
-                    }
-
-                    AND_WHEN("SendBufferSize option is set to a valid value")
-                    {
-                        const auto value = GENERATE(AS(int),
-                                                    wMemLimits.minValue,
-                                                    wMemLimits.minValue + 18,
-                                                    wMemLimits.minValue + 1024,
-                                                    wMemLimits.defaultValue/2,
-                                                    wMemLimits.defaultValue);
-                        pSocket->setSocketOption(TcpSocket::SocketOption::SendBufferSize, value);
-
-                        THEN("SendBufferSize option value is set to the double of the valid value")
-                        {
-                            const auto setOption = pSocket->getSocketOption(TcpSocket::SocketOption::SendBufferSize);
-                            REQUIRE(setOption == (2 * value));
-                        }
-                    }
-
-                    AND_WHEN("ReceiveBufferSize option is set to a valid value")
-                    {
-                        const auto value = GENERATE(AS(int),
-                                                    rMemLimits.minValue,
-                                                    rMemLimits.minValue + 18,
-                                                    rMemLimits.minValue + 1024,
-                                                    rMemLimits.defaultValue/2,
-                                                    rMemLimits.defaultValue);
-                        pSocket->setSocketOption(TcpSocket::SocketOption::ReceiveBufferSize, value);
-
-                        THEN("ReceiveBufferSize option value is set to the double of the valid value")
-                        {
-                            const auto setOption = pSocket->getSocketOption(TcpSocket::SocketOption::ReceiveBufferSize);
-                            REQUIRE(setOption == (2 * value));
-                        }
-                    }
-
-                    THEN("connected peers can start exchanging data")
-                    {
-                        const auto dataToSend = GENERATE(AS(QByteArray),
-                                                         QByteArray("a"),
-                                                         QByteArray("abcdefgh"),
-                                                         largeData);
-                        const auto disableLowDelayOption = GENERATE(AS(bool), true, false);
-                        const auto setKeepAliveOption = GENERATE(AS(bool), true, false);
-                        const auto readBufferCapacity = GENERATE(AS(size_t), 0, 1024, 16384, 65536);
-                        if (readBufferCapacity > 0)
-                            pSocket->setReadBufferCapacity(readBufferCapacity);
-                        if (disableLowDelayOption)
-                            pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, 0);
-                        REQUIRE(pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay) == disableLowDelayOption ? 0 : 1);
-                        if (setKeepAliveOption)
-                        {
-                            pPeerSocket->setSocketOption(QAbstractSocket::KeepAliveOption, 1);
-                            pSocket->setSocketOption(TcpSocket::SocketOption::KeepAlive, 1);
-                        }
-                        REQUIRE(pPeerSocket->socketOption(QAbstractSocket::KeepAliveOption) == setKeepAliveOption ? 1 : 0);
-                        REQUIRE(pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive) == setKeepAliveOption ? 1 : 0);
-
-                        AND_WHEN("peer sends data to TcpSocket")
-                        {
-                            pPeerSocket->write(dataToSend);
-
-                            THEN("TcpSocket receives sent data")
-                            {
-                                const auto &sentData = socketReceivedData;
-                                while (sentData != dataToSend)
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketReceivedDataFromPeerSemaphore, 1));
-                                }
-
-                                AND_WHEN("peer sends some more data to TcpSocket")
-                                {
-                                    socketReceivedData.clear();
-                                    const QByteArray someMoreData("0123456789");
-                                    pPeerSocket->write(someMoreData);
-
-                                    THEN("TcpSocket receives sent data")
-                                    {
-                                        while (sentData != someMoreData)
-                                        {
-                                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketReceivedDataFromPeerSemaphore, 1));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("peer closes connection after sending data to TcpSocket")
-                        {
-                            pPeerSocket->write(dataToSend);
-                            pPeerSocket->disconnectFromHost();
-
-                            THEN("TcpSocket receives sent data")
-                            {
-                                const auto &sentData = socketReceivedData;
-                                while (sentData != dataToSend)
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketReceivedDataFromPeerSemaphore, 1));
-                                }
-
-                                AND_THEN("both peer and TcpSocket emit disconnected")
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                                    REQUIRE(pPeerSocket->error() == QAbstractSocket::UnknownSocketError);
-                                    REQUIRE(pSocket->errorMessage().empty());
-
-                                    AND_WHEN("peer is deleted")
-                                    {
-                                        while (peerFailedSemaphore.tryAcquire()) {}
-                                        pPeerSocket.reset(nullptr);
-
-                                        THEN("peer does not emit any error")
-                                        {
-                                            REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                            REQUIRE(pSocket->errorMessage().empty());
-                                        }
-                                    }
-
-                                    AND_WHEN("TcpSocket is deleted")
-                                    {
-                                        while (socketFailedSemaphore.tryAcquire()) {}
-                                        pSocket.reset(nullptr);
-
-                                        THEN("neither peer or TcpSocket emit any error")
-                                        {
-                                            REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                            REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("peer aborts after writing data")
-                        {
-                            pPeerSocket->write(dataToSend);
-                            pPeerSocket->abort();
-
-                            THEN("both peer and TcpSocket emit disconnected")
-                            {
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                                REQUIRE(pSocket->errorMessage().empty());
-                            }
-                        }
-
-                        AND_WHEN("peer is deleted after writing data")
-                        {
-                            pPeerSocket->write(dataToSend);
-                            pPeerSocket.reset(nullptr);
-
-                            THEN("both peer and TcpSocket emit disconnected")
-                            {
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                                REQUIRE(pSocket->errorMessage().empty());
-                            }
-                        }
-
-                        AND_WHEN("TcpSocket sends data to peer")
-                        {
-                            pSocket->write(dataToSend.data(), dataToSend.size());
-
-                            THEN("peer receives sent data")
-                            {
-                                const auto &sentData = peerReceivedData;
-                                while (sentData != dataToSend)
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerReceivedDataFromTcpSocketSemaphore, 1));
-                                }
-
-                                AND_WHEN("TcpSocket sends some more data to peer")
-                                {
-                                    peerReceivedData.clear();
-                                    const QByteArray someMoreData("0123456789");
-                                    pSocket->write(someMoreData.data(), someMoreData.size());
-
-                                    THEN("peer receives sent data")
-                                    {
-                                        while (sentData != someMoreData)
-                                        {
-                                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerReceivedDataFromTcpSocketSemaphore, 1));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("TcpSocket closes connection after sending data to peer")
-                        {
-                            pSocket->write(dataToSend.data(), dataToSend.size());
-                            pSocket->disconnectFromPeer();
-
-                            THEN("peer receives sent data")
-                            {
-                                QByteArray sentData;
-                                while (sentData != dataToSend)
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerReceivedDataFromTcpSocketSemaphore, 1));
-                                    sentData = peerReceivedData;
-                                }
-
-                                AND_THEN("TcpSocket emits disconnected and peer emits RemoteHostClosedError before emiting disconnected")
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerFailedSemaphore, 10));
-                                    REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                                    REQUIRE(pSocket->errorMessage().empty());
-
-                                    AND_WHEN("TcpSocket is deleted")
-                                    {
-                                        while (socketFailedSemaphore.tryAcquire()) {}
-                                        pSocket.reset(nullptr);
-
-                                        THEN("TcpSocket does not emit any error")
-                                        {
-                                            REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                                            REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                        }
-                                    }
-
-                                    AND_WHEN("Peer is deleted")
-                                    {
-                                        while (peerFailedSemaphore.tryAcquire()) {}
-                                        pPeerSocket.reset(nullptr);
-
-                                        THEN("neither peer or TcpSocket emit any error")
-                                        {
-                                            REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                            REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("TcpSocket aborts after writing data")
-                        {
-                            pSocket->write(dataToSend.data(), dataToSend.size());
-                            pSocket->abort();
-
-                            THEN("TcpSocket aborts and Peer emits RemoteHostClosedError before emiting disconnected")
-                            {
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerFailedSemaphore, 10));
-                                REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                                REQUIRE(pSocket->errorMessage().empty());
-                            }
-                        }
-
-                        AND_WHEN("TcpSocket is deleted after writing data")
-                        {
-                            pSocket->write(dataToSend.data(), dataToSend.size());
-                            pSocket.reset(nullptr);
-
-                            THEN("TcpSocket aborts and Peer emits RemoteHostClosedError before emiting disconnected")
-                            {
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerFailedSemaphore, 10));
-                                REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            }
-                        }
-                    }
-
-                    AND_WHEN("peer disconnects from TcpSocket")
-                    {
-                        pPeerSocket->disconnectFromHost();
-
-                        THEN("peer emits disconnected and TcpSocket emits disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(pPeerSocket->error() == QAbstractSocket::UnknownSocketError);
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("peer does not emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(pSocket->errorMessage().empty());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                while (socketFailedSemaphore.tryAcquire()) {}
-                                pSocket.reset(nullptr);
-
-                                THEN("neither peer or TcpSocket emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("peer aborts connection")
-                    {
-                        pPeerSocket->abort();
-
-                        THEN("both peer and TcpSocket emit disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(pPeerSocket->error() == QAbstractSocket::UnknownSocketError);
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("peer does not emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(pSocket->errorMessage().empty());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                while (socketFailedSemaphore.tryAcquire()) {}
-                                pSocket.reset(nullptr);
-
-                                THEN("neither peer or TcpSocket emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("TcpSocket disconnects from TcpSocket")
-                    {
-                        pSocket->disconnectFromPeer();
-
-                        THEN("TcpSocket emits disconnected and peer emits RemoteHostClosedError before emiting disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerFailedSemaphore, 10));
-                            REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("neither peer or TcpSocket emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                pSocket.reset(nullptr);
-
-                                THEN("TcpSocket does not emit any error")
-                                {
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                    REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("TcpSocket aborts connection")
-                    {
-                        pSocket->abort();
-
-                        THEN("Peer emits RemoteHostClosedError before emiting disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerFailedSemaphore, 10));
-                            REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("neither peer or TcpSocket emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                pSocket.reset(nullptr);
-
-                                THEN("TcpSocket does not emit any error")
-                                {
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                    REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("both peer and TcpSocket disconnects")
-                    {
-                        pPeerSocket->disconnectFromHost();
-                        pSocket->disconnectFromPeer();
-
-                        THEN("peer emits disconnected and TcpSocket emits disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("TcpSocket not emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(pSocket->errorMessage().empty());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                while (socketFailedSemaphore.tryAcquire()) {}
-                                pSocket.reset(nullptr);
-
-                                THEN("TcpSocket does not emit any error")
-                                {
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("both TcpSocket and peer disconnects")
-                    {
-                        pSocket->disconnectFromPeer();
-                        pPeerSocket->disconnectFromHost();
-
-                        THEN("peer emits disconnected and TcpSocket emits disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("TcpSocket not emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(pSocket->errorMessage().empty());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                while (socketFailedSemaphore.tryAcquire()) {}
-                                pSocket.reset(nullptr);
-
-                                THEN("TcpSocket does not emit any error")
-                                {
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("peer is deleted")
-                    {
-                        while (peerFailedSemaphore.tryAcquire()) {}
-                        pPeerSocket.reset(nullptr);
-
-                        THEN("peer does not emit any error and TcpSocket emits disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(pSocket->errorMessage().empty());
-                            REQUIRE(!peerFailedSemaphore.tryAcquire());
-                        }
-                    }
-
-                    AND_WHEN("TcpSocket is deleted")
-                    {
-                        while (socketFailedSemaphore.tryAcquire()) {}
-                        pSocket.reset(nullptr);
-                        QCoreApplication::processEvents();
-
-                        THEN("peer socket emits error and disconnected signal")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(pPeerSocket->error() == QAbstractSocket::SocketError::RemoteHostClosedError);
-                            REQUIRE(!socketFailedSemaphore.tryAcquire());
-                        }
-                    }
-                }
+                });
+        pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
+        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
+        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+        const auto disableLowDelayOption = GENERATE(AS(bool), true, false);
+        const auto setKeepAliveOption = GENERATE(AS(bool), true, false);
+        const auto readBufferCapacity = GENERATE(AS(size_t), 0, 1024, 16384, 65536);
+        if (readBufferCapacity > 0)
+        {
+            pClientPeer->setReadBufferCapacity(readBufferCapacity);
+            pServerPeer->setReadBufferCapacity(readBufferCapacity);
+        }
+        if (disableLowDelayOption)
+        {
+            pClientPeer->setSocketOption(TcpSocket::SocketOption::LowDelay, 0);
+            pServerPeer->setSocketOption(TcpSocket::SocketOption::LowDelay, 0);
+        }
+        REQUIRE(pClientPeer->getSocketOption(TcpSocket::SocketOption::LowDelay) == disableLowDelayOption ? 0 : 1);
+        REQUIRE(pServerPeer->getSocketOption(TcpSocket::SocketOption::LowDelay) == disableLowDelayOption ? 0 : 1);
+        if (setKeepAliveOption)
+        {
+            pClientPeer->setSocketOption(TcpSocket::SocketOption::KeepAlive, 1);
+            pServerPeer->setSocketOption(TcpSocket::SocketOption::KeepAlive, 1);
+        }
+        REQUIRE(pClientPeer->getSocketOption(TcpSocket::SocketOption::KeepAlive) == setKeepAliveOption ? 1 : 0);
+        REQUIRE(pServerPeer->getSocketOption(TcpSocket::SocketOption::KeepAlive) == setKeepAliveOption ? 1 : 0);
+
+        WHEN("client peer sends PING message to server peer")
+        {
+            pClientPeer->write("PING");
+
+            THEN("server peer responds with a PONG message and closes the connection")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerReceivedPingSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerReceivedPongSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
             }
         }
     }
 }
 
 
-SCENARIO("TcpSocket interacts with server peer by address")
+SCENARIO("Connected TcpSocket peers interact with each other")
 {
-    GIVEN("a listening server")
-    {
-        QTcpServer server;
-        QSemaphore peerConnectedSemaphore;
-        QSemaphore peerFailedSemaphore;
-        QSemaphore peerDisconnectedSemaphore;
-        QSemaphore peerReceivedDataFromTcpSocketSemaphore;
-        QByteArray peerReceivedData;
-        std::unique_ptr<QTcpSocket> pPeerSocket;
-        QObject::connect(&server, &QTcpServer::newConnection, [&]()
-        {
-            REQUIRE(server.hasPendingConnections());
-            REQUIRE(!pPeerSocket);
-            pPeerSocket.reset(server.nextPendingConnection());
-            REQUIRE(pPeerSocket.get() != nullptr);
-            pPeerSocket->setParent(nullptr);
-            REQUIRE(!server.hasPendingConnections());
-            QObject::connect(pPeerSocket.get(), &QTcpSocket::errorOccurred, [&](QAbstractSocket::SocketError error) {peerFailedSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QTcpSocket::disconnected, [&](){peerDisconnectedSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QTcpSocket::readyRead, [&]()
-            {
-                peerReceivedData.append(pPeerSocket->readAll());
-                peerReceivedDataFromTcpSocketSemaphore.release();
-            });
-            peerConnectedSemaphore.release();
-        });
-        const auto serverAndBindAddresses = GENERATE(AS(std::pair<QHostAddress, std::pair<QHostAddress, bool>>),
-                                                     {QHostAddress("127.10.10.25"), {QHostAddress::Any, false}},
-                                                     {QHostAddress("127.10.10.25"), {QHostAddress("127.100.200.117"), false}},
-                                                     {QHostAddress("127.10.10.25"), {QHostAddress("127.100.200.118"), true}},
-                                                     {QHostAddress("::1"), {QHostAddress::Any, false}},
-                                                     {QHostAddress("::1"), {QHostAddress("::1"), false}},
-                                                     {QHostAddress("::1"), {QHostAddress("::1"), true}},
-                                                     {QHostAddress::Any, {QHostAddress("127.110.220.123"), false}},
-                                                     {QHostAddress::Any, {QHostAddress("127.110.220.125"), true}});
-        const auto serverAddress = serverAndBindAddresses.first;
-        REQUIRE(server.listen(serverAddress, 0));
-        const auto serverPort = server.serverPort();
-        REQUIRE(serverPort >= 1024);
-
-        WHEN("TcpSocket connects to server")
-        {
-            QSemaphore socketConnectedSemaphore;
-            QSemaphore socketFailedSemaphore;
-            QSemaphore socketDisconnectedSemaphore;
-            QSemaphore socketReceivedDataFromPeerSemaphore;
-            QByteArray socketReceivedData;
-            std::unique_ptr<TcpSocket> pSocket(new TcpSocket);
-            Object::connect(pSocket.get(), &TcpSocket::error, [&]() {socketFailedSemaphore.release();});
-            Object::connect(pSocket.get(), &TcpSocket::connected, [&](){socketConnectedSemaphore.release();});
-            Object::connect(pSocket.get(), &TcpSocket::disconnected, [&](){socketDisconnectedSemaphore.release();});
-            Object::connect(pSocket.get(), &TcpSocket::receivedData, [&]()
-            {
-                QByteArray readData;
-                readData.resize(pSocket->dataAvailable());
-                pSocket->read(readData.data(), readData.size());
-                socketReceivedData.append(readData);
-                socketReceivedDataFromPeerSemaphore.release();
-            });
-            if (serverAndBindAddresses.second.first != QHostAddress::Any)
-            {
-                if (serverAndBindAddresses.second.second)
-                {
-                    QTcpSocket socket;
-                    socket.bind(serverAndBindAddresses.second.first);
-                    const auto availableBindPort = socket.localPort();
-                    socket.abort();
-                    REQUIRE(availableBindPort > 0 && availableBindPort <= 65535);
-                    pSocket->setBindAddressAndPort(serverAndBindAddresses.second.first.toString().toStdString(), availableBindPort);
-                }
-                else
-                    pSocket->setBindAddressAndPort(serverAndBindAddresses.second.first.toString().toStdString());
-            }
-            pSocket->connect(serverAddress.toString().toStdString(), serverPort);
-
-            THEN("peer emits newConnection with a connected socket")
-            {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
-                REQUIRE(pPeerSocket->state() == QAbstractSocket::ConnectedState);
-
-                AND_THEN("TcpSocket emits connected")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
-                    if (serverAndBindAddresses.first.protocol() == serverAndBindAddresses.second.first.protocol())
-                    {
-                        REQUIRE(pPeerSocket->localAddress().toString().toStdString() == pSocket->peerAddress());
-                        REQUIRE(pPeerSocket->localPort() == pSocket->peerPort());
-                        REQUIRE(pPeerSocket->peerAddress().toString().toStdString() == pSocket->localAddress());
-                        REQUIRE(pPeerSocket->peerPort() == pSocket->localPort());
-                    }
-                    else
-                    {
-                        REQUIRE(pPeerSocket->localAddress().isEqual(QHostAddress(QString::fromStdString(std::string(pSocket->peerAddress()))), QHostAddress::ConvertV4MappedToIPv4));
-                        REQUIRE(pPeerSocket->localPort() == pSocket->peerPort());
-                        REQUIRE(pPeerSocket->peerAddress().isEqual(QHostAddress(QString::fromStdString(std::string(pSocket->localAddress()))), QHostAddress::ConvertV4MappedToIPv4));
-                        REQUIRE(pPeerSocket->peerPort() == pSocket->localPort());
-                    }
-
-                    AND_THEN("socket is constructed with LowDelay option set")
-                    {
-                        const auto defaultLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                        REQUIRE(defaultLowDelayOption == 1);
-
-                        AND_WHEN("LowDelay option is set to 0")
-                        {
-                            pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, 0);
-
-                            THEN("LowDelay option becomes unset")
-                            {
-                                const auto setLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                                REQUIRE(setLowDelayOption == 0);
-
-                                AND_WHEN("LowDelay option is enabled again")
-                                {
-                                    pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, 1);
-
-                                    THEN("LowDelay option becomes set")
-                                    {
-                                        const auto setLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                                        REQUIRE(setLowDelayOption == 1);
-                                    }
-                                }
-
-                                AND_WHEN("LowDelay option is set to a value other than 0 or 1")
-                                {
-                                    const auto value = GENERATE(AS(int), -3, 2, 5, 117);
-                                    pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, value);
-
-                                    THEN("LowDelay option is set")
-                                    {
-                                        const auto setLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                                        REQUIRE(setLowDelayOption == 1);
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("LowDelay option is set to 1")
-                        {
-                            pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, 1);
-
-                            THEN("LowDelay option stays set")
-                            {
-                                const auto setLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                                REQUIRE(setLowDelayOption == 1);
-                            }
-                        }
-
-                        AND_WHEN("LowDelay option is set to a value other than 0 or 1")
-                        {
-                            const auto value = GENERATE(AS(int), -3, 2, 5, 117);
-                            pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, value);
-
-                            THEN("LowDelay option stays set")
-                            {
-                                const auto setLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                                REQUIRE(setLowDelayOption == 1);
-                            }
-                        }
-                    }
-
-                    AND_THEN("socket is constructed with KeepAlive option unset")
-                    {
-                        const auto defaultKeepAliveOption = pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive);
-                        REQUIRE(defaultKeepAliveOption == 0);
-
-                        AND_WHEN("KeepAlive option is set to 1")
-                        {
-                            pSocket->setSocketOption(TcpSocket::SocketOption::KeepAlive, 1);
-
-                            THEN("KeepAlive option becomes set")
-                            {
-                                const auto setKeepAliveOption = pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive);
-                                REQUIRE(setKeepAliveOption == 1);
-
-                                AND_WHEN("KeepAlive option is set to 0")
-                                {
-                                    pSocket->setSocketOption(TcpSocket::SocketOption::KeepAlive, 0);
-
-                                    THEN("KeepAlive option becomes unset")
-                                    {
-                                        const auto setKeepAliveOption = pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive);
-                                        REQUIRE(setKeepAliveOption == 0);
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("KeepAlive option is set to 0")
-                        {
-                            pSocket->setSocketOption(TcpSocket::SocketOption::KeepAlive, 0);
-
-                            THEN("KeepAlive option stays unset")
-                            {
-                                const auto setKeepAliveOption = pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive);
-                                REQUIRE(setKeepAliveOption == 0);
-                            }
-                        }
-
-                        AND_WHEN("KeepAlive option is set to a value other than 0 or 1")
-                        {
-                            const auto value = GENERATE(AS(int), -3, 2, 5, 117);
-                            pSocket->setSocketOption(TcpSocket::SocketOption::KeepAlive, value);
-
-                            THEN("KeepAlive option is set")
-                            {
-                                const auto setKeepAliveOption = pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive);
-                                REQUIRE(setKeepAliveOption == 1);
-                            }
-                        }
-                    }
-
-                    AND_WHEN("SendBufferSize option is set to a valid value")
-                    {
-                        const auto value = GENERATE(AS(int),
-                                                    wMemLimits.minValue,
-                                                    wMemLimits.minValue + 18,
-                                                    wMemLimits.minValue + 1024,
-                                                    wMemLimits.defaultValue/2,
-                                                    wMemLimits.defaultValue);
-                        pSocket->setSocketOption(TcpSocket::SocketOption::SendBufferSize, value);
-
-                        THEN("SendBufferSize option value is set to the double of the valid value")
-                        {
-                            const auto setOption = pSocket->getSocketOption(TcpSocket::SocketOption::SendBufferSize);
-                            REQUIRE(setOption == (2 * value));
-                        }
-                    }
-
-                    AND_WHEN("ReceiveBufferSize option is set to a valid value")
-                    {
-                        const auto value = GENERATE(AS(int),
-                                                    rMemLimits.minValue,
-                                                    rMemLimits.minValue + 18,
-                                                    rMemLimits.minValue + 1024,
-                                                    rMemLimits.defaultValue/2,
-                                                    rMemLimits.defaultValue);
-                        pSocket->setSocketOption(TcpSocket::SocketOption::ReceiveBufferSize, value);
-
-                        THEN("ReceiveBufferSize option value is set to the double of the valid value")
-                        {
-                            const auto setOption = pSocket->getSocketOption(TcpSocket::SocketOption::ReceiveBufferSize);
-                            REQUIRE(setOption == (2 * value));
-                        }
-                    }
-
-                    THEN("connected peers can start exchanging data")
-                    {
-                        const auto dataToSend = GENERATE(AS(QByteArray),
-                                                         QByteArray("a"),
-                                                         QByteArray("abcdefgh"),
-                                                         largeData);
-                        const auto disableLowDelayOption = GENERATE(AS(bool), true, false);
-                        const auto setKeepAliveOption = GENERATE(AS(bool), true, false);
-                        const auto readBufferCapacity = GENERATE(AS(size_t), 0, 1024, 16384, 65536);
-                        if (readBufferCapacity > 0)
-                            pSocket->setReadBufferCapacity(readBufferCapacity);
-                        if (disableLowDelayOption)
-                            pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, 0);
-                        REQUIRE(pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay) == disableLowDelayOption ? 0 : 1);
-                        if (setKeepAliveOption)
-                        {
-                            pPeerSocket->setSocketOption(QAbstractSocket::KeepAliveOption, 1);
-                            pSocket->setSocketOption(TcpSocket::SocketOption::KeepAlive, 1);
-                        }
-                        REQUIRE(pPeerSocket->socketOption(QAbstractSocket::KeepAliveOption) == setKeepAliveOption ? 1 : 0);
-                        REQUIRE(pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive) == setKeepAliveOption ? 1 : 0);
-
-                        AND_WHEN("peer sends data to TcpSocket")
-                        {
-                            pPeerSocket->write(dataToSend);
-
-                            THEN("TcpSocket receives sent data")
-                            {
-                                const auto &sentData = socketReceivedData;
-                                while (sentData != dataToSend)
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketReceivedDataFromPeerSemaphore, 1));
-                                }
-
-                                AND_WHEN("peer sends some more data to TcpSocket")
-                                {
-                                    socketReceivedData.clear();
-                                    const QByteArray someMoreData("0123456789");
-                                    pPeerSocket->write(someMoreData);
-
-                                    THEN("TcpSocket receives sent data")
-                                    {
-                                        while (sentData != someMoreData)
-                                        {
-                                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketReceivedDataFromPeerSemaphore, 1));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("peer closes connection after sending data to TcpSocket")
-                        {
-                            pPeerSocket->write(dataToSend);
-                            pPeerSocket->disconnectFromHost();
-
-                            THEN("TcpSocket receives sent data")
-                            {
-                                const auto &sentData = socketReceivedData;
-                                while (sentData != dataToSend)
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketReceivedDataFromPeerSemaphore, 1));
-                                }
-
-                                AND_THEN("both peer and TcpSocket emit disconnected")
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                                    REQUIRE(pPeerSocket->error() == QAbstractSocket::UnknownSocketError);
-                                    REQUIRE(pSocket->errorMessage().empty());
-
-                                    AND_WHEN("peer is deleted")
-                                    {
-                                        while (peerFailedSemaphore.tryAcquire()) {}
-                                        pPeerSocket.reset(nullptr);
-
-                                        THEN("peer does not emit any error")
-                                        {
-                                            REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                            REQUIRE(pSocket->errorMessage().empty());
-                                        }
-                                    }
-
-                                    AND_WHEN("TcpSocket is deleted")
-                                    {
-                                        while (socketFailedSemaphore.tryAcquire()) {}
-                                        pSocket.reset(nullptr);
-
-                                        THEN("neither peer or TcpSocket emit any error")
-                                        {
-                                            REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                            REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("peer aborts after writing data")
-                        {
-                            pPeerSocket->write(dataToSend);
-                            pPeerSocket->abort();
-
-                            THEN("both peer and TcpSocket emit disconnected")
-                            {
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                                REQUIRE(pSocket->errorMessage().empty());
-                            }
-                        }
-
-                        AND_WHEN("peer is deleted after writing data")
-                        {
-                            pPeerSocket->write(dataToSend);
-                            pPeerSocket.reset(nullptr);
-
-                            THEN("both peer and TcpSocket emit disconnected")
-                            {
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                                REQUIRE(pSocket->errorMessage().empty());
-                            }
-                        }
-
-                        AND_WHEN("TcpSocket sends data to peer")
-                        {
-                            pSocket->write(dataToSend.data(), dataToSend.size());
-
-                            THEN("peer receives sent data")
-                            {
-                                const auto &sentData = peerReceivedData;
-                                while (sentData != dataToSend)
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerReceivedDataFromTcpSocketSemaphore, 1));
-                                }
-
-                                AND_WHEN("TcpSocket sends some more data to peer")
-                                {
-                                    peerReceivedData.clear();
-                                    const QByteArray someMoreData("0123456789");
-                                    pSocket->write(someMoreData.data(), someMoreData.size());
-
-                                    THEN("peer receives sent data")
-                                    {
-                                        while (sentData != someMoreData)
-                                        {
-                                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerReceivedDataFromTcpSocketSemaphore, 1));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("TcpSocket closes connection after sending data to peer")
-                        {
-                            pSocket->write(dataToSend.data(), dataToSend.size());
-                            pSocket->disconnectFromPeer();
-
-                            THEN("peer receives sent data")
-                            {
-                                QByteArray sentData;
-                                while (sentData != dataToSend)
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerReceivedDataFromTcpSocketSemaphore, 1));
-                                    sentData = peerReceivedData;
-                                }
-
-                                AND_THEN("TcpSocket emits disconnected and peer emits RemoteHostClosedError before emiting disconnected")
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerFailedSemaphore, 10));
-                                    REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                                    REQUIRE(pSocket->errorMessage().empty());
-
-                                    AND_WHEN("TcpSocket is deleted")
-                                    {
-                                        while (socketFailedSemaphore.tryAcquire()) {}
-                                        pSocket.reset(nullptr);
-
-                                        THEN("TcpSocket does not emit any error")
-                                        {
-                                            REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                                            REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                        }
-                                    }
-
-                                    AND_WHEN("Peer is deleted")
-                                    {
-                                        while (peerFailedSemaphore.tryAcquire()) {}
-                                        pPeerSocket.reset(nullptr);
-
-                                        THEN("neither peer or TcpSocket emit any error")
-                                        {
-                                            REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                            REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("TcpSocket aborts after writing data")
-                        {
-                            pSocket->write(dataToSend.data(), dataToSend.size());
-                            pSocket->abort();
-
-                            THEN("TcpSocket aborts and Peer emits RemoteHostClosedError before emiting disconnected")
-                            {
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerFailedSemaphore, 10));
-                                REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                                REQUIRE(pSocket->errorMessage().empty());
-                            }
-                        }
-
-                        AND_WHEN("TcpSocket is deleted after writing data")
-                        {
-                            pSocket->write(dataToSend.data(), dataToSend.size());
-                            pSocket.reset(nullptr);
-
-                            THEN("TcpSocket aborts and Peer emits RemoteHostClosedError before emiting disconnected")
-                            {
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerFailedSemaphore, 10));
-                                REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            }
-                        }
-                    }
-
-                    AND_WHEN("peer disconnects from TcpSocket")
-                    {
-                        pPeerSocket->disconnectFromHost();
-
-                        THEN("peer emits disconnected and TcpSocket emits disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(pPeerSocket->error() == QAbstractSocket::UnknownSocketError);
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("peer does not emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(pSocket->errorMessage().empty());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                while (socketFailedSemaphore.tryAcquire()) {}
-                                pSocket.reset(nullptr);
-
-                                THEN("neither peer or TcpSocket emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("peer aborts connection")
-                    {
-                        pPeerSocket->abort();
-
-                        THEN("both peer and TcpSocket emit disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(pPeerSocket->error() == QAbstractSocket::UnknownSocketError);
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("peer does not emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(pSocket->errorMessage().empty());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                while (socketFailedSemaphore.tryAcquire()) {}
-                                pSocket.reset(nullptr);
-
-                                THEN("neither peer or TcpSocket emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("TcpSocket disconnects from TcpSocket")
-                    {
-                        pSocket->disconnectFromPeer();
-
-                        THEN("TcpSocket emits disconnected and peer emits RemoteHostClosedError before emiting disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerFailedSemaphore, 10));
-                            REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("neither peer or TcpSocket emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                pSocket.reset(nullptr);
-
-                                THEN("TcpSocket does not emit any error")
-                                {
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                    REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("TcpSocket aborts connection")
-                    {
-                        pSocket->abort();
-
-                        THEN("Peer emits RemoteHostClosedError before emiting disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerFailedSemaphore, 10));
-                            REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("neither peer or TcpSocket emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                pSocket.reset(nullptr);
-
-                                THEN("TcpSocket does not emit any error")
-                                {
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                    REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("both peer and TcpSocket disconnects")
-                    {
-                        pPeerSocket->disconnectFromHost();
-                        pSocket->disconnectFromPeer();
-
-                        THEN("peer emits disconnected and TcpSocket emits disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("TcpSocket not emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(pSocket->errorMessage().empty());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                while (socketFailedSemaphore.tryAcquire()) {}
-                                pSocket.reset(nullptr);
-
-                                THEN("TcpSocket does not emit any error")
-                                {
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("both TcpSocket and peer disconnects")
-                    {
-                        pSocket->disconnectFromPeer();
-                        pPeerSocket->disconnectFromHost();
-
-                        THEN("peer emits disconnected and TcpSocket emits disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("TcpSocket not emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(pSocket->errorMessage().empty());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                while (socketFailedSemaphore.tryAcquire()) {}
-                                pSocket.reset(nullptr);
-
-                                THEN("TcpSocket does not emit any error")
-                                {
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("peer is deleted")
-                    {
-                        while (peerFailedSemaphore.tryAcquire()) {}
-                        pPeerSocket.reset(nullptr);
-
-                        THEN("peer does not emit any error and TcpSocket emits disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(pSocket->errorMessage().empty());
-                            REQUIRE(!peerFailedSemaphore.tryAcquire());
-                        }
-                    }
-
-                    AND_WHEN("TcpSocket is deleted")
-                    {
-                        while (socketFailedSemaphore.tryAcquire()) {}
-                        pSocket.reset(nullptr);
-                        QCoreApplication::processEvents();
-
-                        THEN("peer socket emits error and disconnected signal")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(pPeerSocket->error() == QAbstractSocket::SocketError::RemoteHostClosedError);
-                            REQUIRE(!socketFailedSemaphore.tryAcquire());
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-
-SCENARIO("TcpSocket interacts with server peer by name")
-{
-    GIVEN("a listening server")
-    {
-        QTcpServer server;
-        QTcpServer ipv6Server;
-        bool connectedToIpv6Server = false;
-        QSemaphore peerConnectedSemaphore;
-        QSemaphore peerFailedSemaphore;
-        QSemaphore peerDisconnectedSemaphore;
-        QSemaphore peerReceivedDataFromTcpSocketSemaphore;
-        QByteArray peerReceivedData;
-        std::unique_ptr<QTcpSocket> pPeerSocket;
-        QObject::connect(&ipv6Server, &QTcpServer::newConnection, [&]()
-        {
-            connectedToIpv6Server = true;
-            REQUIRE(ipv6Server.hasPendingConnections());
-            REQUIRE(!pPeerSocket);
-            pPeerSocket.reset(ipv6Server.nextPendingConnection());
-            REQUIRE(pPeerSocket.get() != nullptr);
-            pPeerSocket->setParent(nullptr);
-            REQUIRE(!ipv6Server.hasPendingConnections());
-            QObject::connect(pPeerSocket.get(), &QTcpSocket::errorOccurred, [&](QAbstractSocket::SocketError error) {peerFailedSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QTcpSocket::disconnected, [&](){peerDisconnectedSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QTcpSocket::readyRead, [&]()
-            {
-                peerReceivedData.append(pPeerSocket->readAll());
-                peerReceivedDataFromTcpSocketSemaphore.release();
-            });
-            peerConnectedSemaphore.release();
-        });
-        REQUIRE(ipv6Server.listen(QHostAddress("::1"), 0));
-        const auto serverPort = ipv6Server.serverPort();
-        REQUIRE(serverPort >= 1024);
-        QObject::connect(&server, &QTcpServer::newConnection, [&]()
-        {
-            REQUIRE(server.hasPendingConnections());
-            REQUIRE(!pPeerSocket);
-            pPeerSocket.reset(server.nextPendingConnection());
-            REQUIRE(pPeerSocket.get() != nullptr);
-            pPeerSocket->setParent(nullptr);
-            REQUIRE(!server.hasPendingConnections());
-            QObject::connect(pPeerSocket.get(), &QTcpSocket::errorOccurred, [&](QAbstractSocket::SocketError error) {peerFailedSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QTcpSocket::disconnected, [&](){peerDisconnectedSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QTcpSocket::readyRead, [&]()
-            {
-                peerReceivedData.append(pPeerSocket->readAll());
-                peerReceivedDataFromTcpSocketSemaphore.release();
-            });
-            peerConnectedSemaphore.release();
-        });
-        const auto serverAddress = GENERATE(AS(QHostAddress),
-                                            QHostAddress("127.10.20.50"),
-                                            QHostAddress("127.10.20.60"),
-                                            QHostAddress("127.10.20.70"),
-                                            QHostAddress("127.10.20.80"),
-                                            QHostAddress("127.10.20.90"));
-        REQUIRE(server.listen(serverAddress, serverPort));
-
-        WHEN("TcpSocket connects to server")
-        {
-            QSemaphore socketConnectedSemaphore;
-            QSemaphore socketFailedSemaphore;
-            QSemaphore socketDisconnectedSemaphore;
-            QSemaphore socketReceivedDataFromPeerSemaphore;
-            QByteArray socketReceivedData;
-            std::unique_ptr<TcpSocket> pSocket(new TcpSocket);
-            Object::connect(pSocket.get(), &TcpSocket::error, [&]() {socketFailedSemaphore.release();});
-            Object::connect(pSocket.get(), &TcpSocket::connected, [&](){socketConnectedSemaphore.release();});
-            Object::connect(pSocket.get(), &TcpSocket::disconnected, [&](){socketDisconnectedSemaphore.release();});
-            Object::connect(pSocket.get(), &TcpSocket::receivedData, [&]()
-            {
-                QByteArray readData;
-                readData.resize(pSocket->dataAvailable());
-                pSocket->read(readData.data(), readData.size());
-                socketReceivedData.append(readData);
-                socketReceivedDataFromPeerSemaphore.release();
-            });
-            const auto serverBindAddressAndPort = GENERATE(AS(std::pair<QHostAddress, bool>),
-                                                           {QHostAddress::Any, false},
-                                                           {QHostAddress("127.2.3.18"), true},
-                                                           {QHostAddress("127.2.3.20"), false},
-                                                           {QHostAddress("::1"), true},
-                                                           {QHostAddress("::1"), false});
-            bool isBound = false;
-            QHostAddress bindAddress;
-            bool isBindPortZero = false;
-            quint16 bindPort = 0;
-            if (serverBindAddressAndPort.first != QHostAddress::Any)
-            {
-                isBound = true;
-                bindAddress = serverBindAddressAndPort.first;
-                isBindPortZero = !serverBindAddressAndPort.second;
-                if (!isBindPortZero)
-                {
-                    QTcpSocket socket;
-                    REQUIRE(socket.bind(serverBindAddressAndPort.first));
-                    bindPort = socket.localPort();
-                    REQUIRE(bindPort > 1024 && bindPort <= 65535);
-                    socket.abort();
-                    pSocket->setBindAddressAndPort(bindAddress.toString().toStdString(), bindPort);
-                }
-                else
-                    pSocket->setBindAddressAndPort(bindAddress.toString().toStdString());
-            }
-            pSocket->connect("test.onlocalhost.com", serverPort);
-
-            THEN("peer emits newConnection with a connected socket")
-            {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
-                REQUIRE(pPeerSocket->state() == QAbstractSocket::ConnectedState);
-
-                AND_THEN("TcpSocket emits connected")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
-                    REQUIRE(pPeerSocket->localAddress().toString().toStdString() == pSocket->peerAddress());
-                    REQUIRE(pPeerSocket->localPort() == pSocket->peerPort());
-                    REQUIRE(pPeerSocket->peerAddress().toString().toStdString() == pSocket->localAddress());
-                    REQUIRE(pPeerSocket->peerPort() == pSocket->localPort());
-                    if (isBound)
-                    {
-                        REQUIRE(pSocket->localAddress() == bindAddress.toString().toStdString());
-
-                        if (!isBindPortZero)
-                        {
-                            REQUIRE(pSocket->localPort() == bindPort);
-                        }
-                    }
-                    if (serverBindAddressAndPort.first != QHostAddress::Any)
-                    {
-                        if (serverBindAddressAndPort.first.protocol() == QAbstractSocket::IPv6Protocol)
-                        {
-                            REQUIRE(connectedToIpv6Server);
-                        }
-                        else
-                        {
-                            REQUIRE(!connectedToIpv6Server);
-                        }
-                    }
-                    
-                    AND_THEN("socket is constructed with LowDelay option set")
-                    {
-                        const auto defaultLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                        REQUIRE(defaultLowDelayOption == 1);
-
-                        AND_WHEN("LowDelay option is set to 0")
-                        {
-                            pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, 0);
-
-                            THEN("LowDelay option becomes unset")
-                            {
-                                const auto setLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                                REQUIRE(setLowDelayOption == 0);
-
-                                AND_WHEN("LowDelay option is enabled again")
-                                {
-                                    pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, 1);
-
-                                    THEN("LowDelay option becomes set")
-                                    {
-                                        const auto setLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                                        REQUIRE(setLowDelayOption == 1);
-                                    }
-                                }
-
-                                AND_WHEN("LowDelay option is set to a value other than 0 or 1")
-                                {
-                                    const auto value = GENERATE(AS(int), -3, 2, 5, 117);
-                                    pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, value);
-
-                                    THEN("LowDelay option is set")
-                                    {
-                                        const auto setLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                                        REQUIRE(setLowDelayOption == 1);
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("LowDelay option is set to 1")
-                        {
-                            pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, 1);
-
-                            THEN("LowDelay option stays set")
-                            {
-                                const auto setLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                                REQUIRE(setLowDelayOption == 1);
-                            }
-                        }
-
-                        AND_WHEN("LowDelay option is set to a value other than 0 or 1")
-                        {
-                            const auto value = GENERATE(AS(int), -3, 2, 5, 117);
-                            pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, value);
-
-                            THEN("LowDelay option stays set")
-                            {
-                                const auto setLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                                REQUIRE(setLowDelayOption == 1);
-                            }
-                        }
-                    }
-
-                    AND_THEN("socket is constructed with KeepAlive option unset")
-                    {
-                        const auto defaultKeepAliveOption = pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive);
-                        REQUIRE(defaultKeepAliveOption == 0);
-
-                        AND_WHEN("KeepAlive option is set to 1")
-                        {
-                            pSocket->setSocketOption(TcpSocket::SocketOption::KeepAlive, 1);
-
-                            THEN("KeepAlive option becomes set")
-                            {
-                                const auto setKeepAliveOption = pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive);
-                                REQUIRE(setKeepAliveOption == 1);
-
-                                AND_WHEN("KeepAlive option is set to 0")
-                                {
-                                    pSocket->setSocketOption(TcpSocket::SocketOption::KeepAlive, 0);
-
-                                    THEN("KeepAlive option becomes unset")
-                                    {
-                                        const auto setKeepAliveOption = pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive);
-                                        REQUIRE(setKeepAliveOption == 0);
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("KeepAlive option is set to 0")
-                        {
-                            pSocket->setSocketOption(TcpSocket::SocketOption::KeepAlive, 0);
-
-                            THEN("KeepAlive option stays unset")
-                            {
-                                const auto setKeepAliveOption = pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive);
-                                REQUIRE(setKeepAliveOption == 0);
-                            }
-                        }
-
-                        AND_WHEN("KeepAlive option is set to a value other than 0 or 1")
-                        {
-                            const auto value = GENERATE(AS(int), -3, 2, 5, 117);
-                            pSocket->setSocketOption(TcpSocket::SocketOption::KeepAlive, value);
-
-                            THEN("KeepAlive option is set")
-                            {
-                                const auto setKeepAliveOption = pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive);
-                                REQUIRE(setKeepAliveOption == 1);
-                            }
-                        }
-                    }
-
-                    AND_WHEN("SendBufferSize option is set to a valid value")
-                    {
-                        const auto value = GENERATE(AS(int),
-                                                    wMemLimits.minValue,
-                                                    wMemLimits.minValue + 18,
-                                                    wMemLimits.minValue + 1024,
-                                                    wMemLimits.defaultValue/2,
-                                                    wMemLimits.defaultValue);
-                        pSocket->setSocketOption(TcpSocket::SocketOption::SendBufferSize, value);
-
-                        THEN("SendBufferSize option value is set to the double of the valid value")
-                        {
-                            const auto setOption = pSocket->getSocketOption(TcpSocket::SocketOption::SendBufferSize);
-                            REQUIRE(setOption == (2 * value));
-                        }
-                    }
-
-                    AND_WHEN("ReceiveBufferSize option is set to a valid value")
-                    {
-                        const auto value = GENERATE(AS(int),
-                                                    rMemLimits.minValue,
-                                                    rMemLimits.minValue + 18,
-                                                    rMemLimits.minValue + 1024,
-                                                    rMemLimits.defaultValue/2,
-                                                    rMemLimits.defaultValue);
-                        pSocket->setSocketOption(TcpSocket::SocketOption::ReceiveBufferSize, value);
-
-                        THEN("ReceiveBufferSize option value is set to the double of the valid value")
-                        {
-                            const auto setOption = pSocket->getSocketOption(TcpSocket::SocketOption::ReceiveBufferSize);
-                            REQUIRE(setOption == (2 * value));
-                        }
-                    }
-
-                    THEN("connected peers can start exchanging data")
-                    {
-                        const auto dataToSend = GENERATE(AS(QByteArray),
-                                                         QByteArray("a"),
-                                                         QByteArray("abcdefgh"),
-                                                         largeData);
-                        const auto disableLowDelayOption = GENERATE(AS(bool), true, false);
-                        const auto setKeepAliveOption = GENERATE(AS(bool), true, false);
-                        const auto readBufferCapacity = GENERATE(AS(size_t), 0, 1024, 16384, 65536);
-                        if (readBufferCapacity > 0)
-                            pSocket->setReadBufferCapacity(readBufferCapacity);
-                        if (disableLowDelayOption)
-                            pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, 0);
-                        REQUIRE(pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay) == disableLowDelayOption ? 0 : 1);
-                        if (setKeepAliveOption)
-                        {
-                            pPeerSocket->setSocketOption(QAbstractSocket::KeepAliveOption, 1);
-                            pSocket->setSocketOption(TcpSocket::SocketOption::KeepAlive, 1);
-                        }
-                        REQUIRE(pPeerSocket->socketOption(QAbstractSocket::KeepAliveOption) == setKeepAliveOption ? 1 : 0);
-                        REQUIRE(pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive) == setKeepAliveOption ? 1 : 0);
-
-                        AND_WHEN("peer sends data to TcpSocket")
-                        {
-                            pPeerSocket->write(dataToSend);
-
-                            THEN("TcpSocket receives sent data")
-                            {
-                                const auto &sentData = socketReceivedData;
-                                while (sentData != dataToSend)
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketReceivedDataFromPeerSemaphore, 1));
-                                }
-
-                                AND_WHEN("peer sends some more data to TcpSocket")
-                                {
-                                    socketReceivedData.clear();
-                                    const QByteArray someMoreData("0123456789");
-                                    pPeerSocket->write(someMoreData);
-
-                                    THEN("TcpSocket receives sent data")
-                                    {
-                                        while (sentData != someMoreData)
-                                        {
-                                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketReceivedDataFromPeerSemaphore, 1));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("peer closes connection after sending data to TcpSocket")
-                        {
-                            pPeerSocket->write(dataToSend);
-                            pPeerSocket->disconnectFromHost();
-
-                            THEN("TcpSocket receives sent data")
-                            {
-                                const auto &sentData = socketReceivedData;
-                                while (sentData != dataToSend)
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketReceivedDataFromPeerSemaphore, 1));
-                                }
-
-                                AND_THEN("both peer and TcpSocket emit disconnected")
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                                    REQUIRE(pPeerSocket->error() == QAbstractSocket::UnknownSocketError);
-                                    REQUIRE(pSocket->errorMessage().empty());
-
-                                    AND_WHEN("peer is deleted")
-                                    {
-                                        while (peerFailedSemaphore.tryAcquire()) {}
-                                        pPeerSocket.reset(nullptr);
-
-                                        THEN("peer does not emit any error")
-                                        {
-                                            REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                            REQUIRE(pSocket->errorMessage().empty());
-                                        }
-                                    }
-
-                                    AND_WHEN("TcpSocket is deleted")
-                                    {
-                                        while (socketFailedSemaphore.tryAcquire()) {}
-                                        pSocket.reset(nullptr);
-
-                                        THEN("neither peer or TcpSocket emit any error")
-                                        {
-                                            REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                            REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("peer aborts after writing data")
-                        {
-                            pPeerSocket->write(dataToSend);
-                            pPeerSocket->abort();
-
-                            THEN("both peer and TcpSocket emit disconnected")
-                            {
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                                REQUIRE(pSocket->errorMessage().empty());
-                            }
-                        }
-
-                        AND_WHEN("peer is deleted after writing data")
-                        {
-                            pPeerSocket->write(dataToSend);
-                            pPeerSocket.reset(nullptr);
-
-                            THEN("both peer and TcpSocket emit disconnected")
-                            {
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                                REQUIRE(pSocket->errorMessage().empty());
-                            }
-                        }
-
-                        AND_WHEN("TcpSocket sends data to peer")
-                        {
-                            pSocket->write(dataToSend.data(), dataToSend.size());
-
-                            THEN("peer receives sent data")
-                            {
-                                const auto &sentData = peerReceivedData;
-                                while (sentData != dataToSend)
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerReceivedDataFromTcpSocketSemaphore, 1));
-                                }
-
-                                AND_WHEN("TcpSocket sends some more data to peer")
-                                {
-                                    peerReceivedData.clear();
-                                    const QByteArray someMoreData("0123456789");
-                                    pSocket->write(someMoreData.data(), someMoreData.size());
-
-                                    THEN("peer receives sent data")
-                                    {
-                                        while (sentData != someMoreData)
-                                        {
-                                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerReceivedDataFromTcpSocketSemaphore, 1));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("TcpSocket closes connection after sending data to peer")
-                        {
-                            pSocket->write(dataToSend.data(), dataToSend.size());
-                            pSocket->disconnectFromPeer();
-
-                            THEN("peer receives sent data")
-                            {
-                                QByteArray sentData;
-                                while (sentData != dataToSend)
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerReceivedDataFromTcpSocketSemaphore, 1));
-                                    sentData = peerReceivedData;
-                                }
-
-                                AND_THEN("TcpSocket emits disconnected and peer emits RemoteHostClosedError before emiting disconnected")
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerFailedSemaphore, 10));
-                                    REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                                    REQUIRE(pSocket->errorMessage().empty());
-
-                                    AND_WHEN("TcpSocket is deleted")
-                                    {
-                                        while (socketFailedSemaphore.tryAcquire()) {}
-                                        pSocket.reset(nullptr);
-
-                                        THEN("TcpSocket does not emit any error")
-                                        {
-                                            REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                                            REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                        }
-                                    }
-
-                                    AND_WHEN("Peer is deleted")
-                                    {
-                                        while (peerFailedSemaphore.tryAcquire()) {}
-                                        pPeerSocket.reset(nullptr);
-
-                                        THEN("neither peer or TcpSocket emit any error")
-                                        {
-                                            REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                            REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("TcpSocket aborts after writing data")
-                        {
-                            pSocket->write(dataToSend.data(), dataToSend.size());
-                            pSocket->abort();
-
-                            THEN("TcpSocket aborts and Peer emits RemoteHostClosedError before emiting disconnected")
-                            {
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerFailedSemaphore, 10));
-                                REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                                REQUIRE(pSocket->errorMessage().empty());
-                            }
-                        }
-
-                        AND_WHEN("TcpSocket is deleted after writing data")
-                        {
-                            pSocket->write(dataToSend.data(), dataToSend.size());
-                            pSocket.reset(nullptr);
-
-                            THEN("TcpSocket aborts and Peer emits RemoteHostClosedError before emiting disconnected")
-                            {
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerFailedSemaphore, 10));
-                                REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            }
-                        }
-                    }
-
-                    AND_WHEN("peer disconnects from TcpSocket")
-                    {
-                        pPeerSocket->disconnectFromHost();
-
-                        THEN("peer emits disconnected and TcpSocket emits disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(pPeerSocket->error() == QAbstractSocket::UnknownSocketError);
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("peer does not emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(pSocket->errorMessage().empty());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                while (socketFailedSemaphore.tryAcquire()) {}
-                                pSocket.reset(nullptr);
-
-                                THEN("neither peer or TcpSocket emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("peer aborts connection")
-                    {
-                        pPeerSocket->abort();
-
-                        THEN("both peer and TcpSocket emit disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(pPeerSocket->error() == QAbstractSocket::UnknownSocketError);
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("peer does not emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(pSocket->errorMessage().empty());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                while (socketFailedSemaphore.tryAcquire()) {}
-                                pSocket.reset(nullptr);
-
-                                THEN("neither peer or TcpSocket emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("TcpSocket disconnects from TcpSocket")
-                    {
-                        pSocket->disconnectFromPeer();
-
-                        THEN("TcpSocket emits disconnected and peer emits RemoteHostClosedError before emiting disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerFailedSemaphore, 10));
-                            REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("neither peer or TcpSocket emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                pSocket.reset(nullptr);
-
-                                THEN("TcpSocket does not emit any error")
-                                {
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                    REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("TcpSocket aborts connection")
-                    {
-                        pSocket->abort();
-
-                        THEN("Peer emits RemoteHostClosedError before emiting disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerFailedSemaphore, 10));
-                            REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("neither peer or TcpSocket emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                pSocket.reset(nullptr);
-
-                                THEN("TcpSocket does not emit any error")
-                                {
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                    REQUIRE(pPeerSocket->error() == QAbstractSocket::RemoteHostClosedError);
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("both peer and TcpSocket disconnects")
-                    {
-                        pPeerSocket->disconnectFromHost();
-                        pSocket->disconnectFromPeer();
-
-                        THEN("peer emits disconnected and TcpSocket emits disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("TcpSocket not emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(pSocket->errorMessage().empty());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                while (socketFailedSemaphore.tryAcquire()) {}
-                                pSocket.reset(nullptr);
-
-                                THEN("TcpSocket does not emit any error")
-                                {
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("both TcpSocket and peer disconnects")
-                    {
-                        pSocket->disconnectFromPeer();
-                        pPeerSocket->disconnectFromHost();
-
-                        THEN("peer emits disconnected and TcpSocket emits disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("TcpSocket not emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(pSocket->errorMessage().empty());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                while (socketFailedSemaphore.tryAcquire()) {}
-                                pSocket.reset(nullptr);
-
-                                THEN("TcpSocket does not emit any error")
-                                {
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("peer is deleted")
-                    {
-                        while (peerFailedSemaphore.tryAcquire()) {}
-                        pPeerSocket.reset(nullptr);
-
-                        THEN("peer does not emit any error and TcpSocket emits disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(pSocket->errorMessage().empty());
-                            REQUIRE(!peerFailedSemaphore.tryAcquire());
-                        }
-                    }
-
-                    AND_WHEN("TcpSocket is deleted")
-                    {
-                        while (socketFailedSemaphore.tryAcquire()) {}
-                        pSocket.reset(nullptr);
-                        QCoreApplication::processEvents();
-
-                        THEN("peer socket emits error and disconnected signal")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(pPeerSocket->error() == QAbstractSocket::SocketError::RemoteHostClosedError);
-                            REQUIRE(!socketFailedSemaphore.tryAcquire());
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-
-SCENARIO("TcpSocket interacts with client TcpSocket-based peer")
-{
-    GIVEN("a listening server")
+    GIVEN("two connected TcpSockets")
     {
         TcpServer server;
-        QSemaphore socketConnectedSemaphore;
-        QSemaphore socketFailedSemaphore;
-        QSemaphore socketDisconnectedSemaphore;
-        QSemaphore socketReceivedDataFromPeerSemaphore;
-        QByteArray socketReceivedData;
-        std::unique_ptr<TcpSocket> pSocket;
+        REQUIRE(server.listen(QHostAddress::LocalHost));
+        std::unique_ptr<TcpSocket> pServerPeer;
+        QSemaphore serverPeerConnectedSemaphore;
+        QSemaphore serverPeerDisconnectedSemaphore;
+        QSemaphore serverPeerFailedSemaphore;
+        QSemaphore serverPeerReceivedDataSemaphore;
+        QByteArray receivedServerPeerData;
         Object::connect(&server, &TcpServer::newConnection, [&](TcpSocket *pNewSocket)
-        {
-            pSocket.reset(pNewSocket);
-            Object::connect(pSocket.get(), &TcpSocket::error, [&]() {socketFailedSemaphore.release();});
-            Object::connect(pSocket.get(), &TcpSocket::disconnected, [&socketDisconnectedSemaphore](){socketDisconnectedSemaphore.release();});
-            Object::connect(pSocket.get(), &TcpSocket::receivedData, [&]()
             {
-                QByteArray readData;
-                readData.resize(pSocket->dataAvailable());
-                pSocket->read(readData.data(), readData.size());
-                socketReceivedData.append(readData);
-                socketReceivedDataFromPeerSemaphore.release();
+                REQUIRE(!pServerPeer);
+                pServerPeer.reset(pNewSocket);
+                Object::connect(pServerPeer.get(), &TcpSocket::disconnected, [&]{serverPeerDisconnectedSemaphore.release();});
+                Object::connect(pServerPeer.get(), &TcpSocket::error, [&]{serverPeerFailedSemaphore.release();});
+                Object::connect(pServerPeer.get(), &TcpSocket::receivedData, [&]()
+                    {
+                        receivedServerPeerData.append(pServerPeer->readAll());
+                        serverPeerReceivedDataSemaphore.release();
+                    });
+                serverPeerConnectedSemaphore.release();
             });
-            socketConnectedSemaphore.release();
-        });
-        const auto serverAddress = GENERATE(AS(QHostAddress), QHostAddress("127.10.10.25"), QHostAddress("::1"));
-        REQUIRE(server.listen(serverAddress, 0));
-        const auto serverPort = server.serverPort();
-        REQUIRE(serverPort >= 1024);
-
-        WHEN("peer connects to host")
-        {
-            QSemaphore peerConnectedSemaphore;
-            QSemaphore peerFailedSemaphore;
-            QSemaphore peerDisconnectedSemaphore;
-            QSemaphore peerReceivedDataFromTcpSocketSemaphore;
-            QByteArray peerReceivedData;
-            std::unique_ptr<TcpSocket> pPeerSocket(new TcpSocket);
-            Object::connect(pPeerSocket.get(), &TcpSocket::error, [&]() {peerFailedSemaphore.release();});
-            Object::connect(pPeerSocket.get(), &TcpSocket::connected, [&peerConnectedSemaphore](){peerConnectedSemaphore.release();});
-            Object::connect(pPeerSocket.get(), &TcpSocket::disconnected, [&peerDisconnectedSemaphore](){peerDisconnectedSemaphore.release();});
-            Object::connect(pPeerSocket.get(), &TcpSocket::receivedData, [&]()
+        std::unique_ptr<TcpSocket> pClientPeer(new TcpSocket);
+        QSemaphore clientPeerConnectedSemaphore;
+        QSemaphore clientPeerDisconnectedSemaphore;
+        QSemaphore clientPeerFailedSemaphore;
+        QSemaphore clientPeerReceivedDataSemaphore;
+        QByteArray receivedClientPeerData;
+        Object::connect(pClientPeer.get(), &TcpSocket::connected, [&]{clientPeerConnectedSemaphore.release();});
+        Object::connect(pClientPeer.get(), &TcpSocket::disconnected, [&]{clientPeerDisconnectedSemaphore.release();});
+        Object::connect(pClientPeer.get(), &TcpSocket::error, [&]{clientPeerFailedSemaphore.release();});
+        Object::connect(pClientPeer.get(), &TcpSocket::receivedData, [&]()
             {
-                peerReceivedData.append(pPeerSocket->readAll());
-                peerReceivedDataFromTcpSocketSemaphore.release();
+                receivedClientPeerData.append(pClientPeer->readAll());
+                clientPeerReceivedDataSemaphore.release();
             });
-            pPeerSocket->connect(serverAddress.toString().toStdString(), serverPort);
+        pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
+        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
+        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
 
-            THEN("server emits newConnection with a connected socket")
+        WHEN("TcpSocket sends data to connected peer")
+        {
+            const auto dataToSend = GENERATE(AS(QByteArray),
+                                                QByteArray("a"),
+                                                QByteArray("abcdefgh"),
+                                                largeData);
+            const bool isClientTheSendingPeer = GENERATE(AS(bool), true, false);
+            auto &pSendingPeer = isClientTheSendingPeer ? pClientPeer : pServerPeer;
+            auto &pReceivingPeer = isClientTheSendingPeer ? pServerPeer : pClientPeer;
+            pSendingPeer->write(dataToSend);
+
+            THEN("connected peer receives sent data")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
-                REQUIRE(pSocket->state() == TcpSocket::State::Connected);
-
-                AND_THEN("connecting peer socket emits connected")
+                auto &receivedData = isClientTheSendingPeer ? receivedServerPeerData : receivedClientPeerData;
+                auto &connectedPeerReceivedDataSemaphore = isClientTheSendingPeer ? serverPeerReceivedDataSemaphore : clientPeerReceivedDataSemaphore;
+                while(dataToSend != receivedData)
                 {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
-                    REQUIRE(pPeerSocket->localAddress() == pSocket->peerAddress());
-                    REQUIRE(pPeerSocket->localPort() == pSocket->peerPort());
-                    REQUIRE(pPeerSocket->peerAddress() == pSocket->localAddress());
-                    REQUIRE(pPeerSocket->peerPort() == pSocket->localPort());
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(connectedPeerReceivedDataSemaphore, 1));
+                }
 
-                    AND_THEN("socket is constructed with LowDelay option set")
+                AND_WHEN("TcpSocket sends more data to connected peer")
+                {
+                    receivedData.clear();
+                    const QByteArray someMoreData("0123456789");
+                    pSendingPeer->write(someMoreData);
+
+                    THEN("connected peer receives sent data")
                     {
-                        const auto defaultLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                        REQUIRE(defaultLowDelayOption == 1);
-
-                        AND_WHEN("LowDelay option is set to 0")
+                        while(someMoreData != receivedData)
                         {
-                            pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, 0);
-
-                            THEN("LowDelay option becomes unset")
-                            {
-                                const auto setLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                                REQUIRE(setLowDelayOption == 0);
-
-                                AND_WHEN("LowDelay option is enabled again")
-                                {
-                                    pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, 1);
-
-                                    THEN("LowDelay option becomes set")
-                                    {
-                                        const auto setLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                                        REQUIRE(setLowDelayOption == 1);
-                                    }
-                                }
-
-                                AND_WHEN("LowDelay option is set to a value other than 0 or 1")
-                                {
-                                    const auto value = GENERATE(AS(int), -3, 2, 5, 117);
-                                    pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, value);
-
-                                    THEN("LowDelay option is set")
-                                    {
-                                        const auto setLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                                        REQUIRE(setLowDelayOption == 1);
-                                    }
-                                }
-                            }
+                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(connectedPeerReceivedDataSemaphore, 1));
                         }
 
-                        AND_WHEN("LowDelay option is set to 1")
+                        AND_WHEN("TcpSocket disconnects from connected peer")
                         {
-                            pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, 1);
+                            pSendingPeer->disconnectFromPeer();
 
-                            THEN("LowDelay option stays set")
+                            THEN("both peers disconnect")
                             {
-                                const auto setLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                                REQUIRE(setLowDelayOption == 1);
+                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                             }
-                        }
-
-                        AND_WHEN("LowDelay option is set to a value other than 0 or 1")
-                        {
-                            const auto value = GENERATE(AS(int), -3, 2, 5, 117);
-                            pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, value);
-
-                            THEN("LowDelay option stays set")
-                            {
-                                const auto setLowDelayOption = pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay);
-                                REQUIRE(setLowDelayOption == 1);
-                            }
-                        }
-                    }
-
-                    AND_THEN("socket is constructed with KeepAlive option unset")
-                    {
-                        const auto defaultKeepAliveOption = pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive);
-                        REQUIRE(defaultKeepAliveOption == 0);
-
-                        AND_WHEN("KeepAlive option is set to 1")
-                        {
-                            pSocket->setSocketOption(TcpSocket::SocketOption::KeepAlive, 1);
-
-                            THEN("KeepAlive option becomes set")
-                            {
-                                const auto setKeepAliveOption = pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive);
-                                REQUIRE(setKeepAliveOption == 1);
-
-                                AND_WHEN("KeepAlive option is set to 0")
-                                {
-                                    pSocket->setSocketOption(TcpSocket::SocketOption::KeepAlive, 0);
-
-                                    THEN("KeepAlive option becomes unset")
-                                    {
-                                        const auto setKeepAliveOption = pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive);
-                                        REQUIRE(setKeepAliveOption == 0);
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("KeepAlive option is set to 0")
-                        {
-                            pSocket->setSocketOption(TcpSocket::SocketOption::KeepAlive, 0);
-
-                            THEN("KeepAlive option stays unset")
-                            {
-                                const auto setKeepAliveOption = pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive);
-                                REQUIRE(setKeepAliveOption == 0);
-                            }
-                        }
-
-                        AND_WHEN("KeepAlive option is set to a value other than 0 or 1")
-                        {
-                            const auto value = GENERATE(AS(int), -3, 2, 5, 117);
-                            pSocket->setSocketOption(TcpSocket::SocketOption::KeepAlive, value);
-
-                            THEN("KeepAlive option is set")
-                            {
-                                const auto setKeepAliveOption = pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive);
-                                REQUIRE(setKeepAliveOption == 1);
-                            }
-                        }
-                    }
-
-                    AND_WHEN("SendBufferSize option is set to a valid value")
-                    {
-                        const auto value = GENERATE(AS(int),
-                                                    wMemLimits.minValue,
-                                                    wMemLimits.minValue + 18,
-                                                    wMemLimits.minValue + 1024,
-                                                    wMemLimits.defaultValue/2,
-                                                    wMemLimits.defaultValue);
-                        pSocket->setSocketOption(TcpSocket::SocketOption::SendBufferSize, value);
-
-                        THEN("SendBufferSize option value is set to the double of the valid value")
-                        {
-                            const auto setOption = pSocket->getSocketOption(TcpSocket::SocketOption::SendBufferSize);
-                            REQUIRE(setOption == (2 * value));
-                        }
-                    }
-
-                    AND_WHEN("ReceiveBufferSize option is set to a valid value")
-                    {
-                        const auto value = GENERATE(AS(int),
-                                                    rMemLimits.minValue,
-                                                    rMemLimits.minValue + 18,
-                                                    rMemLimits.minValue + 1024,
-                                                    rMemLimits.defaultValue/2,
-                                                    rMemLimits.defaultValue);
-                        pSocket->setSocketOption(TcpSocket::SocketOption::ReceiveBufferSize, value);
-
-                        THEN("ReceiveBufferSize option value is set to the double of the valid value")
-                        {
-                            const auto setOption = pSocket->getSocketOption(TcpSocket::SocketOption::ReceiveBufferSize);
-                            REQUIRE(setOption == (2 * value));
-                        }
-                    }
-
-                    THEN("connected peers can start exchanging data")
-                    {
-                        const auto dataToSend = GENERATE(AS(QByteArray),
-                                                         QByteArray("a"),
-                                                         QByteArray("abcdefgh"),
-                                                         largeData);
-                        const auto disableLowDelayOption = GENERATE(AS(bool), true, false);
-                        const auto setKeepAliveOption = GENERATE(AS(bool), true, false);
-                        const auto readBufferCapacity = GENERATE(AS(size_t), 0, 1024, 16384, 65536);
-                        if (readBufferCapacity > 0)
-                            pSocket->setReadBufferCapacity(readBufferCapacity);
-                        if (disableLowDelayOption)
-                            pSocket->setSocketOption(TcpSocket::SocketOption::LowDelay, 0);
-                        REQUIRE(pSocket->getSocketOption(TcpSocket::SocketOption::LowDelay) == disableLowDelayOption ? 0 : 1);
-                        if (setKeepAliveOption)
-                        {
-                            pPeerSocket->setSocketOption(TcpSocket::SocketOption::KeepAlive, 1);
-                            pSocket->setSocketOption(TcpSocket::SocketOption::KeepAlive, 1);
-                        }
-                        REQUIRE(pPeerSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive) == setKeepAliveOption ? 1 : 0);
-                        REQUIRE(pSocket->getSocketOption(TcpSocket::SocketOption::KeepAlive) == setKeepAliveOption ? 1 : 0);
-
-                        AND_WHEN("peer sends data to TcpSocket")
-                        {
-                            pPeerSocket->write(dataToSend.data(), dataToSend.size());
-
-                            THEN("TcpSocket receives sent data")
-                            {
-                                const auto &sentData = socketReceivedData;
-                                while (sentData != dataToSend)
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketReceivedDataFromPeerSemaphore, 1));
-                                }
-
-                                AND_WHEN("peer sends some more data to TcpSocket")
-                                {
-                                    socketReceivedData.clear();
-                                    const QByteArray someMoreData("0123456789");
-                                    pPeerSocket->write(someMoreData.data(), someMoreData.size());
-
-                                    THEN("TcpSocket receives sent data")
-                                    {
-                                        while (sentData != someMoreData)
-                                        {
-                                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketReceivedDataFromPeerSemaphore, 1));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("peer closes connection after sending data to TcpSocket")
-                        {
-                            pPeerSocket->write(dataToSend.data(), dataToSend.size());
-                            pPeerSocket->disconnectFromPeer();
-
-                            THEN("TcpSocket receives sent data")
-                            {
-                                const auto &sentData = socketReceivedData;
-                                while (sentData != dataToSend)
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketReceivedDataFromPeerSemaphore, 1));
-                                }
-
-                                AND_THEN("both peer and TcpSocket emit disconnected")
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                                    REQUIRE(pPeerSocket->errorMessage().empty());
-                                    REQUIRE(pSocket->errorMessage().empty());
-
-                                    AND_WHEN("peer is deleted")
-                                    {
-                                        while (peerFailedSemaphore.tryAcquire()) {}
-                                        pPeerSocket.reset(nullptr);
-
-                                        THEN("peer does not emit any error")
-                                        {
-                                            REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                            REQUIRE(pSocket->errorMessage().empty());
-                                        }
-                                    }
-
-                                    AND_WHEN("TcpSocket is deleted")
-                                    {
-                                        while (socketFailedSemaphore.tryAcquire()) {}
-                                        pSocket.reset(nullptr);
-
-                                        THEN("neither peer or TcpSocket emit any error")
-                                        {
-                                            REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                            REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("peer aborts after writing data")
-                        {
-                            pPeerSocket->write(dataToSend.data(), dataToSend.size());
-                            pPeerSocket->abort();
-
-                            THEN("TcpSocket emits disconnected")
-                            {
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                                REQUIRE(pSocket->errorMessage().empty());
-                                REQUIRE(pPeerSocket->errorMessage().empty());
-                            }
-                        }
-
-                        AND_WHEN("peer is deleted after writing data")
-                        {
-                            pPeerSocket->write(dataToSend.data(), dataToSend.size());
-                            pPeerSocket.reset(nullptr);
-
-                            THEN("TcpSocket emits disconnected")
-                            {
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                                REQUIRE(pSocket->errorMessage().empty());
-                            }
-                        }
-
-                        AND_WHEN("TcpSocket sends data to peer")
-                        {
-                            pSocket->write(dataToSend.data(), dataToSend.size());
-
-                            THEN("peer receives sent data")
-                            {
-                                const auto &sentData = peerReceivedData;
-                                while (sentData != dataToSend)
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerReceivedDataFromTcpSocketSemaphore, 1));
-                                }
-
-                                AND_WHEN("TcpSocket sends some more data to peer")
-                                {
-                                    peerReceivedData.clear();
-                                    const QByteArray someMoreData("0123456789");
-                                    pSocket->write(someMoreData.data(), someMoreData.size());
-
-                                    THEN("peer receives sent data")
-                                    {
-                                        while (sentData != someMoreData)
-                                        {
-                                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerReceivedDataFromTcpSocketSemaphore, 1));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("TcpSocket closes connection after sending data to peer")
-                        {
-                            pSocket->write(dataToSend.data(), dataToSend.size());
-                            pSocket->disconnectFromPeer();
-
-                            THEN("peer receives sent data")
-                            {
-                                QByteArray sentData;
-                                while (sentData != dataToSend)
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerReceivedDataFromTcpSocketSemaphore, 1));
-                                    sentData = peerReceivedData;
-                                }
-
-                                AND_THEN("both sockets emit disconnected")
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                                    REQUIRE(pPeerSocket->errorMessage().empty());
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                                    REQUIRE(pSocket->errorMessage().empty());
-
-                                    AND_WHEN("TcpSocket is deleted")
-                                    {
-                                        while (socketFailedSemaphore.tryAcquire()) {}
-                                        pSocket.reset(nullptr);
-
-                                        THEN("TcpSocket does not emit any error")
-                                        {
-                                            REQUIRE(pPeerSocket->errorMessage().empty());
-                                            REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                        }
-                                    }
-
-                                    AND_WHEN("Peer is deleted")
-                                    {
-                                        while (peerFailedSemaphore.tryAcquire()) {}
-                                        pPeerSocket.reset(nullptr);
-
-                                        THEN("neither peer or TcpSocket emit any error")
-                                        {
-                                            REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                            REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        AND_WHEN("TcpSocket aborts after writing data")
-                        {
-                            pSocket->write(dataToSend.data(), dataToSend.size());
-                            pSocket->abort();
-
-                            THEN("TcpSocket aborts and Peer emits disconnected")
-                            {
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                                REQUIRE(pSocket->errorMessage().empty());
-                                REQUIRE(pPeerSocket->errorMessage().empty());
-                            }
-                        }
-
-                        AND_WHEN("TcpSocket is deleted after writing data")
-                        {
-                            pSocket->write(dataToSend.data(), dataToSend.size());
-                            pSocket.reset(nullptr);
-
-                            THEN("TcpSocket aborts and Peer emits disconnected")
-                            {
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                                REQUIRE(pPeerSocket->errorMessage().empty());
-                            }
-                        }
-                    }
-
-                    AND_WHEN("peer disconnects from TcpSocket")
-                    {
-                        pPeerSocket->disconnectFromPeer();
-
-                        THEN("peer emits disconnected and TcpSocket emits disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(pPeerSocket->errorMessage().empty());
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("peer does not emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(pSocket->errorMessage().empty());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                while (socketFailedSemaphore.tryAcquire()) {}
-                                pSocket.reset(nullptr);
-
-                                THEN("neither peer or TcpSocket emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("peer aborts connection")
-                    {
-                        pPeerSocket->abort();
-
-                        THEN("TcpSocket emits disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(pPeerSocket->errorMessage().empty());
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("peer does not emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(pSocket->errorMessage().empty());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                while (socketFailedSemaphore.tryAcquire()) {}
-                                pSocket.reset(nullptr);
-
-                                THEN("neither peer or TcpSocket emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("TcpSocket disconnects from TcpSocket")
-                    {
-                        pSocket->disconnectFromPeer();
-
-                        THEN("both sockets emit disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(pPeerSocket->errorMessage().empty());
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("neither peer or TcpSocket emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                pSocket.reset(nullptr);
-
-                                THEN("TcpSocket does not emit any error")
-                                {
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                    REQUIRE(pPeerSocket->errorMessage().empty());
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("TcpSocket aborts connection")
-                    {
-                        pSocket->abort();
-
-                        THEN("Peer emits disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(pPeerSocket->errorMessage().empty());
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("neither peer or TcpSocket emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                pSocket.reset(nullptr);
-
-                                THEN("TcpSocket does not emit any error")
-                                {
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                    REQUIRE(pPeerSocket->errorMessage().empty());
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("both peer and TcpSocket disconnects")
-                    {
-                        pPeerSocket->disconnectFromPeer();
-                        pSocket->disconnectFromPeer();
-
-                        THEN("both sockets emit disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(pPeerSocket->errorMessage().empty());
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("TcpSocket not emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(pSocket->errorMessage().empty());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                while (socketFailedSemaphore.tryAcquire()) {}
-                                pSocket.reset(nullptr);
-
-                                THEN("TcpSocket does not emit any error")
-                                {
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("both TcpSocket and peer disconnects")
-                    {
-                        pSocket->disconnectFromPeer();
-                        pPeerSocket->disconnectFromPeer();
-
-                        THEN("both sockets emit disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(pPeerSocket->errorMessage().empty());
-                            REQUIRE(pSocket->errorMessage().empty());
-
-                            AND_WHEN("peer is deleted")
-                            {
-                                while (peerFailedSemaphore.tryAcquire()) {}
-                                pPeerSocket.reset(nullptr);
-
-                                THEN("TcpSocket not emit any error")
-                                {
-                                    REQUIRE(!peerFailedSemaphore.tryAcquire());
-                                    REQUIRE(pSocket->errorMessage().empty());
-                                }
-                            }
-
-                            AND_WHEN("TcpSocket is deleted")
-                            {
-                                while (socketFailedSemaphore.tryAcquire()) {}
-                                pSocket.reset(nullptr);
-
-                                THEN("TcpSocket does not emit any error")
-                                {
-                                    REQUIRE(!socketFailedSemaphore.tryAcquire());
-                                }
-                            }
-                        }
-                    }
-
-                    AND_WHEN("peer is deleted")
-                    {
-                        while (peerFailedSemaphore.tryAcquire()) {}
-                        pPeerSocket.reset(nullptr);
-                        QCoreApplication::processEvents();
-
-                        THEN("peer does not emit any error and TcpSocket emits disconnected")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                            REQUIRE(pSocket->errorMessage().empty());
-                            REQUIRE(!peerFailedSemaphore.tryAcquire());
-                        }
-                    }
-
-                    AND_WHEN("TcpSocket is deleted")
-                    {
-                        while (socketFailedSemaphore.tryAcquire()) {}
-                        pSocket.reset(nullptr);
-                        QCoreApplication::processEvents();
-
-                        THEN("peer socket emits error and disconnected signal")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                            REQUIRE(pPeerSocket->errorMessage().empty());
-                            REQUIRE(!socketFailedSemaphore.tryAcquire());
                         }
                     }
                 }
+            }
+        }
+
+        WHEN("TcpSocket closes connection after sending data to connected peer")
+        {
+            const auto dataToSend = GENERATE(AS(QByteArray),
+                                                QByteArray("a"),
+                                                QByteArray("abcdefgh"),
+                                                largeData);
+            const bool isClientTheSendingPeer = GENERATE(AS(bool), true, false);
+            auto &pSendingPeer = isClientTheSendingPeer ? pClientPeer : pServerPeer;
+            auto &pReceivingPeer = isClientTheSendingPeer ? pServerPeer : pClientPeer;
+            pSendingPeer->write(dataToSend);
+            pSendingPeer->disconnectFromPeer();
+
+            THEN("connected peer receives sent data")
+            {
+                auto &receivedData = isClientTheSendingPeer ? receivedServerPeerData : receivedClientPeerData;
+                auto &connectedPeerReceivedDataSemaphore = isClientTheSendingPeer ? serverPeerReceivedDataSemaphore : clientPeerReceivedDataSemaphore;
+                while(dataToSend != receivedData)
+                {
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(connectedPeerReceivedDataSemaphore, 1));
+                }
+
+                AND_THEN("both peers disconnect without emitting any errors")
+                {
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                    REQUIRE(pSendingPeer->errorMessage().empty());
+                    REQUIRE(pReceivingPeer->errorMessage().empty());
+
+                    AND_WHEN("sending peer is deleted")
+                    {
+                        pSendingPeer.reset(nullptr);
+
+                        THEN("neither peer emit any error")
+                        {
+                            REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(clientPeerFailedSemaphore, QDeadlineTimer(1)));
+                            REQUIRE(!serverPeerFailedSemaphore.tryAcquire());
+                        }
+                    }
+
+                    AND_WHEN("receiving peer is deleted")
+                    {
+                        pReceivingPeer.reset(nullptr);
+
+                        THEN("neither peer emit any error")
+                        {
+                            REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(clientPeerFailedSemaphore, QDeadlineTimer(1)));
+                            REQUIRE(!serverPeerFailedSemaphore.tryAcquire());
+                        }
+                    }
+                }
+            }
+        }
+
+        WHEN("TcpSocket aborts after sending data to connected peer")
+        {
+            const auto dataToSend = GENERATE(AS(QByteArray),
+                                                QByteArray("a"),
+                                                QByteArray("abcdefgh"),
+                                                largeData);
+            const bool isClientTheSendingPeer = GENERATE(AS(bool), true, false);
+            auto &pSendingPeer = isClientTheSendingPeer ? pClientPeer : pServerPeer;
+            auto &pReceivingPeer = isClientTheSendingPeer ? pServerPeer : pClientPeer;
+            pSendingPeer->write(dataToSend);
+            pSendingPeer->abort();
+
+            THEN("connected peer disconnects without peers emitting any errors")
+            {
+                auto &connectedPeerDisconnectedSemaphore = isClientTheSendingPeer ? serverPeerDisconnectedSemaphore : clientPeerDisconnectedSemaphore;
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(connectedPeerDisconnectedSemaphore, 10));
+                REQUIRE(pSendingPeer->errorMessage().empty());
+                REQUIRE(pReceivingPeer->errorMessage().empty());
+            }
+        }
+
+        WHEN("TcpSocket is deleted after sending data to connected peer")
+        {
+            const auto dataToSend = GENERATE(AS(QByteArray),
+                                                QByteArray("a"),
+                                                QByteArray("abcdefgh"),
+                                                largeData);
+            const bool isClientTheSendingPeer = GENERATE(AS(bool), true, false);
+            auto &pSendingPeer = isClientTheSendingPeer ? pClientPeer : pServerPeer;
+            auto &pReceivingPeer = isClientTheSendingPeer ? pServerPeer : pClientPeer;
+            pSendingPeer->write(dataToSend);
+            pSendingPeer.reset(nullptr);
+
+            THEN("connected peer disconnects without emitting any errors")
+            {
+                auto &connectedPeerDisconnectedSemaphore = isClientTheSendingPeer ? serverPeerDisconnectedSemaphore : clientPeerDisconnectedSemaphore;
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(connectedPeerDisconnectedSemaphore, 10));
+                REQUIRE(pReceivingPeer->errorMessage().empty());
+            }
+        }
+
+        WHEN("TcpSocket disconnects from connected peer")
+        {
+            const bool isTcpSocketTheClient = GENERATE(AS(bool), true, false);
+            auto &pTcpSocket = isTcpSocketTheClient ? pClientPeer : pServerPeer;
+            auto &pConnectedPeer = isTcpSocketTheClient ? pServerPeer : pClientPeer;
+            pTcpSocket->disconnectFromPeer();
+
+            THEN("both peers disconnect")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                REQUIRE(pTcpSocket->errorMessage().empty());
+                REQUIRE(pConnectedPeer->errorMessage().empty());
+
+                AND_WHEN("TcpSocket is deleted")
+                {
+                    auto &tcpSocketFailedSemaphore = isTcpSocketTheClient ? clientPeerFailedSemaphore : serverPeerFailedSemaphore;
+                    auto &connectedPeerFailedSemaphore = isTcpSocketTheClient ? serverPeerFailedSemaphore : clientPeerFailedSemaphore;
+                    pTcpSocket.reset(nullptr);
+
+                    THEN("neither peer emit any error")
+                    {
+                        REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(connectedPeerFailedSemaphore, QDeadlineTimer(1)));
+                        REQUIRE(!tcpSocketFailedSemaphore.tryAcquire());
+                    }
+                }
+            }
+        }
+
+        WHEN("TcpSocket aborts connection")
+        {
+            const bool isTcpSocketTheClient = GENERATE(AS(bool), true, false);
+            auto &pTcpSocket = isTcpSocketTheClient ? pClientPeer : pServerPeer;
+            auto &pConnectedPeer = isTcpSocketTheClient ? pServerPeer : pClientPeer;
+            pTcpSocket->abort();
+
+            THEN("connected peer disconnect")
+            {
+                auto &connectedPeerDisconnectedSemaphore = isTcpSocketTheClient ? serverPeerDisconnectedSemaphore : clientPeerDisconnectedSemaphore;
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(connectedPeerDisconnectedSemaphore, 10));
+                REQUIRE(pTcpSocket->errorMessage().empty());
+                REQUIRE(pConnectedPeer->errorMessage().empty());
+
+                AND_WHEN("TcpSocket is deleted")
+                {
+                    auto &tcpSocketFailedSemaphore = isTcpSocketTheClient ? clientPeerFailedSemaphore : serverPeerFailedSemaphore;
+                    auto &connectedPeerFailedSemaphore = isTcpSocketTheClient ? serverPeerFailedSemaphore : clientPeerFailedSemaphore;
+                    pTcpSocket.reset(nullptr);
+
+                    THEN("neither peer emit any error")
+                    {
+                        REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(connectedPeerFailedSemaphore, QDeadlineTimer(1)));
+                        REQUIRE(!tcpSocketFailedSemaphore.tryAcquire());
+                    }
+                }
+            }
+        }
+
+        WHEN("both peers disconnect")
+        {
+            const bool isTcpSocketTheClient = GENERATE(AS(bool), true, false);
+            auto &pTcpSocket = isTcpSocketTheClient ? pClientPeer : pServerPeer;
+            auto &pConnectedPeer = isTcpSocketTheClient ? pServerPeer : pClientPeer;
+            pTcpSocket->disconnectFromPeer();
+            pConnectedPeer->disconnectFromPeer();
+
+            THEN("both peers disconnect")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                REQUIRE(pTcpSocket->errorMessage().empty());
+                REQUIRE(pConnectedPeer->errorMessage().empty());
+
+                AND_WHEN("TcpSocket is deleted")
+                {
+                    auto &tcpSocketFailedSemaphore = isTcpSocketTheClient ? clientPeerFailedSemaphore : serverPeerFailedSemaphore;
+                    auto &connectedPeerFailedSemaphore = isTcpSocketTheClient ? serverPeerFailedSemaphore : clientPeerFailedSemaphore;
+                    pTcpSocket.reset(nullptr);
+
+                    THEN("neither peer emit any error")
+                    {
+                        REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(connectedPeerFailedSemaphore, QDeadlineTimer(1)));
+                        REQUIRE(!tcpSocketFailedSemaphore.tryAcquire());
+                    }
+                }
+            }
+        }
+
+        WHEN("both peers abort connection")
+        {
+            const bool isTcpSocketTheClient = GENERATE(AS(bool), true, false);
+            auto &pTcpSocket = isTcpSocketTheClient ? pClientPeer : pServerPeer;
+            auto &pConnectedPeer = isTcpSocketTheClient ? pServerPeer : pClientPeer;
+            pTcpSocket->abort();
+            pConnectedPeer->abort();
+
+            THEN("both peers abort connection without errors")
+            {
+                REQUIRE(pTcpSocket->errorMessage().empty());
+                REQUIRE(pConnectedPeer->errorMessage().empty());
+
+                AND_WHEN("TcpSocket is deleted")
+                {
+                    auto &tcpSocketFailedSemaphore = isTcpSocketTheClient ? clientPeerFailedSemaphore : serverPeerFailedSemaphore;
+                    auto &connectedPeerFailedSemaphore = isTcpSocketTheClient ? serverPeerFailedSemaphore : clientPeerFailedSemaphore;
+                    pTcpSocket.reset(nullptr);
+
+                    THEN("neither peer emit any error")
+                    {
+                        REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(connectedPeerFailedSemaphore, QDeadlineTimer(1)));
+                        REQUIRE(!tcpSocketFailedSemaphore.tryAcquire());
+                    }
+                }
+            }
+        }
+
+        WHEN("TcpSocket is deleted")
+        {
+            const bool isTcpSocketTheClient = GENERATE(AS(bool), true, false);
+            auto &pTcpSocket = isTcpSocketTheClient ? pClientPeer : pServerPeer;
+            auto &pConnectedPeer = isTcpSocketTheClient ? pServerPeer : pClientPeer;
+            pTcpSocket.reset(nullptr);
+
+            THEN("connected peer disconnects without errors")
+            {
+                auto &connectedPeerDisconnectedSemaphore = isTcpSocketTheClient ? serverPeerDisconnectedSemaphore : clientPeerDisconnectedSemaphore;
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(connectedPeerDisconnectedSemaphore, 10));
+                auto &tcpSocketFailedSemaphore = isTcpSocketTheClient ? clientPeerFailedSemaphore : serverPeerFailedSemaphore;
+                auto &connectedPeerFailedSemaphore = isTcpSocketTheClient ? serverPeerFailedSemaphore : clientPeerFailedSemaphore;
+                REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(connectedPeerFailedSemaphore, QDeadlineTimer(1)));
+                REQUIRE(!tcpSocketFailedSemaphore.tryAcquire());
+                REQUIRE(pConnectedPeer->errorMessage().empty());
             }
         }
     }
@@ -2966,29 +763,29 @@ SCENARIO("TcpSocket interacts with client TcpSocket-based peer")
 
 SCENARIO("TcpSocket fails as expected")
 {
-    GIVEN("no server running on any IP related to test.onlocalhost.com")
+    GIVEN("no server running on any IP related to localhost-ips.test.kourier.io")
     {
-        WHEN("TcpSocket is connected to test.onlocalhost.com")
+        WHEN("TcpSocket is connected to localhost-ips.test.kourier.io")
         {
             TcpSocket socket;
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
-            socket.connect("test.onlocalhost.com", 5000);
+            socket.connect("localhost-ips.test.kourier.io", 5000);
 
             THEN("connection fails")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
-                REQUIRE(socket.errorMessage().starts_with("Failed to connect to test.onlocalhost.com at"));
+                REQUIRE(socket.errorMessage().starts_with("Failed to connect to localhost-ips.test.kourier.io at"));
             }
         }
     }
 
-    GIVEN("a non-existent domain")
+    GIVEN("a domain without IPV4/IPV6 records")
     {
-        std::string_view nonExistentDomain("nonexistentdomain.thisdomaindoesnotexist");
+        std::string_view nonExistentDomain("no-ip.test.kourier.io");
 
-        WHEN("TcpSocket is connected to the non-existent domain")
+        WHEN("TcpSocket is connected to the domain without IPV4/IPV6 records")
         {
             TcpSocket socket;
             QSemaphore socketFailedSemaphore;
@@ -2999,18 +796,19 @@ SCENARIO("TcpSocket fails as expected")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
-                REQUIRE(socket.errorMessage() == "Failed to connect to nonexistentdomain.thisdomaindoesnotexist. Could not fetch any address for domain.");
+                REQUIRE(socket.errorMessage() == "Failed to connect to no-ip.test.kourier.io. Could not fetch any address for domain.");
             }
         }
     }
 
     GIVEN("a server running on IPV6 localhost")
     {
-        QTcpServer server;
+        TcpServer server;
         REQUIRE(server.listen(QHostAddress::LocalHostIPv6));
-        QObject::connect(&server, &QTcpServer::newConnection, [](){FAIL("This code is supposed to be unreachable.");});
+        size_t connectionCount = 0;
+        Object::connect(&server, &TcpServer::newConnection, [&](){++connectionCount;});
 
-        WHEN("a TcpSocket bounded to a IPV4 address is connected to the IPV6 server")
+        WHEN("a TcpSocket bounded to a IPV4 address is connected to the IPV6 server by host address")
         {
             TcpSocket socket;
             QSemaphore socketFailedSemaphore;
@@ -3023,6 +821,22 @@ SCENARIO("TcpSocket fails as expected")
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
                 REQUIRE(socket.errorMessage().starts_with("Failed to connect to [::1]:"));
+            }
+        }
+
+        WHEN("a TcpSocket bounded to a IPV4 address is connected to the IPV6 server by host name")
+        {
+            TcpSocket socket;
+            QSemaphore socketFailedSemaphore;
+            Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
+            socket.setBindAddressAndPort("127.2.2.5");
+            socket.connect("ipv6-localhost.test.kourier.io", server.serverPort());
+
+            THEN("connection fails")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
+                REQUIRE(socket.state() == TcpSocket::State::Unconnected);
+                REQUIRE(socket.errorMessage().starts_with("Failed to connect to ipv6-localhost.test.kourier.io at [::1]:"));
             }
         }
 
@@ -3041,16 +855,38 @@ SCENARIO("TcpSocket fails as expected")
                 REQUIRE(socket.errorMessage() == "Failed to bind socket to [::1]:443. POSIX error EACCES(13): Permission denied.");
             }
         }
+
+        WHEN("TcpSocket bound to an already used address/port pair is connected to server")
+        {
+            TcpSocket previouslyConnectedSocket;
+            QSemaphore previouslyConnectedSocketSemaphore;
+            Object::connect(&previouslyConnectedSocket, &TcpSocket::connected, [&](){previouslyConnectedSocketSemaphore.release();});
+            previouslyConnectedSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
+            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(previouslyConnectedSocketSemaphore, 10));
+            TcpSocket socket;
+            QSemaphore socketFailedSemaphore;
+            Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
+            socket.setBindAddressAndPort(previouslyConnectedSocket.localAddress(), previouslyConnectedSocket.localPort());
+            socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
+
+            THEN("connection fails")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
+                REQUIRE(socket.state() == TcpSocket::State::Unconnected);
+                REQUIRE(socket.errorMessage() == std::string("Failed to bind socket to [::1]:").append(std::to_string(previouslyConnectedSocket.localPort())).append(". POSIX error EADDRINUSE(98): Address already in use."));
+                REQUIRE(connectionCount == 1);
+            }
+        }
     }
 
     GIVEN("a server running on IPV4 localhost")
     {
-        QTcpServer server;
-        REQUIRE(server.listen(QHostAddress("127.18.28.38")));
+        TcpServer server;
+        REQUIRE(server.listen(QHostAddress("127.10.20.100")));
         size_t connectionCount = 0;
-        QObject::connect(&server, &QTcpServer::newConnection, [&](){while (server.nextPendingConnection() != nullptr) {++connectionCount;}});
+        Object::connect(&server, &TcpServer::newConnection, [&](){++connectionCount;});
 
-        WHEN("a TcpSocket bounded to a IPV6 address is connected to the IPV4 server")
+        WHEN("a TcpSocket bounded to a IPV6 address is connected to the IPV4 server by host address")
         {
             TcpSocket socket;
             QSemaphore socketFailedSemaphore;
@@ -3062,7 +898,24 @@ SCENARIO("TcpSocket fails as expected")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
-                REQUIRE(socket.errorMessage().starts_with("Failed to connect to 127.18.28.38:"));
+                REQUIRE(socket.errorMessage().starts_with("Failed to connect to 127.10.20.100:"));
+                REQUIRE(connectionCount == 0);
+            }
+        }
+
+        WHEN("a TcpSocket bounded to a IPV6 address is connected to the IPV4 server by host name")
+        {
+            TcpSocket socket;
+            QSemaphore socketFailedSemaphore;
+            Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
+            socket.setBindAddressAndPort("::1");
+            socket.connect("ipv4-localhost.test.kourier.io", server.serverPort());
+
+            THEN("connection fails")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
+                REQUIRE(socket.state() == TcpSocket::State::Unconnected);
+                REQUIRE(socket.errorMessage().starts_with("Failed to connect to ipv4-localhost.test.kourier.io at 127.10.20.100:"));
                 REQUIRE(connectionCount == 0);
             }
         }
@@ -3086,15 +939,15 @@ SCENARIO("TcpSocket fails as expected")
 
         WHEN("TcpSocket bound to an already used address/port pair is connected to server")
         {
-            QTcpSocket previouslyConnectedSocket;
+            TcpSocket previouslyConnectedSocket;
             QSemaphore previouslyConnectedSocketSemaphore;
-            QObject::connect(&previouslyConnectedSocket, &QTcpSocket::connected, [&](){previouslyConnectedSocketSemaphore.release();});
-            previouslyConnectedSocket.connectToHost(server.serverAddress(), server.serverPort());
+            Object::connect(&previouslyConnectedSocket, &TcpSocket::connected, [&](){previouslyConnectedSocketSemaphore.release();});
+            previouslyConnectedSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
             REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(previouslyConnectedSocketSemaphore, 10));
             TcpSocket socket;
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
-            socket.setBindAddressAndPort(previouslyConnectedSocket.localAddress().toString().toStdString(), previouslyConnectedSocket.localPort());
+            socket.setBindAddressAndPort(previouslyConnectedSocket.localAddress(), previouslyConnectedSocket.localPort());
             socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("connection fails")
@@ -3116,7 +969,7 @@ SCENARIO("TcpSocket fails as expected")
         {
             TcpSocket socket(fileDescriptor);
 
-            THEN("socket is created as unconnected")
+            THEN("socket is created in the unconnected state")
             {
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
             }
@@ -3131,7 +984,7 @@ SCENARIO("TcpSocket fails as expected")
         {
             TcpSocket socket(invalidDescriptor);
 
-            THEN("socket is created as unconnected")
+            THEN("socket is created in the unconnected state")
             {
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
             }
@@ -3147,14 +1000,14 @@ SCENARIO("TcpSocket fails as expected")
         {
             TcpSocket socket(socketDescriptor);
 
-            THEN("socket is created as unconnected")
+            THEN("socket is created in the unconnected state")
             {
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
             }
         }
     }
 
-    GIVEN("a server that does not accept new connections")
+    GIVEN("a server with a full listen backlog size that does not accept new connections")
     {
         QTcpServer server;
         static constexpr int backlogSize = 128;
@@ -3182,7 +1035,7 @@ SCENARIO("TcpSocket fails as expected")
         WHEN("a TcpSocket tries to connect to server")
         {
             TcpSocket socket;
-            socket.setConnectTimeout(std::chrono::milliseconds(10));
+            socket.setConnectTimeout(std::chrono::milliseconds(5));
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&]() {socketFailedSemaphore.release();});
             socket.connect("127.10.20.82", server.serverPort());
@@ -3199,6 +1052,8 @@ SCENARIO("TcpSocket fails as expected")
         }
     }
 }
+
+
 
 
 SCENARIO("TcpSocket allows connected slots to take any action")
@@ -3660,139 +1515,143 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             }
         }
 
-        WHEN("TcpSocket tries to connect to a non-existent server by name")
+        WHEN("TcpSocket tries to connect to a non-existent server by name and disconnects while handling the error signal")
         {
-            pSocket->connect("This.domain.name.does.not.exist.for.sure", 3008);
             QSemaphore socketHandledErrorSemaphore;
-
-            AND_WHEN("TcpSocket is disconnected while handling the error signal")
-            {
-                Object::connect(pSocket.get(), &TcpSocket::error, [&]()
+            Object::connect(pSocket.get(), &TcpSocket::error, [&]()
                 {
                     REQUIRE(!pSocket->errorMessage().empty());
                     pSocket->disconnectFromPeer();
                     socketHandledErrorSemaphore.release();
                 });
-
-                THEN("no exception is thrown")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                }
-            }
-
-            AND_WHEN("TcpSocket aborts connection while handling the error signal")
+            pSocket->connect("no-ip.test.kourier.io", 3008);
+            
+            THEN("no exception is thrown")
             {
-                Object::connect(pSocket.get(), &TcpSocket::error, [&]()
-                {
-                    REQUIRE(!pSocket->errorMessage().empty());
-                    pSocket->abort();
-                    socketHandledErrorSemaphore.release();
-                });
-
-                THEN("no exception is thrown")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                }
-            }
-
-            AND_WHEN("TcpSocket is destroyed while handling the error signal")
-            {
-                Object::connect(pSocket.get(), &TcpSocket::error, [&]()
-                {
-                    REQUIRE(!pSocket->errorMessage().empty());
-                    pSocket.release()->scheduleForDeletion();
-                    socketHandledErrorSemaphore.release();
-                });
-
-                THEN("no exception is thrown")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                }
-            }
-
-            AND_WHEN("TcpSocket is reconnected to the running server while handling the error signal")
-            {
-                Object::connect(pSocket.get(), &TcpSocket::error, [&]()
-                {
-                    REQUIRE(!pSocket->errorMessage().empty());
-                    REQUIRE(!socketConnectedSemaphore.tryAcquire());
-                    pSocket->connect(server.serverAddress().toString().toStdString(), server.serverPort());
-                    socketHandledErrorSemaphore.release();
-                });
-
-                THEN("TcpSocket reconnects after aborting")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
-                }
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
             }
         }
 
-        WHEN("TcpSocket tries to connect to test.onlocalhost.com without any server running")
+        WHEN("TcpSocket tries to connect to a non-existent server by name and  aborts connection while handling the error signal")
         {
-            pSocket->connect("test.onlocalhost.com", 3008);
             QSemaphore socketHandledErrorSemaphore;
-
-            AND_WHEN("TcpSocket is disconnected while handling the error signal")
+            Object::connect(pSocket.get(), &TcpSocket::error, [&]()
             {
-                Object::connect(pSocket.get(), &TcpSocket::error, [&]()
+                REQUIRE(!pSocket->errorMessage().empty());
+                pSocket->abort();
+                socketHandledErrorSemaphore.release();
+            });
+            pSocket->connect("This.domain.name.does.not.exist.for.sure", 3008);
+
+            THEN("no exception is thrown")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
+            }
+        }
+
+        WHEN("TcpSocket is destroyed while handling the error signal")
+        {
+            QSemaphore socketHandledErrorSemaphore;
+            Object::connect(pSocket.get(), &TcpSocket::error, [&]()
+            {
+                REQUIRE(!pSocket->errorMessage().empty());
+                pSocket.release()->scheduleForDeletion();
+                socketHandledErrorSemaphore.release();
+            });
+            pSocket->connect("This.domain.name.does.not.exist.for.sure", 3008);
+
+            THEN("no exception is thrown")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
+            }
+        }
+
+        WHEN("TcpSocket is reconnected to the running server while handling the error signal")
+        {
+            QSemaphore socketHandledErrorSemaphore;
+            Object::connect(pSocket.get(), &TcpSocket::error, [&]()
+            {
+                REQUIRE(!pSocket->errorMessage().empty());
+                REQUIRE(!socketConnectedSemaphore.tryAcquire());
+                pSocket->connect(server.serverAddress().toString().toStdString(), server.serverPort());
+                socketHandledErrorSemaphore.release();
+            });
+            pSocket->connect("This.domain.name.does.not.exist.for.sure", 3008);
+
+            THEN("TcpSocket reconnects after aborting")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
+            }
+        }
+
+        WHEN("TcpSocket tries to connect to localhost-ips.test.kourier.io without any server running and disconnects while handling the error signal")
+        {
+            QSemaphore socketHandledErrorSemaphore;
+            Object::connect(pSocket.get(), &TcpSocket::error, [&]()
                 {
                     REQUIRE(!pSocket->errorMessage().empty());
                     pSocket->disconnectFromPeer();
                     socketHandledErrorSemaphore.release();
                 });
+            pSocket->connect("localhost-ips.test.kourier.io", 3008);
 
-                THEN("no exception is thrown")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                }
-            }
-
-            AND_WHEN("TcpSocket aborts connection while handling the error signal")
+            THEN("no exception is thrown")
             {
-                Object::connect(pSocket.get(), &TcpSocket::error, [&]()
-                {
-                    REQUIRE(!pSocket->errorMessage().empty());
-                    pSocket->abort();
-                    socketHandledErrorSemaphore.release();
-                });
-
-                THEN("no exception is thrown")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                }
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
             }
+        }
 
-            AND_WHEN("TcpSocket is destroyed while handling the error signal")
+        WHEN("TcpSocket tries to connect to localhost-ips.test.kourier.io without any server running and aborts connection while handling the error signal")
+        {
+            QSemaphore socketHandledErrorSemaphore;
+            Object::connect(pSocket.get(), &TcpSocket::error, [&]()
             {
-                Object::connect(pSocket.get(), &TcpSocket::error, [&]()
-                {
-                    REQUIRE(!pSocket->errorMessage().empty());
-                    pSocket.release()->scheduleForDeletion();
-                    socketHandledErrorSemaphore.release();
-                });
+                REQUIRE(!pSocket->errorMessage().empty());
+                pSocket->abort();
+                socketHandledErrorSemaphore.release();
+            });
+            pSocket->connect("localhost-ips.test.kourier.io", 3008);
 
-                THEN("no exception is thrown")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                }
+            THEN("no exception is thrown")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
             }
+        }
 
-            AND_WHEN("TcpSocket is reconnected to the running server while handling the error signal")
+        WHEN("TcpSocket tries to connect to localhost-ips.test.kourier.io without any server running and is destroyed while handling the error signal")
+        {
+            QSemaphore socketHandledErrorSemaphore;
+            Object::connect(pSocket.get(), &TcpSocket::error, [&]()
             {
-                Object::connect(pSocket.get(), &TcpSocket::error, [&]()
-                {
-                    REQUIRE(!pSocket->errorMessage().empty());
-                    REQUIRE(!socketConnectedSemaphore.tryAcquire());
-                    pSocket->connect(server.serverAddress().toString().toStdString(), server.serverPort());
-                    socketHandledErrorSemaphore.release();
-                });
+                REQUIRE(!pSocket->errorMessage().empty());
+                pSocket.release()->scheduleForDeletion();
+                socketHandledErrorSemaphore.release();
+            });
+            pSocket->connect("localhost-ips.test.kourier.io", 3008);
 
-                THEN("TcpSocket reconnects after aborting")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
-                }
+            THEN("no exception is thrown")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
+            }
+        }
+
+        WHEN("TcpSocket tries to connect to localhost-ips.test.kourier.io without any server running and is reconnected to the running server while handling the error signal")
+        {
+            QSemaphore socketHandledErrorSemaphore;
+            Object::connect(pSocket.get(), &TcpSocket::error, [&]()
+            {
+                REQUIRE(!pSocket->errorMessage().empty());
+                REQUIRE(!socketConnectedSemaphore.tryAcquire());
+                pSocket->connect(server.serverAddress().toString().toStdString(), server.serverPort());
+                socketHandledErrorSemaphore.release();
+            });
+            pSocket->connect("localhost-ips.test.kourier.io", 3008);
+
+            THEN("TcpSocket reconnects after aborting")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
             }
         }
     }

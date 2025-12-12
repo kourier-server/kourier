@@ -1,5 +1,7 @@
 import lldb
 
+# Add std::string_view QByteArrayView QStringView QLatin1Char QLatin1String QLatin1StringView QUtf8StringView
+# QTime QDate QDateTime QJsonValue QJsonObject QJsonDocument
 
 class QByteArrayProvider:
     def __init__(self, valueObject, internal_dict):
