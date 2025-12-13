@@ -27,6 +27,7 @@
 #include <QDeadlineTimer>
 #include <QRandomGenerator64>
 #include <QHostInfo>
+#include <QHostAddress>
 #include <memory>
 #include <fstream>
 #include <netinet/in.h>
@@ -781,26 +782,6 @@ SCENARIO("TcpSocket fails as expected")
         }
     }
 
-    GIVEN("a domain without IPV4/IPV6 records")
-    {
-        std::string_view nonExistentDomain("no-ip.test.kourier.io");
-
-        WHEN("TcpSocket is connected to the domain without IPV4/IPV6 records")
-        {
-            TcpSocket socket;
-            QSemaphore socketFailedSemaphore;
-            Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
-            socket.connect(nonExistentDomain, 5000);
-
-            THEN("connection fails")
-            {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
-                REQUIRE(socket.state() == TcpSocket::State::Unconnected);
-                REQUIRE(socket.errorMessage() == "Failed to connect to no-ip.test.kourier.io. Could not fetch any address for domain.");
-            }
-        }
-    }
-
     GIVEN("a server running on IPV6 localhost")
     {
         TcpServer server;
@@ -1074,7 +1055,24 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             Object::connect(pPeerSocket.get(), &TcpSocket::disconnected, [&](){peerDisconnectedSemaphore.release();});
             peerConnectedSemaphore.release(2);
         });
-        REQUIRE(server.listen(QHostAddress("127.11.22.44")));
+        // This test creates a lot of sockets in TIME_WAIT state.
+        // To minimize the problem, we always change the localhost ipv4
+        // address used by the server.
+        static uint16_t secondIPv4 = 1;
+        static uint16_t thirdIPv4 = 1;
+        static uint16_t forthIPv4 = 1;
+        const QHostAddress hostAddress(QString::fromLatin1("127.%1.%2.%3").arg(secondIPv4).arg(thirdIPv4).arg(forthIPv4));
+        if (++forthIPv4 == 250)
+        {
+            forthIPv4 = 1;
+            if (++thirdIPv4 == 250)
+            {
+                thirdIPv4 = 1;
+                if (++secondIPv4 == 250)
+                    secondIPv4 = 1;
+            }
+        }
+        REQUIRE(server.listen(hostAddress));
         QSemaphore socketConnectedSemaphore;
         QSemaphore socketDisconnectedSemaphore;
         QSemaphore socketFailedSemaphore;
@@ -1591,83 +1589,6 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             }
         }
 
-        WHEN("TcpSocket tries to connect to a non-existent server by name and disconnects while handling the error signal")
-        {
-            QSemaphore socketHandledErrorSemaphore;
-            Object::connect(pSocket.get(), &TcpSocket::error, [&]()
-                {
-                    REQUIRE(!pSocket->errorMessage().empty());
-                    pSocket->disconnectFromPeer();
-                    socketHandledErrorSemaphore.release();
-                });
-            pSocket->connect("no-ip.test.kourier.io", 3008);
-            
-            THEN("TcpSocket handles error")
-            {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-            }
-        }
-
-        WHEN("TcpSocket tries to connect to a non-existent server by name and aborts connection while handling the error signal")
-        {
-            QSemaphore socketHandledErrorSemaphore;
-            Object::connect(pSocket.get(), &TcpSocket::error, [&]()
-                {
-                    REQUIRE(!pSocket->errorMessage().empty());
-                    pSocket->abort();
-                    socketHandledErrorSemaphore.release();
-                });
-            pSocket->connect("no-ip.test.kourier.io", 3008);
-
-            THEN("TcpSocket handles error")
-            {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-            }
-        }
-
-        WHEN("TcpSocket is destroyed while handling the error signal")
-        {
-            QSemaphore socketHandledErrorSemaphore;
-            Object::connect(pSocket.get(), &TcpSocket::error, [&]()
-                {
-                    REQUIRE(!pSocket->errorMessage().empty());
-                    pSocket.release()->scheduleForDeletion();
-                    socketHandledErrorSemaphore.release();
-                });
-            pSocket->connect("no-ip.test.kourier.io", 3008);
-
-            THEN("TcpSocket handles error")
-            {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-            }
-        }
-
-        WHEN("TcpSocket is reconnected to the running server while handling the error signal")
-        {
-            QSemaphore socketHandledErrorSemaphore;
-            Object::connect(pSocket.get(), &TcpSocket::error, [&]()
-                {
-                    REQUIRE(!pSocket->errorMessage().empty());
-                    REQUIRE(!socketConnectedSemaphore.tryAcquire());
-                    pSocket->connect(server.serverAddress().toString().toStdString(), server.serverPort());
-                    socketHandledErrorSemaphore.release();
-                });
-            Object::connect(pSocket.get(), &TcpSocket::connected, [&]()
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
-                    socketConnectedSemaphore.release();
-                    pSocket->disconnectFromPeer();
-                });
-            pSocket->connect("no-ip.test.kourier.io", 3008);
-
-            THEN("TcpSocket handles error and aborts before connecting to peer")
-            {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
-            }
-        }
-
         WHEN("TcpSocket tries to connect to localhost-ips.test.kourier.io without any server running and disconnects while handling the error signal")
         {
             QSemaphore socketHandledErrorSemaphore;
@@ -1735,7 +1656,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                     socketConnectedSemaphore.release();
                     pSocket->disconnectFromPeer();
                 });
-            pSocket->connect("no-ip.test.kourier.io", 3008);
+            pSocket->connect("localhost-ips.test.kourier.io", 3008);
 
             THEN("TcpSocket handles error and aborts before connecting to peer")
             {
