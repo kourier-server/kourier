@@ -1035,8 +1035,6 @@ SCENARIO("TcpSocket fails as expected")
 }
 
 
-
-
 SCENARIO("TcpSocket allows connected slots to take any action")
 {
     GIVEN("a TcpSocket and a running server")
@@ -1055,7 +1053,9 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             Object::connect(pPeerSocket.get(), &TcpSocket::disconnected, [&](){peerDisconnectedSemaphore.release();});
             peerConnectedSemaphore.release(2);
         });
-        // This test creates a lot of sockets in TIME_WAIT state.
+        // This test creates a lot of sockets in TIME_WAIT state if run
+        // repeatedly (by using the -r command line option), as it 
+        // intentionally interrupt the connection abruptly.
         // To minimize the problem, we always change the localhost ipv4
         // address used by the server.
         static uint16_t secondIPv4 = 1;
@@ -1669,247 +1669,41 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 }
 
 
-
-
-
-
 SCENARIO("TcpSockets can be reused")
 {
-    GIVEN("a QTcpServer listening for connections")
-    {
-        QTcpServer server;
-        QSemaphore peerConnectedSemaphore;
-        QSemaphore peerFailedSemaphore;
-        QSemaphore peerDisconnectedSemaphore;
-        QSemaphore peerReceivedDataFromTcpSocketSemaphore;
-        QObject::connect(&server, &QTcpServer::newConnection, &server, [&]()
-        {
-            REQUIRE(server.hasPendingConnections());
-            auto *pPeerSocket = server.nextPendingConnection();
-            REQUIRE(pPeerSocket != nullptr);
-            REQUIRE(!server.hasPendingConnections());
-            QObject::connect(pPeerSocket, &QTcpSocket::errorOccurred, [&](QAbstractSocket::SocketError error) {peerFailedSemaphore.release();});
-            QObject::connect(pPeerSocket, &QTcpSocket::disconnected, [&](){peerDisconnectedSemaphore.release();});
-            QObject::connect(pPeerSocket, &QTcpSocket::readyRead, [pPeerSocket, &peerReceivedDataFromTcpSocketSemaphore]()
-            {
-                if (pPeerSocket->bytesAvailable() != 6)
-                    return;
-                const auto receivedData = pPeerSocket->readAll();
-                if (receivedData == "PING\r\n")
-                    pPeerSocket->write("PONG\r\n");
-                else if (receivedData == "QUIT\r\n")
-                    pPeerSocket->disconnectFromHost();
-                else
-                {
-                    FAIL("This code is supposed to be unreachable");
-                }
-                peerReceivedDataFromTcpSocketSemaphore.release();
-            });
-            peerConnectedSemaphore.release();
-        });
-        REQUIRE(server.listen(QHostAddress::LocalHost));
-        const auto serverPort = server.serverPort();
-        REQUIRE(serverPort >= 1024);
-
-        WHEN("TcpSocket connects to server and play ping pong game three times")
-        {
-            static constexpr int repCount = 3;
-            static constexpr int pingCount = 31;
-            QSemaphore socketConnectedSemaphore;
-            QSemaphore socketFailedSemaphore;
-            QSemaphore socketDisconnectedSemaphore;
-            QSemaphore socketReceivedDataFromPeerSemaphore;
-            int currentPingCount = 0;
-            std::unique_ptr<TcpSocket> pSocket(new TcpSocket);
-            Object::connect(pSocket.get(), &TcpSocket::error, [&]() {socketFailedSemaphore.release();});
-            Object::connect(pSocket.get(), &TcpSocket::connected, [&]()
-            {
-                ++currentPingCount;
-                pSocket->write("PING\r\n");
-                socketConnectedSemaphore.release();
-            });
-            Object::connect(pSocket.get(), &TcpSocket::disconnected, [&]()
-            {
-                currentPingCount = 0;
-                socketDisconnectedSemaphore.release();
-            });
-            Object::connect(pSocket.get(), &TcpSocket::receivedData, [&]()
-            {
-                std::string_view expectedData("PONG\r\n");
-                if (pSocket->dataAvailable() != expectedData.size())
-                    return;
-                REQUIRE(pSocket->readAll() == expectedData);
-                if (++currentPingCount <= pingCount)
-                    pSocket->write("PING\r\n");
-                else
-                    pSocket->write("QUIT\r\n");
-                socketReceivedDataFromPeerSemaphore.release();
-            });
-            for (auto i = 0; i < repCount; ++i)
-            {
-                pSocket->connect(server.serverAddress().toString().toStdString(), serverPort);
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-            }
-
-            THEN("sockets exchange messages as expected")
-            {
-                const int tcpSocketReceivedDataSemaphoreReleaseCount = repCount * pingCount;
-                REQUIRE(socketReceivedDataFromPeerSemaphore.tryAcquire(tcpSocketReceivedDataSemaphoreReleaseCount));
-                REQUIRE(!socketReceivedDataFromPeerSemaphore.tryAcquire(1));
-            }
-        }
-    }
-
-    GIVEN("a TcpServer listening for connections")
+    GIVEN("A running server whose sockets close the connections just after they get established")
     {
         TcpServer server;
         QSemaphore peerConnectedSemaphore;
         QSemaphore peerDisconnectedSemaphore;
-        QSemaphore peerReceivedDataFromTcpSocketSemaphore;
         std::unique_ptr<TcpSocket> pPeerSocket;
-        Object::connect(&server, &TcpServer::newConnection, [&](TcpSocket *pNewSocket)
-        {
-            pPeerSocket.reset(pNewSocket);
-            Object::connect(pPeerSocket.get(), &TcpSocket::receivedData, [&]()
+        Object::connect(&server, &TcpServer::newConnection, [&](TcpSocket *pSocket)
             {
-                if (pPeerSocket->dataAvailable() != 6)
-                    return;
-                const auto receivedData = pPeerSocket->readAll();
-                if (receivedData == "PING\r\n")
-                    pPeerSocket->write("PONG\r\n");
-                else if (receivedData == "QUIT\r\n")
-                    pPeerSocket->disconnectFromPeer();
-                else
-                {
-                    FAIL("This code is supposed to be unreachable");
-                }
-                peerReceivedDataFromTcpSocketSemaphore.release();
+                REQUIRE(!pPeerSocket);
+                pPeerSocket.reset(pSocket);
+                Object::connect(pPeerSocket.get(), &TcpSocket::disconnected, [&](){pPeerSocket.release()->scheduleForDeletion(); peerDisconnectedSemaphore.release();});
+                pPeerSocket->disconnectFromPeer();
+                peerConnectedSemaphore.release();
             });
-            Object::connect(pPeerSocket.get(), &TcpSocket::disconnected, [&](){peerDisconnectedSemaphore.release();});
-            Object::connect(pPeerSocket.get(), &TcpSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
-            peerConnectedSemaphore.release();
-        });
-        REQUIRE(server.listen(QHostAddress("127.0.0.1"), 0));
-        const auto serverPort = server.serverPort();
-        REQUIRE(serverPort >= 1024);
+        REQUIRE(server.listen(QHostAddress::LocalHost));
 
-        WHEN("TcpSocket connects to server and play ping pong game three times")
+        WHEN("the same socket connects with server three times")
         {
-            static constexpr int repCount = 3;
-            static constexpr int pingCount = 31;
-            QSemaphore socketConnectedSemaphore;
-            QSemaphore socketDisconnectedSemaphore;
-            QSemaphore socketReceivedDataFromPeerSemaphore;
-            int currentPingCount = 0;
-            std::unique_ptr<TcpSocket> pSocket(new TcpSocket);
-            Object::connect(pSocket.get(), &TcpSocket::error, [&]() {FAIL("This code is supposed to be unreachable.");});
-            Object::connect(pSocket.get(), &TcpSocket::connected, [&]()
-            {
-                ++currentPingCount;
-                pSocket->write("PING\r\n");
-                socketConnectedSemaphore.release();
-            });
-            Object::connect(pSocket.get(), &TcpSocket::disconnected, [&]()
-            {
-                currentPingCount = 0;
-                socketDisconnectedSemaphore.release();
-            });
-            Object::connect(pSocket.get(), &TcpSocket::receivedData, [&]()
-            {
-                std::string_view expectedData("PONG\r\n");
-                if (pSocket->dataAvailable() != expectedData.size())
-                    return;
-                REQUIRE(pSocket->readAll() == expectedData);
-                if (++currentPingCount <= pingCount)
-                    pSocket->write("PING\r\n");
-                else
-                    pSocket->write("QUIT\r\n");
-                socketReceivedDataFromPeerSemaphore.release();
-            });
-            for (auto i = 0; i < repCount; ++i)
-            {
-                pSocket->connect(server.serverAddress().toString().toStdString(), serverPort);
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-            }
-
-            THEN("sockets exchange messages as expected")
-            {
-                const int tcpSocketReceivedDataSemaphoreReleaseCount = repCount * pingCount;
-                REQUIRE(socketReceivedDataFromPeerSemaphore.tryAcquire(tcpSocketReceivedDataSemaphoreReleaseCount));
-                REQUIRE(!socketReceivedDataFromPeerSemaphore.tryAcquire(1));
-            }
-        }
-
-        WHEN("TcpSocket connects and then disconnects from server")
-        {
-            QSemaphore socketConnectedSemaphore;
-            QSemaphore socketDisconnectedSemaphore;
-            QSemaphore socketReceivedDataFromPeerSemaphore;
             TcpSocket socket;
-            Object::connect(&socket, &TcpSocket::error, [&]() {FAIL("This code is supposed to be unreachable.");});
-            Object::connect(&socket, &TcpSocket::connected, [&](){socketConnectedSemaphore.release(); socket.disconnectFromPeer();});
+            QSemaphore socketConnectedSemaphore;
+            QSemaphore socketDisconnectedSemaphore;
+            Object::connect(&socket, &TcpSocket::connected, [&](){socketConnectedSemaphore.release();});
             Object::connect(&socket, &TcpSocket::disconnected, [&](){socketDisconnectedSemaphore.release();});
-            socket.connect(server.serverAddress().toString().toStdString(), serverPort);
 
-            THEN("socket connects and then disconnects")
+            THEN("socket connects and then disconnects from server as many times as socket was connected to server")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-
-                AND_WHEN("we use server TcpSocket as client to connect to server and play ping pong game three times")
+                for (auto i = 0; i < 3; ++i)
                 {
-                    static constexpr int repCount = 3;
-                    static constexpr int pingCount = 31;
-                    int currentPingCount = 0;
-                    std::unique_ptr<TcpSocket> pSocket(pPeerSocket.release());
-                    REQUIRE(pSocket.get() != nullptr);
-                    Object::connect(pSocket.get(), &TcpSocket::error, [&]() {FAIL("This code is supposed to be unreachable.");});
-                    Object::connect(pSocket.get(), &TcpSocket::connected, [&]()
-                    {
-                        ++currentPingCount;
-                        pSocket->write("PING\r\n");
-                        socketConnectedSemaphore.release();
-                    });
-                    Object::connect(pSocket.get(), &TcpSocket::disconnected, [&]()
-                    {
-                        currentPingCount = 0;
-                        socketDisconnectedSemaphore.release();
-                    });
-                    Object::connect(pSocket.get(), &TcpSocket::receivedData, [&]()
-                    {
-                        std::string_view expectedData("PONG\r\n");
-                        if (pSocket->dataAvailable() != expectedData.size())
-                            return;
-                        REQUIRE(pSocket->readAll() == expectedData);
-                        if (++currentPingCount <= pingCount)
-                            pSocket->write("PING\r\n");
-                        else
-                            pSocket->write("QUIT\r\n");
-                        socketReceivedDataFromPeerSemaphore.release();
-                    });
-                    for (auto i = 0; i < repCount; ++i)
-                    {
-                        pSocket->connect(server.serverAddress().toString().toStdString(), serverPort);
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                    }
-
-                    THEN("sockets exchange messages as expected")
-                    {
-                        const int tcpSocketReceivedDataSemaphoreReleaseCount = repCount * pingCount;
-                        REQUIRE(socketReceivedDataFromPeerSemaphore.tryAcquire(tcpSocketReceivedDataSemaphoreReleaseCount));
-                        REQUIRE(!socketReceivedDataFromPeerSemaphore.tryAcquire(1));
-                    }
+                    socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
                 }
             }
         }
