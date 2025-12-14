@@ -28,6 +28,7 @@
 #include <QRandomGenerator64>
 #include <QHostInfo>
 #include <QHostAddress>
+#include <chrono>
 #include <memory>
 #include <fstream>
 #include <netinet/in.h>
@@ -771,6 +772,7 @@ SCENARIO("TcpSocket fails as expected")
             TcpSocket socket;
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
+            socket.setConnectTimeout(std::chrono::milliseconds(5));
             socket.connect("localhost-ips.test.kourier.io", 5000);
 
             THEN("connection fails")
@@ -795,6 +797,7 @@ SCENARIO("TcpSocket fails as expected")
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
             socket.setBindAddressAndPort("127.2.2.5");
+            socket.setConnectTimeout(std::chrono::milliseconds(5));
             socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("connection fails")
@@ -811,6 +814,7 @@ SCENARIO("TcpSocket fails as expected")
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
             socket.setBindAddressAndPort("127.2.2.5");
+            socket.setConnectTimeout(std::chrono::milliseconds(5));
             socket.connect("ipv6-localhost.test.kourier.io", server.serverPort());
 
             THEN("connection fails")
@@ -827,6 +831,7 @@ SCENARIO("TcpSocket fails as expected")
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
             socket.setBindAddressAndPort("::1", 443);
+            socket.setConnectTimeout(std::chrono::milliseconds(5));
             socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("connection fails")
@@ -848,6 +853,7 @@ SCENARIO("TcpSocket fails as expected")
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
             socket.setBindAddressAndPort(previouslyConnectedSocket.localAddress(), previouslyConnectedSocket.localPort());
+            socket.setConnectTimeout(std::chrono::milliseconds(5));
             socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("connection fails")
@@ -873,6 +879,7 @@ SCENARIO("TcpSocket fails as expected")
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
             socket.setBindAddressAndPort("::1");
+            socket.setConnectTimeout(std::chrono::milliseconds(5));
             socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("connection fails")
@@ -890,6 +897,7 @@ SCENARIO("TcpSocket fails as expected")
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
             socket.setBindAddressAndPort("::1");
+            socket.setConnectTimeout(std::chrono::milliseconds(5));
             socket.connect("ipv4-localhost.test.kourier.io", server.serverPort());
 
             THEN("connection fails")
@@ -907,6 +915,7 @@ SCENARIO("TcpSocket fails as expected")
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
             socket.setBindAddressAndPort("127.0.0.1", 443);
+            socket.setConnectTimeout(std::chrono::milliseconds(5));
             socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("connection fails")
@@ -929,6 +938,7 @@ SCENARIO("TcpSocket fails as expected")
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
             socket.setBindAddressAndPort(previouslyConnectedSocket.localAddress(), previouslyConnectedSocket.localPort());
+            socket.setConnectTimeout(std::chrono::milliseconds(5));
             socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("connection fails")
@@ -1140,7 +1150,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
         WHEN("TcpSocket connects to server and connects again while handling the connected signal")
         {
             Object *pCtxObject = new Object;
-            Object::connect(pSocket.get(), &TcpSocket::connected, pCtxObject, [&]()
+            Object::connect(pSocket.get(), &TcpSocket::connected, pCtxObject, [&, ptrCtxObject = pCtxObject]()
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
                 socketConnectedSemaphore.release();
@@ -1152,7 +1162,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                         socketConnectedSemaphore.release();
                     });
                 pSocket->connect(server.serverAddress().toString().toStdString(), server.serverPort());
-                delete pCtxObject;
+                delete ptrCtxObject;
             });
             pSocket->connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
@@ -1187,6 +1197,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             THEN("TcpSocket and peer connect, TcpSocket aborts and peer disconnects and then TcpSocket fails to connect to the non-existent server")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
                 REQUIRE(pSocket->errorMessage().starts_with("Failed to connect to 127.1.2.3:"));
@@ -1223,7 +1234,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                     Object::connect(pSocket.get(), &TcpSocket::receivedData, [&](){pSocket->abort();});
                     pPeerSocket->write("abcdefgh");
 
-                    THEN("TcpSocket aborts and peer disconnect")
+                    THEN("TcpSocket aborts and peer disconnects")
                     {
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
                         REQUIRE(pSocket->state() == TcpSocket::State::Unconnected);
@@ -1252,10 +1263,14 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                     pPeerSocket->write("abcdefgh");
                     pPeerSocket.release();
 
-                    THEN("TcpSocket aborts and then reconnects")
+                    THEN("TcpSocket aborts and peer disconnects and then TcpSocket reconnects to another peer")
                     {
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
+                        pSocket->disconnectFromPeer();
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
                     }
                 }
 
@@ -1309,7 +1324,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                     QByteArray dataToSend(3 * socketSendBufferSize, ' ');
                     pSocket->write(dataToSend.data(), dataToSend.size());
 
-                    THEN("peer disconnect")
+                    THEN("peer disconnects")
                     {
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
                         REQUIRE(pSocket->state() == TcpSocket::State::Unconnected);
@@ -1337,10 +1352,13 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
                 AND_WHEN("TcpSocket sends more data than the socket's send buffer can store and TcpSocket is destroyed while handling the sentData signal with data still to be written")
                 {
-                    Object::connect(pSocket.get(), &TcpSocket::sentData, [&]()
+                    Object::connect(pSocket.get(), &TcpSocket::sentData, [&, ptrSocket = pSocket.get()]()
                     {
-                        if (pSocket->dataToWrite())
-                            pSocket.release()->scheduleForDeletion();
+                        if (ptrSocket->dataToWrite())
+                        {
+                            ptrSocket->scheduleForDeletion();
+                            pSocket.release();
+                        }
                     });
                     const auto socketSendBufferSize = pSocket->getSocketOption(TcpSocket::SocketOption::SendBufferSize);
                     REQUIRE(socketSendBufferSize > 1);
@@ -1373,7 +1391,8 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
                 AND_WHEN("TcpSocket sends more data than the socket's send buffer can store and TcpSocket is reconnected while handling the sentData signal with data still to be written")
                 {
-                    Object::connect(pPeerSocket.get(), &TcpSocket::disconnected, [pPeer = pPeerSocket.release()](){pPeer->scheduleForDeletion();});
+                    auto *pPeer = pPeerSocket.release();
+                    Object::connect(pPeer, &TcpSocket::disconnected, [=](){pPeer->scheduleForDeletion();});
 
                     Object::connect(pSocket.get(), &TcpSocket::sentData, [&]()
                     {
@@ -1390,12 +1409,16 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
+                        pSocket->disconnectFromPeer();
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
                     }
                 }
 
                 AND_WHEN("TcpSocket sends more data than the socket's send buffer can store and TcpSocket is reconnected while handling the sentData signal with no more data still to be written")
                 {
-                    Object::connect(pPeerSocket.get(), &TcpSocket::disconnected, [pPeer = pPeerSocket.release()](){pPeer->scheduleForDeletion();});
+                    auto *pPeer = pPeerSocket.release();
+                    Object::connect(pPeer, &TcpSocket::disconnected, [=](){pPeer->scheduleForDeletion();});
 
                     Object::connect(pSocket.get(), &TcpSocket::sentData, [&]()
                     {
@@ -1412,6 +1435,9 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
+                        pSocket->disconnectFromPeer();
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
                     }
                 }
             }
@@ -1473,10 +1499,12 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             AND_WHEN("connected peer disconnects and TcpSocket is reconnected while handling the disconnected signal")
             {
                 QSemaphore socketDisconnectedFromPeerSemaphore;
-                Object::connect(pSocket.get(), &TcpSocket::disconnected, [&]()
+                auto *pCtxObject = new Object;
+                Object::connect(pSocket.get(), &TcpSocket::disconnected, pCtxObject, [&, ptrCtxObject = pCtxObject]()
                 {
                     socketDisconnectedFromPeerSemaphore.release();
                     pSocket->connect(server.serverAddress().toString().toStdString(), server.serverPort());
+                    delete ptrCtxObject;
                 });
                 pPeerSocket->disconnectFromPeer();
                 pPeerSocket.release()->scheduleForDeletion();
@@ -1487,6 +1515,9 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                     REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedFromPeerSemaphore, 10));
                     REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
                     REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
+                    pSocket->disconnectFromPeer();
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
                 }
             }
         }
@@ -1564,7 +1595,6 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                 {
                     REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
                     socketConnectedSemaphore.release();
-                    pSocket->disconnectFromPeer();
                 });
             Object::connect(pSocket.get(), &TcpSocket::error, [&]()
                 {
@@ -1586,6 +1616,9 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
                 REQUIRE(pSocket->errorMessage().empty());
+                pSocket->disconnectFromPeer();
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
             }
         }
 
@@ -1654,7 +1687,6 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                 {
                     REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
                     socketConnectedSemaphore.release();
-                    pSocket->disconnectFromPeer();
                 });
             pSocket->connect("localhost-ips.test.kourier.io", 3008);
 
@@ -1663,6 +1695,9 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
+                pSocket->disconnectFromPeer();
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
             }
         }
     }
