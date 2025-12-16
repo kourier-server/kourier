@@ -38,6 +38,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         HttpServerWorkerFactory.h)
     find_package(Qt6 COMPONENTS Core Concurrent Network REQUIRED)
     target_link_libraries(KourierHttpServer PRIVATE
+        KourierServer
         Qt::Core
         Qt::Concurrent
         Qt::Network)
