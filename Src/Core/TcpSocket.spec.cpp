@@ -18,6 +18,7 @@
 #include "TcpSocket.h"
 #include "AsyncQObject.h"
 #include <Tests/Resources/TcpServer.h>
+#include <Tests/Resources/TestHostNamesFetcher.h>
 #include <QTcpSocket>
 #include <QTcpServer>
 #include <QSemaphore>
@@ -40,6 +41,7 @@ using Kourier::TcpServer;
 using Kourier::TcpSocket;
 using Kourier::Object;
 using Kourier::AsyncQObject;
+using Kourier::TestHostNamesFetcher;
 using Spectator::SemaphoreAwaiter;
 
 
@@ -167,7 +169,7 @@ SCENARIO("TcpSocket connects to server by host name")
 {
     GIVEN("a running server")
     {
-        std::string_view hostName("localhost-ips.test.kourier.io");
+        auto [hostName, hostAddresses] = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses();
         TcpServer server;
         const auto serverAddress = GENERATE(AS(QHostAddress),
                                                QHostAddress("127.10.20.50"),
@@ -176,6 +178,7 @@ SCENARIO("TcpSocket connects to server by host name")
                                                QHostAddress("127.10.20.80"),
                                                QHostAddress("127.10.20.90"),
                                                QHostAddress("::1"));
+        REQUIRE(hostAddresses.contains(serverAddress));
         REQUIRE(server.listen(serverAddress));
         std::unique_ptr<TcpSocket> serverPeer;
         QSemaphore serverPeerConnectedSemaphore;
@@ -252,7 +255,10 @@ SCENARIO("TcpSocket allows binding to an address/port prior to connecting to ser
 {
     GIVEN("a running server")
     {
-        const auto serverAddress = GENERATE(AS(QHostAddress), QHostAddress("127.10.20.50"), QHostAddress("::1"));
+        const auto testIpv4 = GENERATE(AS(bool), true, false);
+        auto [hostName, hostAddresses] = testIpv4 ? TestHostNamesFetcher::hostNameWithIpv4Address() : TestHostNamesFetcher::hostNameWithIpv6Address();
+        REQUIRE(hostAddresses.size() == 1);
+        const auto serverAddress = hostAddresses[0];
         TcpServer server;
         REQUIRE(server.listen(serverAddress));
         std::unique_ptr<TcpSocket> serverPeer;
@@ -287,7 +293,7 @@ SCENARIO("TcpSocket allows binding to an address/port prior to connecting to ser
             const auto bindWithExplicitPort = GENERATE(AS(bool), true, false);
             const static QHostAddress bindIpv4Address("127.4.8.12");
             const static QHostAddress bindIpv6Address("::1");
-            const auto bindAddress = (serverAddress.protocol() == QHostAddress::IPv6Protocol) ? bindIpv6Address : bindIpv4Address;
+            const auto bindAddress = testIpv4 ? bindIpv4Address : bindIpv6Address;
             constexpr static auto fetchAvailablePort = [](QHostAddress address) -> uint16_t
             {
                 QTcpSocket socket;
@@ -317,7 +323,7 @@ SCENARIO("TcpSocket allows binding to an address/port prior to connecting to ser
                 });
             const auto connectByName = GENERATE(AS(bool), true, false);
             if (connectByName)
-                clientPeer.connect("localhost-ips.test.kourier.io", server.serverPort());
+                clientPeer.connect(hostName, server.serverPort());
             else
                 clientPeer.connect(serverAddress.toString().toStdString(), server.serverPort());
 
@@ -389,15 +395,15 @@ SCENARIO("TcpSocket allows OS-level socket options to be set")
         Object::connect(pClientPeer.get(), &TcpSocket::connected, [&]{clientPeerConnectedSemaphore.release();});
         Object::connect(pClientPeer.get(), &TcpSocket::disconnected, [&]{clientPeerDisconnectedSemaphore.release();});
         Object::connect(pClientPeer.get(), &TcpSocket::receivedData, [&]()
+            {
+                receivedClientPeerData.append(pClientPeer->readAll());
+                if (receivedClientPeerData == "PONG")
+                    clientPeerReceivedPongSemaphore.release();
+                else if (receivedClientPeerData.size() >= 4)
                 {
-                    receivedClientPeerData.append(pClientPeer->readAll());
-                    if (receivedClientPeerData == "PONG")
-                        clientPeerReceivedPongSemaphore.release();
-                    else if (receivedClientPeerData.size() >= 4)
-                    {
-                        FAIL("Client peer expects a single PONG message.");
-                    }
-                });
+                    FAIL("Client peer expects a single PONG message.");
+                }
+            });
         pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
@@ -765,21 +771,22 @@ SCENARIO("Connected TcpSocket peers interact with each other")
 
 SCENARIO("TcpSocket fails as expected")
 {
-    GIVEN("no server running on any IP related to localhost-ips.test.kourier.io")
+    GIVEN("no server running on any IP related to host name with IPV4/IPV6 addresses")
     {
-        WHEN("TcpSocket is connected to localhost-ips.test.kourier.io")
+        WHEN("TcpSocket is connected to host name with IPV4/IPV6 addresses")
         {
             TcpSocket socket;
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
             socket.setConnectTimeout(std::chrono::milliseconds(5));
-            socket.connect("localhost-ips.test.kourier.io", 5000);
+            auto hostName = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses().first;
+            socket.connect(hostName, 5000);
 
             THEN("connection fails")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
-                REQUIRE(socket.errorMessage().starts_with("Failed to connect to localhost-ips.test.kourier.io at"));
+                REQUIRE(socket.errorMessage().starts_with(std::string("Failed to connect to ").append(hostName).append(" at")));
             }
         }
     }
@@ -787,7 +794,9 @@ SCENARIO("TcpSocket fails as expected")
     GIVEN("a server running on IPV6 localhost")
     {
         TcpServer server;
-        REQUIRE(server.listen(QHostAddress::LocalHostIPv6));
+        auto [hostName, hostAddresses] = TestHostNamesFetcher::hostNameWithIpv6Address();
+        REQUIRE(hostAddresses.size() == 1 && hostAddresses[0] == QHostAddress("::1"));
+        REQUIRE(server.listen(QHostAddress("::1")));
         size_t connectionCount = 0;
         Object::connect(&server, &TcpServer::newConnection, [&](){++connectionCount;});
 
@@ -815,13 +824,13 @@ SCENARIO("TcpSocket fails as expected")
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
             socket.setBindAddressAndPort("127.2.2.5");
             socket.setConnectTimeout(std::chrono::milliseconds(5));
-            socket.connect("ipv6-localhost.test.kourier.io", server.serverPort());
+            socket.connect(hostName, server.serverPort());
 
             THEN("connection fails")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
-                REQUIRE(socket.errorMessage().starts_with("Failed to connect to ipv6-localhost.test.kourier.io at [::1]:"));
+                REQUIRE(socket.errorMessage().starts_with(std::string("Failed to connect to ").append(hostName).append(" at [::1]:")));
             }
         }
 
@@ -868,8 +877,11 @@ SCENARIO("TcpSocket fails as expected")
 
     GIVEN("a server running on IPV4 localhost")
     {
+        auto [hostName, hostAddresses] = TestHostNamesFetcher::hostNameWithIpv4Address();
+        REQUIRE(hostAddresses.size() == 1 && hostAddresses[0].protocol() == QHostAddress::IPv4Protocol);
+        const auto hostAddress = hostAddresses[0];
         TcpServer server;
-        REQUIRE(server.listen(QHostAddress("127.10.20.100")));
+        REQUIRE(server.listen(hostAddress));
         size_t connectionCount = 0;
         Object::connect(&server, &TcpServer::newConnection, [&](){++connectionCount;});
 
@@ -886,7 +898,7 @@ SCENARIO("TcpSocket fails as expected")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
-                REQUIRE(socket.errorMessage().starts_with("Failed to connect to 127.10.20.100:"));
+                REQUIRE(socket.errorMessage().starts_with(std::string("Failed to connect to ") + hostAddress.toString().toStdString() + std::string(":")));
                 REQUIRE(connectionCount == 0);
             }
         }
@@ -898,13 +910,13 @@ SCENARIO("TcpSocket fails as expected")
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
             socket.setBindAddressAndPort("::1");
             socket.setConnectTimeout(std::chrono::milliseconds(5));
-            socket.connect("ipv4-localhost.test.kourier.io", server.serverPort());
+            socket.connect(hostName, server.serverPort());
 
             THEN("connection fails")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
-                REQUIRE(socket.errorMessage().starts_with("Failed to connect to ipv4-localhost.test.kourier.io at 127.10.20.100:"));
+                REQUIRE(socket.errorMessage().starts_with(std::string("Failed to connect to ").append(hostName).append(" at ").append(hostAddress.toString().toStdString()).append(":")));
                 REQUIRE(connectionCount == 0);
             }
         }
@@ -1004,7 +1016,8 @@ SCENARIO("TcpSocket fails as expected")
         static constexpr int backlogSize = 128;
         server.setListenBacklogSize(backlogSize);
         QObject::connect(&server, &QTcpServer::newConnection, [](){FAIL("This code is supposed to be unreachable.");});
-        REQUIRE(server.listen(QHostAddress("127.10.20.82")));
+        auto hostAddress("127.10.20.82");
+        REQUIRE(server.listen(QHostAddress(hostAddress)));
         REQUIRE(server.listenBacklogSize() == backlogSize);
         server.pauseAccepting();
         QSemaphore connectedSemaphore;
@@ -1029,13 +1042,15 @@ SCENARIO("TcpSocket fails as expected")
             socket.setConnectTimeout(std::chrono::milliseconds(5));
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&]() {socketFailedSemaphore.release();});
-            socket.connect("127.10.20.82", server.serverPort());
+            socket.connect(hostAddress, server.serverPort());
 
             THEN("TcpSocket times out while trying to connect to server")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
-                std::string expectedErrorMessage("Failed to connect to 127.10.20.82:");
+                std::string expectedErrorMessage("Failed to connect to ");
+                expectedErrorMessage.append(hostAddress);
+                expectedErrorMessage.append(":");
                 expectedErrorMessage.append(std::to_string(server.serverPort()));
                 expectedErrorMessage.append(".");
                 REQUIRE(socket.errorMessage() == expectedErrorMessage);
@@ -1064,8 +1079,8 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             peerConnectedSemaphore.release(2);
         });
         // This test creates a lot of sockets in TIME_WAIT state if run
-        // repeatedly (by using the -r command line option), as it 
-        // intentionally interrupt the connection abruptly.
+        // repeatedly (by using the -r command line option), as this test 
+        // intentionally interrupts the connection abruptly.
         // To minimize the problem, we always change the localhost ipv4
         // address used by the server.
         static uint16_t secondIPv4 = 1;
@@ -1622,7 +1637,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             }
         }
 
-        WHEN("TcpSocket tries to connect to localhost-ips.test.kourier.io without any server running and disconnects while handling the error signal")
+        WHEN("TcpSocket tries to connect to host name with IPV4/IPV6 addresses without any server running and disconnects while handling the error signal")
         {
             QSemaphore socketHandledErrorSemaphore;
             Object::connect(pSocket.get(), &TcpSocket::error, [&]()
@@ -1631,7 +1646,9 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                     pSocket->disconnectFromPeer();
                     socketHandledErrorSemaphore.release();
                 });
-            pSocket->connect("localhost-ips.test.kourier.io", 3008);
+            pSocket->setConnectTimeout(std::chrono::milliseconds(5));
+            auto hostName = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses().first;
+            pSocket->connect(hostName, 3008);
 
             THEN("TcpSocket handles error")
             {
@@ -1639,7 +1656,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             }
         }
 
-        WHEN("TcpSocket tries to connect to localhost-ips.test.kourier.io without any server running and aborts connection while handling the error signal")
+        WHEN("TcpSocket tries to connect to host name with IPV4/IPV6 addresses without any server running and aborts connection while handling the error signal")
         {
             QSemaphore socketHandledErrorSemaphore;
             Object::connect(pSocket.get(), &TcpSocket::error, [&]()
@@ -1648,7 +1665,8 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                 pSocket->abort();
                 socketHandledErrorSemaphore.release();
             });
-            pSocket->connect("localhost-ips.test.kourier.io", 3008);
+            auto hostName = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses().first;
+            pSocket->connect(hostName, 3008);
 
             THEN("TcpSocket handles error")
             {
@@ -1656,7 +1674,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             }
         }
 
-        WHEN("TcpSocket tries to connect to localhost-ips.test.kourier.io without any server running and is destroyed while handling the error signal")
+        WHEN("TcpSocket tries to connect to host name with IPV4/IPV6 addresses without any server running and is destroyed while handling the error signal")
         {
             QSemaphore socketHandledErrorSemaphore;
             Object::connect(pSocket.get(), &TcpSocket::error, [&]()
@@ -1665,7 +1683,8 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                 pSocket.release()->scheduleForDeletion();
                 socketHandledErrorSemaphore.release();
             });
-            pSocket->connect("localhost-ips.test.kourier.io", 3008);
+            auto hostName = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses().first;
+            pSocket->connect(hostName, 3008);
 
             THEN("TcpSocket handles error")
             {
@@ -1673,7 +1692,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             }
         }
 
-        WHEN("TcpSocket tries to connect to localhost-ips.test.kourier.io without any server running and is reconnected to the running server while handling the error signal")
+        WHEN("TcpSocket tries to connect to host name with IPV4/IPV6 addresses without any server running and is reconnected to the running server while handling the error signal")
         {
             QSemaphore socketHandledErrorSemaphore;
             Object::connect(pSocket.get(), &TcpSocket::error, [&]()
@@ -1688,7 +1707,8 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                     REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
                     socketConnectedSemaphore.release();
                 });
-            pSocket->connect("localhost-ips.test.kourier.io", 3008);
+            auto hostName = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses().first;
+            pSocket->connect(hostName, 3008);
 
             THEN("TcpSocket handles error and aborts before connecting to peer")
             {

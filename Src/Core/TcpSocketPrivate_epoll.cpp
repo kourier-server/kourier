@@ -312,7 +312,6 @@ void TcpSocketPrivate::connectToHost()
                 return;
             }
             const int value = 1;
-            ::setsockopt(m_socketDescriptor, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(value));
             if (::bind(m_socketDescriptor, (struct sockaddr *) &addr, sizeof(addr)) != 0)
             {
                 setError(RuntimeError(std::string("Failed to bind socket to ")

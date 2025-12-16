@@ -5,6 +5,8 @@
 qt_add_library(TestResources STATIC
     TcpServer.cpp
     TcpServer.h
+    TestHostNamesFetcher.cpp
+    TestHostNamesFetcher.h
     TlsServer.cpp
     TlsServer.h
     TlsTestCertificates.cpp
