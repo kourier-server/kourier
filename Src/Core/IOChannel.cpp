@@ -151,7 +151,7 @@ size_t IOChannel::readDataFromChannel()
 
 size_t IOChannel::writeDataToChannel()
 {
-    const auto dataSent = m_writeBuffer.read(dataSink());
+    const size_t dataSent = m_writeBuffer.isEmpty() ? 0 : m_writeBuffer.read(dataSink());
     setWriteChannelNotificationEnabled(!m_writeBuffer.isEmpty());
     return dataSent;
 }
