@@ -286,7 +286,7 @@ SCENARIO("TlsSocket connects to server by host name")
                 serverPeerConnectedSemaphore.release();
             });
 
-        WHEN("TlsSocket connects to running server by address and port")
+        WHEN("TlsSocket connects to running server by host name")
         {
             TlsSocket clientPeer(clientTlsConfiguration);
             QSemaphore clientPeerConnectedSemaphore;
