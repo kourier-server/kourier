@@ -104,12 +104,12 @@ SCENARIO("TlsSocket connects to server by host address")
         const auto certificateType = GENERATE(AS(TlsTestCertificates::CertificateType),
                                               TlsTestCertificates::CertificateType::RSA_2048,
                                               TlsTestCertificates::CertificateType::RSA_2048_CHAIN,
-                                            //   TlsTestCertificates::CertificateType::RSA_2048_EncryptedPrivateKey,
-                                            //   TlsTestCertificates::CertificateType::RSA_2048_CHAIN_EncryptedPrivateKey,
-                                            //   TlsTestCertificates::CertificateType::ECDSA,
-                                            //   TlsTestCertificates::CertificateType::ECDSA_CHAIN,
-                                            //   TlsTestCertificates::CertificateType::ECDSA_EncryptedPrivateKey,
-                                            //   TlsTestCertificates::CertificateType::ECDSA_CHAIN_EncryptedPrivateKey
+                                              TlsTestCertificates::CertificateType::RSA_2048_EncryptedPrivateKey,
+                                              TlsTestCertificates::CertificateType::RSA_2048_CHAIN_EncryptedPrivateKey,
+                                              TlsTestCertificates::CertificateType::ECDSA,
+                                              TlsTestCertificates::CertificateType::ECDSA_CHAIN,
+                                              TlsTestCertificates::CertificateType::ECDSA_EncryptedPrivateKey,
+                                              TlsTestCertificates::CertificateType::ECDSA_CHAIN_EncryptedPrivateKey
                                             );
         std::string certificateFile;
         std::string privateKeyFile;
