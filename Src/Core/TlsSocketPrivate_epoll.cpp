@@ -514,9 +514,9 @@ size_t TlsSocket::readDataFromChannel()
 size_t TlsSocket::writeDataToChannel()
 {
     Q_D(TlsSocket);
-    if (d->m_hasCompletedHandshake)
+    if (d->m_hasCompletedHandshake && !d->m_unencryptedOutgoingDataBuffer.isEmpty())
         d->m_unencryptedOutgoingDataBuffer.read(d->m_tlsDataSink);
-    const auto bytesWritten = d->m_encryptedOutgoingDataBuffer.read(dataSink());
+    const size_t bytesWritten = d->m_encryptedOutgoingDataBuffer.isEmpty() ? 0 : d->m_encryptedOutgoingDataBuffer.read(dataSink());
     d->m_hasAlreadyScheduledWriteEvent = false;
     return bytesWritten;
 }
