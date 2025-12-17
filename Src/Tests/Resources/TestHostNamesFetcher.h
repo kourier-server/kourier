@@ -24,7 +24,7 @@
 #include <utility>
 
 
-namespace Kourier
+namespace Kourier::TestResources
 {
 
 class TestHostNamesFetcher

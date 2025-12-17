@@ -22,7 +22,7 @@
 #include "../Spectator/Spectator.h"
 
 
-namespace Kourier
+namespace Kourier::TestResources
 {
 
 class HostAddressesFetcher

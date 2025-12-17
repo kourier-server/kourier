@@ -41,7 +41,7 @@ using Kourier::TcpServer;
 using Kourier::TcpSocket;
 using Kourier::Object;
 using Kourier::AsyncQObject;
-using Kourier::TestHostNamesFetcher;
+using Kourier::TestResources::TestHostNamesFetcher;
 using Spectator::SemaphoreAwaiter;
 
 
