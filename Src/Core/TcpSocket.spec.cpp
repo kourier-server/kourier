@@ -112,7 +112,7 @@ SCENARIO("TcpSocket connects to server, sends a PING and gets a PONG as response
             {
                 REQUIRE(!serverPeer);
                 serverPeer.reset(pNewSocket);
-                Object::connect(serverPeer.get(), &TcpSocket::disconnected, [&]{serverPeerDisconnectedSemaphore.release();});
+                Object::connect(serverPeer.get(), &TcpSocket::disconnected, [&](){serverPeerDisconnectedSemaphore.release();});
                 Object::connect(serverPeer.get(), &TcpSocket::receivedData, [&]()
                     {
                         serverPeerReceivedData.append(serverPeer->readAll());
@@ -137,8 +137,8 @@ SCENARIO("TcpSocket connects to server, sends a PING and gets a PONG as response
             QSemaphore clientPeerDisconnectedSemaphore;
             QSemaphore clientPeerReceivedPongSemaphore;
             QByteArray clientPeerReceivedData;
-            Object::connect(&clientPeer, &TcpSocket::connected, [&]{clientPeerConnectedSemaphore.release();});
-            Object::connect(&clientPeer, &TcpSocket::disconnected, [&]{clientPeerDisconnectedSemaphore.release();});
+            Object::connect(&clientPeer, &TcpSocket::connected, [&](){clientPeerConnectedSemaphore.release();});
+            Object::connect(&clientPeer, &TcpSocket::disconnected, [&](){clientPeerDisconnectedSemaphore.release();});
             Object::connect(&clientPeer, &TcpSocket::receivedData, [&]()
                 {
                     clientPeerReceivedData.append(clientPeer.readAll());
@@ -196,7 +196,7 @@ SCENARIO("TcpSocket allows binding to an address/port prior to connecting to ser
             {
                 REQUIRE(!serverPeer);
                 serverPeer.reset(pNewSocket);
-                Object::connect(serverPeer.get(), &TcpSocket::disconnected, [&]{serverPeerDisconnectedSemaphore.release();});
+                Object::connect(serverPeer.get(), &TcpSocket::disconnected, [&](){serverPeerDisconnectedSemaphore.release();});
                 Object::connect(serverPeer.get(), &TcpSocket::receivedData, [&]()
                     {
                         serverPeerReceivedData.append(serverPeer->readAll());
@@ -235,8 +235,8 @@ SCENARIO("TcpSocket allows binding to an address/port prior to connecting to ser
             QSemaphore clientPeerDisconnectedSemaphore;
             QSemaphore clientPeerReceivedPongSemaphore;
             QByteArray clientPeerReceivedData;
-            Object::connect(&clientPeer, &TcpSocket::connected, [&]{clientPeerConnectedSemaphore.release();});
-            Object::connect(&clientPeer, &TcpSocket::disconnected, [&]{clientPeerDisconnectedSemaphore.release();});
+            Object::connect(&clientPeer, &TcpSocket::connected, [&](){clientPeerConnectedSemaphore.release();});
+            Object::connect(&clientPeer, &TcpSocket::disconnected, [&](){clientPeerDisconnectedSemaphore.release();});
             Object::connect(&clientPeer, &TcpSocket::receivedData, [&]()
                 {
                     clientPeerReceivedData.append(clientPeer.readAll());
@@ -296,7 +296,7 @@ SCENARIO("TcpSocket allows OS-level socket options to be set")
             {
                 REQUIRE(!pServerPeer);
                 pServerPeer.reset(pNewSocket);
-                Object::connect(pServerPeer.get(), &TcpSocket::disconnected, [&]{serverPeerDisconnectedSemaphore.release();});
+                Object::connect(pServerPeer.get(), &TcpSocket::disconnected, [&](){serverPeerDisconnectedSemaphore.release();});
                 Object::connect(pServerPeer.get(), &TcpSocket::receivedData, [&]()
                     {
                         receivedServerPeerData.append(pServerPeer->readAll());
@@ -318,8 +318,8 @@ SCENARIO("TcpSocket allows OS-level socket options to be set")
         QSemaphore clientPeerDisconnectedSemaphore;
         QSemaphore clientPeerReceivedPongSemaphore;
         QByteArray receivedClientPeerData;
-        Object::connect(pClientPeer.get(), &TcpSocket::connected, [&]{clientPeerConnectedSemaphore.release();});
-        Object::connect(pClientPeer.get(), &TcpSocket::disconnected, [&]{clientPeerDisconnectedSemaphore.release();});
+        Object::connect(pClientPeer.get(), &TcpSocket::connected, [&](){clientPeerConnectedSemaphore.release();});
+        Object::connect(pClientPeer.get(), &TcpSocket::disconnected, [&](){clientPeerDisconnectedSemaphore.release();});
         Object::connect(pClientPeer.get(), &TcpSocket::receivedData, [&]()
             {
                 receivedClientPeerData.append(pClientPeer->readAll());
@@ -388,8 +388,8 @@ SCENARIO("Connected TcpSocket peers interact with each other")
             {
                 REQUIRE(!pServerPeer);
                 pServerPeer.reset(pNewSocket);
-                Object::connect(pServerPeer.get(), &TcpSocket::disconnected, [&]{serverPeerDisconnectedSemaphore.release();});
-                Object::connect(pServerPeer.get(), &TcpSocket::error, [&]{serverPeerFailedSemaphore.release();});
+                Object::connect(pServerPeer.get(), &TcpSocket::disconnected, [&](){serverPeerDisconnectedSemaphore.release();});
+                Object::connect(pServerPeer.get(), &TcpSocket::error, [&](){serverPeerFailedSemaphore.release();});
                 Object::connect(pServerPeer.get(), &TcpSocket::receivedData, [&]()
                     {
                         receivedServerPeerData.append(pServerPeer->readAll());
@@ -403,9 +403,9 @@ SCENARIO("Connected TcpSocket peers interact with each other")
         QSemaphore clientPeerFailedSemaphore;
         QSemaphore clientPeerReceivedDataSemaphore;
         QByteArray receivedClientPeerData;
-        Object::connect(pClientPeer.get(), &TcpSocket::connected, [&]{clientPeerConnectedSemaphore.release();});
-        Object::connect(pClientPeer.get(), &TcpSocket::disconnected, [&]{clientPeerDisconnectedSemaphore.release();});
-        Object::connect(pClientPeer.get(), &TcpSocket::error, [&]{clientPeerFailedSemaphore.release();});
+        Object::connect(pClientPeer.get(), &TcpSocket::connected, [&](){clientPeerConnectedSemaphore.release();});
+        Object::connect(pClientPeer.get(), &TcpSocket::disconnected, [&](){clientPeerDisconnectedSemaphore.release();});
+        Object::connect(pClientPeer.get(), &TcpSocket::error, [&](){clientPeerFailedSemaphore.release();});
         Object::connect(pClientPeer.get(), &TcpSocket::receivedData, [&]()
             {
                 receivedClientPeerData.append(pClientPeer->readAll());
@@ -1028,8 +1028,8 @@ SCENARIO("TcpSocket allows connected slots to take any action")
         QSemaphore socketDisconnectedSemaphore;
         QSemaphore socketFailedSemaphore;
         std::unique_ptr<TcpSocket> pSocket(new TcpSocket);
-        Object::connect(pSocket.get(), &TcpSocket::disconnected, [&]{socketDisconnectedSemaphore.release();});
-        Object::connect(pSocket.get(), &TcpSocket::error, [&]{socketFailedSemaphore.release();});
+        Object::connect(pSocket.get(), &TcpSocket::disconnected, [&](){socketDisconnectedSemaphore.release();});
+        Object::connect(pSocket.get(), &TcpSocket::error, [&](){socketFailedSemaphore.release();});
 
         WHEN("TcpSocket connects to server and disconnects while handling the connected signal")
         {

@@ -218,6 +218,360 @@ SCENARIO("TlsSocket connects to server, sends a PING and gets a PONG as response
 }
 
 
+SCENARIO("Connected TlsSocket peers interact with each other")
+{
+    GIVEN("two connected TlsSockets")
+    {
+        const auto certificateType = GENERATE(AS(TlsTestCertificates::CertificateType),
+                                              TlsTestCertificates::CertificateType::RSA_2048,
+                                              TlsTestCertificates::CertificateType::RSA_2048_CHAIN,
+                                              TlsTestCertificates::CertificateType::RSA_2048_EncryptedPrivateKey,
+                                              TlsTestCertificates::CertificateType::RSA_2048_CHAIN_EncryptedPrivateKey,
+                                              TlsTestCertificates::CertificateType::ECDSA,
+                                              TlsTestCertificates::CertificateType::ECDSA_CHAIN,
+                                              TlsTestCertificates::CertificateType::ECDSA_EncryptedPrivateKey,
+                                              TlsTestCertificates::CertificateType::ECDSA_CHAIN_EncryptedPrivateKey
+                                            );
+        std::string certificateFile;
+        std::string privateKeyFile;
+        std::string caCertificateFile;
+        TlsTestCertificates::getFilesFromCertificateType(certificateType, certificateFile, privateKeyFile, caCertificateFile);
+        std::string certificateContents;
+        std::string privateKeyContents;
+        std::string privateKeyPassword;
+        std::string caCertificateContents;
+        TlsTestCertificates::getContentsFromCertificateType(certificateType, certificateContents, privateKeyContents, privateKeyPassword, caCertificateContents);
+        TlsConfiguration clientTlsConfiguration;
+        clientTlsConfiguration.addCaCertificate(caCertificateFile);
+        TlsConfiguration serverTlsConfiguration;
+        serverTlsConfiguration.setCertificateKeyPair(certificateFile, privateKeyFile, privateKeyPassword);
+        serverTlsConfiguration.addCaCertificate(caCertificateFile);
+        TlsServer server(serverTlsConfiguration);
+        const QHostAddress serverAddress("::1");
+        REQUIRE(server.listen(serverAddress));
+        std::unique_ptr<TlsSocket> pServerPeer;
+        QSemaphore serverPeerConnectedSemaphore;
+        QSemaphore serverPeerCompletedTlsHandshakeSemaphore;
+        QSemaphore serverPeerDisconnectedSemaphore;
+        QSemaphore serverPeerFailedSemaphore;
+        QSemaphore serverPeerReceivedDataSemaphore;
+        QByteArray receivedServerPeerData;
+        Object::connect(&server, &TlsServer::newConnection, [&](TlsSocket *pNewSocket)
+            {
+                REQUIRE(!pServerPeer);
+                pServerPeer.reset(pNewSocket);
+                Object::connect(pServerPeer.get(), &TlsSocket::encrypted, [&]{serverPeerCompletedTlsHandshakeSemaphore.release();});
+                Object::connect(pServerPeer.get(), &TlsSocket::disconnected, [&]{serverPeerDisconnectedSemaphore.release();});
+                Object::connect(pServerPeer.get(), &TlsSocket::error, [&]{serverPeerFailedSemaphore.release();});
+                Object::connect(pServerPeer.get(), &TlsSocket::receivedData, [&]()
+                    {
+                        receivedServerPeerData.append(pServerPeer->readAll());
+                        serverPeerReceivedDataSemaphore.release();
+                    });
+                serverPeerConnectedSemaphore.release();
+            });
+        std::unique_ptr<TlsSocket> pClientPeer(new TlsSocket(clientTlsConfiguration));
+        QSemaphore clientPeerConnectedSemaphore;
+        QSemaphore clientPeerCompletedTlsHandshakeSemaphore;
+        QSemaphore clientPeerDisconnectedSemaphore;
+        QSemaphore clientPeerFailedSemaphore;
+        QSemaphore clientPeerReceivedDataSemaphore;
+        QByteArray receivedClientPeerData;
+        Object::connect(pClientPeer.get(), &TlsSocket::connected, [&]{clientPeerConnectedSemaphore.release();});
+        Object::connect(pClientPeer.get(), &TlsSocket::encrypted, [&](){clientPeerCompletedTlsHandshakeSemaphore.release();});
+        Object::connect(pClientPeer.get(), &TlsSocket::disconnected, [&]{clientPeerDisconnectedSemaphore.release();});
+        Object::connect(pClientPeer.get(), &TlsSocket::error, [&]{clientPeerFailedSemaphore.release();});
+        Object::connect(pClientPeer.get(), &TlsSocket::receivedData, [&]()
+            {
+                receivedClientPeerData.append(pClientPeer->readAll());
+                clientPeerReceivedDataSemaphore.release();
+            });
+        pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
+        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
+        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerCompletedTlsHandshakeSemaphore, 10));
+        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerCompletedTlsHandshakeSemaphore, 10));
+
+        WHEN("TlsSocket sends data to connected peer")
+        {
+            const auto dataToSend = GENERATE(AS(QByteArray),
+                                                QByteArray("a"),
+                                                QByteArray("abcdefgh"),
+                                                largeData);
+            const bool isClientTheSendingPeer = GENERATE(AS(bool), true, false);
+            auto &pSendingPeer = isClientTheSendingPeer ? pClientPeer : pServerPeer;
+            auto &pReceivingPeer = isClientTheSendingPeer ? pServerPeer : pClientPeer;
+            pSendingPeer->write(dataToSend);
+
+            THEN("connected peer receives sent data")
+            {
+                auto &receivedData = isClientTheSendingPeer ? receivedServerPeerData : receivedClientPeerData;
+                auto &connectedPeerReceivedDataSemaphore = isClientTheSendingPeer ? serverPeerReceivedDataSemaphore : clientPeerReceivedDataSemaphore;
+                while(dataToSend != receivedData)
+                {
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(connectedPeerReceivedDataSemaphore, 1));
+                }
+
+                AND_WHEN("TlsSocket sends more data to connected peer")
+                {
+                    receivedData.clear();
+                    const QByteArray someMoreData("0123456789");
+                    pSendingPeer->write(someMoreData);
+
+                    THEN("connected peer receives sent data")
+                    {
+                        while(someMoreData != receivedData)
+                        {
+                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(connectedPeerReceivedDataSemaphore, 1));
+                        }
+
+                        AND_WHEN("TlsSocket disconnects from connected peer")
+                        {
+                            pSendingPeer->disconnectFromPeer();
+
+                            THEN("both peers disconnect")
+                            {
+                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        WHEN("TlsSocket closes connection after sending data to connected peer")
+        {
+            const auto dataToSend = GENERATE(AS(QByteArray),
+                                                QByteArray("a"),
+                                                QByteArray("abcdefgh"),
+                                                largeData);
+            const bool isClientTheSendingPeer = GENERATE(AS(bool), true, false);
+            auto &pSendingPeer = isClientTheSendingPeer ? pClientPeer : pServerPeer;
+            auto &pReceivingPeer = isClientTheSendingPeer ? pServerPeer : pClientPeer;
+            pSendingPeer->write(dataToSend);
+            pSendingPeer->disconnectFromPeer();
+
+            THEN("connected peer receives sent data")
+            {
+                auto &receivedData = isClientTheSendingPeer ? receivedServerPeerData : receivedClientPeerData;
+                auto &connectedPeerReceivedDataSemaphore = isClientTheSendingPeer ? serverPeerReceivedDataSemaphore : clientPeerReceivedDataSemaphore;
+                while(dataToSend != receivedData)
+                {
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(connectedPeerReceivedDataSemaphore, 1));
+                }
+
+                AND_THEN("both peers disconnect without emitting any errors")
+                {
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                    REQUIRE(pSendingPeer->errorMessage().empty());
+                    REQUIRE(pReceivingPeer->errorMessage().empty());
+
+                    AND_WHEN("sending peer is deleted")
+                    {
+                        pSendingPeer.reset(nullptr);
+
+                        THEN("neither peer emit any error")
+                        {
+                            REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(clientPeerFailedSemaphore, QDeadlineTimer(1)));
+                            REQUIRE(!serverPeerFailedSemaphore.tryAcquire());
+                        }
+                    }
+
+                    AND_WHEN("receiving peer is deleted")
+                    {
+                        pReceivingPeer.reset(nullptr);
+
+                        THEN("neither peer emit any error")
+                        {
+                            REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(clientPeerFailedSemaphore, QDeadlineTimer(1)));
+                            REQUIRE(!serverPeerFailedSemaphore.tryAcquire());
+                        }
+                    }
+                }
+            }
+        }
+
+        WHEN("TlsSocket aborts after sending data to connected peer")
+        {
+            const auto dataToSend = GENERATE(AS(QByteArray),
+                                                QByteArray("a"),
+                                                QByteArray("abcdefgh"),
+                                                largeData);
+            const bool isClientTheSendingPeer = GENERATE(AS(bool), true, false);
+            auto &pSendingPeer = isClientTheSendingPeer ? pClientPeer : pServerPeer;
+            auto &pReceivingPeer = isClientTheSendingPeer ? pServerPeer : pClientPeer;
+            pSendingPeer->write(dataToSend);
+            pSendingPeer->abort();
+
+            THEN("connected peer disconnects without peers emitting any errors")
+            {
+                auto &connectedPeerDisconnectedSemaphore = isClientTheSendingPeer ? serverPeerDisconnectedSemaphore : clientPeerDisconnectedSemaphore;
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(connectedPeerDisconnectedSemaphore, 10));
+                REQUIRE(pSendingPeer->errorMessage().empty());
+                REQUIRE(pReceivingPeer->errorMessage().empty());
+            }
+        }
+
+        WHEN("TlsSocket is deleted after sending data to connected peer")
+        {
+            const auto dataToSend = GENERATE(AS(QByteArray),
+                                                QByteArray("a"),
+                                                QByteArray("abcdefgh"),
+                                                largeData);
+            const bool isClientTheSendingPeer = GENERATE(AS(bool), true, false);
+            auto &pSendingPeer = isClientTheSendingPeer ? pClientPeer : pServerPeer;
+            auto &pReceivingPeer = isClientTheSendingPeer ? pServerPeer : pClientPeer;
+            pSendingPeer->write(dataToSend);
+            pSendingPeer.reset(nullptr);
+
+            THEN("connected peer disconnects without emitting any errors")
+            {
+                auto &connectedPeerDisconnectedSemaphore = isClientTheSendingPeer ? serverPeerDisconnectedSemaphore : clientPeerDisconnectedSemaphore;
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(connectedPeerDisconnectedSemaphore, 10));
+                REQUIRE(pReceivingPeer->errorMessage().empty());
+            }
+        }
+
+        WHEN("TlsSocket disconnects from connected peer")
+        {
+            const bool isTlsSocketTheClient = GENERATE(AS(bool), true, false);
+            auto &pTlsSocket = isTlsSocketTheClient ? pClientPeer : pServerPeer;
+            auto &pConnectedPeer = isTlsSocketTheClient ? pServerPeer : pClientPeer;
+            pTlsSocket->disconnectFromPeer();
+
+            THEN("both peers disconnect")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                REQUIRE(pTlsSocket->errorMessage().empty());
+                REQUIRE(pConnectedPeer->errorMessage().empty());
+
+                AND_WHEN("TcpSocket is deleted")
+                {
+                    auto &tlsSocketFailedSemaphore = isTlsSocketTheClient ? clientPeerFailedSemaphore : serverPeerFailedSemaphore;
+                    auto &connectedPeerFailedSemaphore = isTlsSocketTheClient ? serverPeerFailedSemaphore : clientPeerFailedSemaphore;
+                    pTlsSocket.reset(nullptr);
+
+                    THEN("neither peer emit any error")
+                    {
+                        REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(connectedPeerFailedSemaphore, QDeadlineTimer(1)));
+                        REQUIRE(!tlsSocketFailedSemaphore.tryAcquire());
+                    }
+                }
+            }
+        }
+
+        WHEN("TlsSocket aborts connection")
+        {
+            const bool isTlsSocketTheClient = GENERATE(AS(bool), true, false);
+            auto &pTlsSocket = isTlsSocketTheClient ? pClientPeer : pServerPeer;
+            auto &pConnectedPeer = isTlsSocketTheClient ? pServerPeer : pClientPeer;
+            pTlsSocket->abort();
+
+            THEN("connected peer disconnect")
+            {
+                auto &connectedPeerDisconnectedSemaphore = isTlsSocketTheClient ? serverPeerDisconnectedSemaphore : clientPeerDisconnectedSemaphore;
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(connectedPeerDisconnectedSemaphore, 10));
+                REQUIRE(pTlsSocket->errorMessage().empty());
+                REQUIRE(pConnectedPeer->errorMessage().empty());
+
+                AND_WHEN("TcpSocket is deleted")
+                {
+                    auto &tlsSocketFailedSemaphore = isTlsSocketTheClient ? clientPeerFailedSemaphore : serverPeerFailedSemaphore;
+                    auto &connectedPeerFailedSemaphore = isTlsSocketTheClient ? serverPeerFailedSemaphore : clientPeerFailedSemaphore;
+                    pTlsSocket.reset(nullptr);
+
+                    THEN("neither peer emit any error")
+                    {
+                        REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(connectedPeerFailedSemaphore, QDeadlineTimer(1)));
+                        REQUIRE(!tlsSocketFailedSemaphore.tryAcquire());
+                    }
+                }
+            }
+        }
+
+        WHEN("both peers disconnect")
+        {
+            const bool isTlsSocketTheClient = GENERATE(AS(bool), true, false);
+            auto &pTlsSocket = isTlsSocketTheClient ? pClientPeer : pServerPeer;
+            auto &pConnectedPeer = isTlsSocketTheClient ? pServerPeer : pClientPeer;
+            pTlsSocket->disconnectFromPeer();
+            pConnectedPeer->disconnectFromPeer();
+
+            THEN("both peers disconnect")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                REQUIRE(pTlsSocket->errorMessage().empty());
+                REQUIRE(pConnectedPeer->errorMessage().empty());
+
+                AND_WHEN("TlsSocket is deleted")
+                {
+                    auto &tlsSocketFailedSemaphore = isTlsSocketTheClient ? clientPeerFailedSemaphore : serverPeerFailedSemaphore;
+                    auto &connectedPeerFailedSemaphore = isTlsSocketTheClient ? serverPeerFailedSemaphore : clientPeerFailedSemaphore;
+                    pTlsSocket.reset(nullptr);
+
+                    THEN("neither peer emit any error")
+                    {
+                        REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(connectedPeerFailedSemaphore, QDeadlineTimer(1)));
+                        REQUIRE(!tlsSocketFailedSemaphore.tryAcquire());
+                    }
+                }
+            }
+        }
+
+        WHEN("both peers abort connection")
+        {
+            const bool isTlsSocketTheClient = GENERATE(AS(bool), true, false);
+            auto &pTlsSocket = isTlsSocketTheClient ? pClientPeer : pServerPeer;
+            auto &pConnectedPeer = isTlsSocketTheClient ? pServerPeer : pClientPeer;
+            pTlsSocket->abort();
+            pConnectedPeer->abort();
+
+            THEN("both peers abort connection without errors")
+            {
+                REQUIRE(pTlsSocket->errorMessage().empty());
+                REQUIRE(pConnectedPeer->errorMessage().empty());
+
+                AND_WHEN("TlsSocket is deleted")
+                {
+                    auto &tlsSocketFailedSemaphore = isTlsSocketTheClient ? clientPeerFailedSemaphore : serverPeerFailedSemaphore;
+                    auto &connectedPeerFailedSemaphore = isTlsSocketTheClient ? serverPeerFailedSemaphore : clientPeerFailedSemaphore;
+                    pTlsSocket.reset(nullptr);
+
+                    THEN("neither peer emit any error")
+                    {
+                        REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(connectedPeerFailedSemaphore, QDeadlineTimer(1)));
+                        REQUIRE(!tlsSocketFailedSemaphore.tryAcquire());
+                    }
+                }
+            }
+        }
+
+        WHEN("TlsSocket is deleted")
+        {
+            const bool isTlsSocketTheClient = GENERATE(AS(bool), true, false);
+            auto &pTlsSocket = isTlsSocketTheClient ? pClientPeer : pServerPeer;
+            auto &pConnectedPeer = isTlsSocketTheClient ? pServerPeer : pClientPeer;
+            pTlsSocket.reset(nullptr);
+
+            THEN("connected peer disconnects without errors")
+            {
+                auto &connectedPeerDisconnectedSemaphore = isTlsSocketTheClient ? serverPeerDisconnectedSemaphore : clientPeerDisconnectedSemaphore;
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(connectedPeerDisconnectedSemaphore, 10));
+                auto &tlsSocketFailedSemaphore = isTlsSocketTheClient ? clientPeerFailedSemaphore : serverPeerFailedSemaphore;
+                auto &connectedPeerFailedSemaphore = isTlsSocketTheClient ? serverPeerFailedSemaphore : clientPeerFailedSemaphore;
+                REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(connectedPeerFailedSemaphore, QDeadlineTimer(1)));
+                REQUIRE(!tlsSocketFailedSemaphore.tryAcquire());
+                REQUIRE(pConnectedPeer->errorMessage().empty());
+            }
+        }
+    }
+}
+
+
 SCENARIO("TlsSocket interacts with client peer")
 {
     GIVEN("a listening server")
