@@ -9,7 +9,7 @@
             "type": "lldb-dap",
             "request": "launch",
             "program": "${command:cmake.launchTargetPath}",
-            "args": ["-s", "Connected TlsSocket peers interact with each other"],
+            "args": ["-s", "TlsSocket supports client authentication (two-way SSL)"],
             "env": [],
             "cwd": "${workspaceRoot}",
             "internalConsoleOptions": "openOnSessionStart",
