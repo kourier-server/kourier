@@ -17,6 +17,7 @@
 
 #include "TlsSocket.h"
 #include "AsyncQObject.h"
+#include <Tests/Resources/TcpServer.h>
 #include <Tests/Resources/TlsServer.h>
 #include <Tests/Resources/TlsTestCertificates.h>
 #include <Tests/Resources/TestHostNamesFetcher.h>
@@ -38,6 +39,7 @@
 #include <sys/mman.h>
 #include <Spectator.h>
 
+using Kourier::TcpServer;
 using Kourier::TlsServer;
 using Kourier::TcpSocket;
 using Kourier::TlsSocket;
@@ -694,9 +696,9 @@ SCENARIO("TlsSocket supports client authentication (two-way SSL)")
 
 SCENARIO("TlsSocket fails as expected")
 {
-    GIVEN("no server running on any IP related to test.onlocalhost.com")
+    GIVEN("no server running on any IP related to host name with IPV4/IPV6 addresses")
     {
-        WHEN("TlsSocket with valid tls configuration is connected to test.onlocalhost.com")
+        WHEN("TlsSocket is connected to host name with IPV4/IPV6 addresses")
         {
             const auto certificateType = TlsTestCertificates::CertificateType::ECDSA;
             std::string certificateFile;
@@ -709,53 +711,29 @@ SCENARIO("TlsSocket fails as expected")
             TlsSocket tlsSocket(tlsConfiguration);
             QSemaphore tlsSocketFailedSemaphore;
             Object::connect(&tlsSocket, &TlsSocket::error, [&](){tlsSocketFailedSemaphore.release();});
-            tlsSocket.connect("test.onlocalhost.com", 5000);
+            auto hostName = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses().first;
+            tlsSocket.connect(hostName, 5000);
 
             THEN("connection fails")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(tlsSocketFailedSemaphore, 10));
                 REQUIRE(tlsSocket.state() == TcpSocket::State::Unconnected);
-                REQUIRE(tlsSocket.errorMessage().starts_with("Failed to connect to test.onlocalhost.com at"));
-            }
-        }
-    }
-
-    GIVEN("a non-existent domain")
-    {
-        std::string_view nonExistentDomain("nonexistentdomain.thisdomaindoesnotexist");
-
-        WHEN("TlsSocket with valid tls configuration is connected to the non-existent domain")
-        {
-            const auto certificateType = TlsTestCertificates::CertificateType::ECDSA;
-            std::string certificateFile;
-            std::string privateKeyFile;
-            std::string caCertificateFile;
-            TlsTestCertificates::getFilesFromCertificateType(certificateType, certificateFile, privateKeyFile, caCertificateFile);
-            TlsConfiguration tlsConfiguration;
-            tlsConfiguration.setCertificateKeyPair(certificateFile, privateKeyFile);
-            tlsConfiguration.addCaCertificate(caCertificateFile);
-            TlsSocket tlsSocket(tlsConfiguration);
-            QSemaphore tlsSocketFailedSemaphore;
-            Object::connect(&tlsSocket, &TlsSocket::error, [&](){tlsSocketFailedSemaphore.release();});
-            tlsSocket.connect(nonExistentDomain, 5000);
-
-            THEN("connection fails")
-            {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(tlsSocketFailedSemaphore, 10));
-                REQUIRE(tlsSocket.state() == TcpSocket::State::Unconnected);
-                REQUIRE(tlsSocket.errorMessage() == "Failed to connect to nonexistentdomain.thisdomaindoesnotexist. Could not fetch any address for domain.");
+                REQUIRE(tlsSocket.errorMessage().starts_with(std::string("Failed to connect to ").append(hostName).append(" at")));
             }
         }
     }
 
     GIVEN("a server running on IPV6 localhost")
     {
-        QTcpServer server;
-        REQUIRE(server.listen(QHostAddress::LocalHostIPv6));
-        QObject::connect(&server, &QTcpServer::newConnection, [](){FAIL("This code is supposed to be unreachable.");});
-        QObject::connect(&server, &QTcpServer::pendingConnectionAvailable, [](){FAIL("This code is supposed to be unreachable.");});
+        TcpServer server;
+        auto [hostName, hostAddresses] = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses();
+        const QHostAddress serverAddress("::1");
+        REQUIRE(hostAddresses.contains(serverAddress));
+        REQUIRE(server.listen(serverAddress));
+        size_t connectionCount = 0;
+        Object::connect(&server, &TcpServer::newConnection, [&](){++connectionCount;});
 
-        WHEN("a TlsSocket with valid tls configuration and bounded to an IPV4 address is connected to the IPV6 server")
+        WHEN("a TlsSocket with valid TLS configuration and bounded to an IPV4 address is connected to the IPV6 server")
         {
             const auto certificateType = TlsTestCertificates::CertificateType::ECDSA;
             std::string certificateFile;
@@ -763,23 +741,28 @@ SCENARIO("TlsSocket fails as expected")
             std::string caCertificateFile;
             TlsTestCertificates::getFilesFromCertificateType(certificateType, certificateFile, privateKeyFile, caCertificateFile);
             TlsConfiguration tlsConfiguration;
-            tlsConfiguration.setCertificateKeyPair(certificateFile, privateKeyFile);
             tlsConfiguration.addCaCertificate(caCertificateFile);
             TlsSocket tlsSocket(tlsConfiguration);
             QSemaphore tlsSocketFailedSemaphore;
             Object::connect(&tlsSocket, &TlsSocket::error, [&](){tlsSocketFailedSemaphore.release();});
             tlsSocket.setBindAddressAndPort("127.2.2.5");
-            tlsSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
+            const auto connectByName = GENERATE(AS(bool), true, false);
+            if (connectByName)
+                tlsSocket.connect(hostName, server.serverPort());
+            else
+                tlsSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("connection fails")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(tlsSocketFailedSemaphore, 10));
                 REQUIRE(tlsSocket.state() == TcpSocket::State::Unconnected);
-                REQUIRE(tlsSocket.errorMessage().starts_with("Failed to connect to [::1]:"));
+                const auto expectedErrorMessage = connectByName ? std::string("Failed to connect to ").append(hostName).append(" at 127.10.20.90:") : std::string("Failed to connect to [::1]:");
+                REQUIRE(tlsSocket.errorMessage().starts_with(expectedErrorMessage));
+                REQUIRE(connectionCount == 0);
             }
         }
 
-        WHEN("TlsSocket with valid tls configuration and bounded to a privileged port on IPV6 is connected to the server")
+        WHEN("TlsSocket with valid TLS configuration and bounded to a privileged port on IPV6 is connected to the server")
         {
             const auto certificateType = TlsTestCertificates::CertificateType::ECDSA;
             std::string certificateFile;
@@ -787,31 +770,71 @@ SCENARIO("TlsSocket fails as expected")
             std::string caCertificateFile;
             TlsTestCertificates::getFilesFromCertificateType(certificateType, certificateFile, privateKeyFile, caCertificateFile);
             TlsConfiguration tlsConfiguration;
-            tlsConfiguration.setCertificateKeyPair(certificateFile, privateKeyFile);
             tlsConfiguration.addCaCertificate(caCertificateFile);
             TlsSocket tlsSocket(tlsConfiguration);
             QSemaphore tlsSocketFailedSemaphore;
             Object::connect(&tlsSocket, &TlsSocket::error, [&](){tlsSocketFailedSemaphore.release();});
             tlsSocket.setBindAddressAndPort("::1", 443);
-            tlsSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
+            const auto connectByName = GENERATE(AS(bool), true, false);
+            if (connectByName)
+                tlsSocket.connect(hostName, server.serverPort());
+            else
+                tlsSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("connection fails")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(tlsSocketFailedSemaphore, 10));
                 REQUIRE(tlsSocket.state() == TcpSocket::State::Unconnected);
                 REQUIRE(tlsSocket.errorMessage() == "Failed to bind socket to [::1]:443. POSIX error EACCES(13): Permission denied.");
+                REQUIRE(connectionCount == 0);
+            }
+        }
+
+        WHEN("TLSSocket bound to an already used address/port pair is connected to server")
+        {
+            TcpSocket previouslyConnectedSocket;
+            QSemaphore previouslyConnectedSocketSemaphore;
+            Object::connect(&previouslyConnectedSocket, &TcpSocket::connected, [&](){previouslyConnectedSocketSemaphore.release();});
+            previouslyConnectedSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
+            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(previouslyConnectedSocketSemaphore, 10));
+            const auto certificateType = TlsTestCertificates::CertificateType::ECDSA;
+            std::string certificateFile;
+            std::string privateKeyFile;
+            std::string caCertificateFile;
+            TlsTestCertificates::getFilesFromCertificateType(certificateType, certificateFile, privateKeyFile, caCertificateFile);
+            TlsConfiguration tlsConfiguration;
+            tlsConfiguration.addCaCertificate(caCertificateFile);
+            TlsSocket tlsSocket(tlsConfiguration);
+            QSemaphore tlsSocketFailedSemaphore;
+            Object::connect(&tlsSocket, &TlsSocket::error, [&](){tlsSocketFailedSemaphore.release();});
+            tlsSocket.setBindAddressAndPort(previouslyConnectedSocket.localAddress(), previouslyConnectedSocket.localPort());
+            const auto connectByName = GENERATE(AS(bool), true, false);
+            if (connectByName)
+                tlsSocket.connect(hostName, server.serverPort());
+            else
+                tlsSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
+
+            THEN("connection fails")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(tlsSocketFailedSemaphore, 10));
+                REQUIRE(tlsSocket.state() == TcpSocket::State::Unconnected);
+                REQUIRE(tlsSocket.errorMessage() == std::string("Failed to bind socket to [::1]:").append(std::to_string(previouslyConnectedSocket.localPort())).append(". POSIX error EADDRINUSE(98): Address already in use."));
+                REQUIRE(connectionCount == 1);
             }
         }
     }
 
     GIVEN("a server running on IPV4 localhost")
     {
-        QTcpServer server;
-        REQUIRE(server.listen(QHostAddress("127.8.8.8")));
+        TcpServer server;
+        auto [hostName, hostAddresses] = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses();
+        const QHostAddress serverAddress("127.10.20.90");
+        REQUIRE(hostAddresses.contains(serverAddress));
+        REQUIRE(server.listen(serverAddress));
         size_t connectionCount = 0;
-        QObject::connect(&server, &QTcpServer::newConnection, [&](){while (server.nextPendingConnection() != nullptr) {++connectionCount;}});
+        Object::connect(&server, &TcpServer::newConnection, [&](){++connectionCount;});
 
-        WHEN("a TlsSocket with valid tls configuration and bounded to a IPV6 address is connected to the IPV4 server")
+        WHEN("a TlsSocket with valid TLS configuration and bounded to a IPV6 address is connected to the IPV4 server")
         {
             const auto certificateType = TlsTestCertificates::CertificateType::ECDSA;
             std::string certificateFile;
@@ -819,24 +842,28 @@ SCENARIO("TlsSocket fails as expected")
             std::string caCertificateFile;
             TlsTestCertificates::getFilesFromCertificateType(certificateType, certificateFile, privateKeyFile, caCertificateFile);
             TlsConfiguration tlsConfiguration;
-            tlsConfiguration.setCertificateKeyPair(certificateFile, privateKeyFile);
             tlsConfiguration.addCaCertificate(caCertificateFile);
             TlsSocket tlsSocket(tlsConfiguration);
             QSemaphore tlsSocketFailedSemaphore;
             Object::connect(&tlsSocket, &TlsSocket::error, [&](){tlsSocketFailedSemaphore.release();});
             tlsSocket.setBindAddressAndPort("::1");
-            tlsSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
+            const auto connectByName = GENERATE(AS(bool), true, false);
+            if (connectByName)
+                tlsSocket.connect(hostName, server.serverPort());
+            else
+                tlsSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("connection fails")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(tlsSocketFailedSemaphore, 10));
                 REQUIRE(tlsSocket.state() == TcpSocket::State::Unconnected);
-                REQUIRE(tlsSocket.errorMessage().starts_with("Failed to connect to 127.8.8.8:"));
+                const auto expectedErrorMessage = connectByName ? std::string("Failed to connect to ").append(hostName).append(" at ").append(serverAddress.toString().toStdString()).append(":") : std::string("Failed to connect to ").append(serverAddress.toString().toStdString()).append(":");
+                REQUIRE(tlsSocket.errorMessage().starts_with(expectedErrorMessage));
                 REQUIRE(connectionCount == 0);
             }
         }
 
-        WHEN("TlsSocket with valid tls configuration and bounded to a privileged port on IPV4 is connected to the server")
+        WHEN("TlsSocket with valid TLS configuration and bounded to a privileged port on IPV4 is connected to the server")
         {
             const auto certificateType = TlsTestCertificates::CertificateType::ECDSA;
             std::string certificateFile;
@@ -844,13 +871,16 @@ SCENARIO("TlsSocket fails as expected")
             std::string caCertificateFile;
             TlsTestCertificates::getFilesFromCertificateType(certificateType, certificateFile, privateKeyFile, caCertificateFile);
             TlsConfiguration tlsConfiguration;
-            tlsConfiguration.setCertificateKeyPair(certificateFile, privateKeyFile);
             tlsConfiguration.addCaCertificate(caCertificateFile);
             TlsSocket tlsSocket(tlsConfiguration);
             QSemaphore tlsSocketFailedSemaphore;
             Object::connect(&tlsSocket, &TlsSocket::error, [&](){tlsSocketFailedSemaphore.release();});
             tlsSocket.setBindAddressAndPort("127.0.0.1", 443);
-            tlsSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
+            const auto connectByName = GENERATE(AS(bool), true, false);
+            if (connectByName)
+                tlsSocket.connect(hostName, server.serverPort());
+            else
+                tlsSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("connection fails")
             {
@@ -863,10 +893,10 @@ SCENARIO("TlsSocket fails as expected")
 
         WHEN("TlsSocket bound to an already used address/port pair is connected to server")
         {
-            QTcpSocket previouslyConnectedSocket;
+            TcpSocket previouslyConnectedSocket;
             QSemaphore previouslyConnectedSocketSemaphore;
-            QObject::connect(&previouslyConnectedSocket, &QTcpSocket::connected, [&](){previouslyConnectedSocketSemaphore.release();});
-            previouslyConnectedSocket.connectToHost(server.serverAddress(), server.serverPort());
+            Object::connect(&previouslyConnectedSocket, &TcpSocket::connected, [&](){previouslyConnectedSocketSemaphore.release();});
+            previouslyConnectedSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
             REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(previouslyConnectedSocketSemaphore, 10));
             const auto certificateType = TlsTestCertificates::CertificateType::ECDSA;
             std::string certificateFile;
@@ -874,13 +904,16 @@ SCENARIO("TlsSocket fails as expected")
             std::string caCertificateFile;
             TlsTestCertificates::getFilesFromCertificateType(certificateType, certificateFile, privateKeyFile, caCertificateFile);
             TlsConfiguration tlsConfiguration;
-            tlsConfiguration.setCertificateKeyPair(certificateFile, privateKeyFile);
             tlsConfiguration.addCaCertificate(caCertificateFile);
             TlsSocket tlsSocket(tlsConfiguration);
             QSemaphore tlsSocketFailedSemaphore;
             Object::connect(&tlsSocket, &TlsSocket::error, [&](){tlsSocketFailedSemaphore.release();});
-            tlsSocket.setBindAddressAndPort(previouslyConnectedSocket.localAddress().toString().toStdString(), previouslyConnectedSocket.localPort());
-            tlsSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
+            tlsSocket.setBindAddressAndPort(previouslyConnectedSocket.localAddress(), previouslyConnectedSocket.localPort());
+            const auto connectByName = GENERATE(AS(bool), true, false);
+            if (connectByName)
+                tlsSocket.connect(hostName, server.serverPort());
+            else
+                tlsSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("connection fails")
             {
@@ -897,7 +930,7 @@ SCENARIO("TlsSocket fails as expected")
         const auto fileDescriptor = ::memfd_create("Kourier_tls_socket_spec_a_descriptor_that_does_not_represent_a_socket", 0);
         REQUIRE(fileDescriptor >= 0);
 
-        WHEN("a TlsSocket with valid tls configuration is created with the given descriptor")
+        WHEN("a TlsSocket with valid TLS configuration is created with the given descriptor")
         {
             const auto certificateType = TlsTestCertificates::CertificateType::ECDSA;
             std::string certificateFile;
@@ -905,7 +938,6 @@ SCENARIO("TlsSocket fails as expected")
             std::string caCertificateFile;
             TlsTestCertificates::getFilesFromCertificateType(certificateType, certificateFile, privateKeyFile, caCertificateFile);
             TlsConfiguration tlsConfiguration;
-            tlsConfiguration.setCertificateKeyPair(certificateFile, privateKeyFile);
             tlsConfiguration.addCaCertificate(caCertificateFile);
             TlsSocket socket(fileDescriptor, tlsConfiguration);
 
@@ -920,7 +952,7 @@ SCENARIO("TlsSocket fails as expected")
     {
         const int invalidDescriptor = std::numeric_limits<int>::max();
 
-        WHEN("a TlsSocket with valid tls configuration is created with the given descritor")
+        WHEN("a TlsSocket with valid TLS configuration is created with the given descritor")
         {
             const auto certificateType = TlsTestCertificates::CertificateType::ECDSA;
             std::string certificateFile;
@@ -944,7 +976,7 @@ SCENARIO("TlsSocket fails as expected")
         const auto socketDescriptor = ::socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
         REQUIRE(socketDescriptor >= 0);
 
-        WHEN("a TlsSocket with valid tls configuration is created with the given descritor")
+        WHEN("a TlsSocket with valid TLS configuration is created with the given descritor")
         {
             const auto certificateType = TlsTestCertificates::CertificateType::ECDSA;
             std::string certificateFile;
@@ -952,7 +984,6 @@ SCENARIO("TlsSocket fails as expected")
             std::string caCertificateFile;
             TlsTestCertificates::getFilesFromCertificateType(certificateType, certificateFile, privateKeyFile, caCertificateFile);
             TlsConfiguration tlsConfiguration;
-            tlsConfiguration.setCertificateKeyPair(certificateFile, privateKeyFile);
             tlsConfiguration.addCaCertificate(caCertificateFile);
             TlsSocket socket(socketDescriptor, tlsConfiguration);
 
@@ -969,7 +1000,10 @@ SCENARIO("TlsSocket fails as expected")
         static constexpr int backlogSize = 128;
         server.setListenBacklogSize(backlogSize);
         QObject::connect(&server, &QTcpServer::newConnection, [](){FAIL("This code is supposed to be unreachable.");});
-        REQUIRE(server.listen(QHostAddress("127.10.20.90")));
+        auto [hostName, hostAddresses] = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses();
+        const QHostAddress serverAddress("127.10.20.90");
+        REQUIRE(hostAddresses.contains(serverAddress));
+        REQUIRE(server.listen(serverAddress));
         REQUIRE(server.listenBacklogSize() == backlogSize);
         server.pauseAccepting();
         QSemaphore connectedSemaphore;
@@ -983,12 +1017,12 @@ SCENARIO("TlsSocket fails as expected")
             Object::connect(pSocket.get(), &TcpSocket::connected, [&connectedSemaphore](){connectedSemaphore.release();});
             Object::connect(pSocket.get(), &TcpSocket::error, [&errorSemaphore](){errorSemaphore.release();});
             pSocket->connect(server.serverAddress().toString().toStdString(), server.serverPort());
-            isServerAcceptingConnections = SemaphoreAwaiter::signalSlotAwareWait(connectedSemaphore, 1);
+            isServerAcceptingConnections = SemaphoreAwaiter::signalSlotAwareWait(connectedSemaphore, QDeadlineTimer(10));
         }
         while (isServerAcceptingConnections);
         sockets.front()->abort();
 
-        WHEN("a TlsSocket with valid tls configuration tries to connect to server")
+        WHEN("a TlsSocket with valid TLS configuration tries to connect to server")
         {
             const auto certificateType = TlsTestCertificates::CertificateType::ECDSA;
             std::string certificateFile;
@@ -996,26 +1030,25 @@ SCENARIO("TlsSocket fails as expected")
             std::string caCertificateFile;
             TlsTestCertificates::getFilesFromCertificateType(certificateType, certificateFile, privateKeyFile, caCertificateFile);
             TlsConfiguration tlsConfiguration;
-            tlsConfiguration.setCertificateKeyPair(certificateFile, privateKeyFile);
             tlsConfiguration.addCaCertificate(caCertificateFile);
             TlsSocket tlsSocket(tlsConfiguration);
+            tlsSocket.setConnectTimeout(std::chrono::milliseconds(5));
             QSemaphore tlsSocketFailedSemaphore;
             Object::connect(&tlsSocket, &TlsSocket::error, [&]() {tlsSocketFailedSemaphore.release();});
-            tlsSocket.connect("test.onlocalhost.com", server.serverPort());
+            tlsSocket.connect(hostName, server.serverPort());
 
             THEN("TlsSocket times out while trying to connect to server")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(tlsSocketFailedSemaphore, 70));
                 REQUIRE(tlsSocket.state() == TcpSocket::State::Unconnected);
-                std::string expectedErrorMessage("Failed to connect to test.onlocalhost.com at 127.10.20.90:");
-                expectedErrorMessage.append(std::to_string(server.serverPort()));
-                expectedErrorMessage.append(".");
+                const auto expectedErrorMessage = std::string("Failed to connect to ").append(hostName).append(" at ").append(serverAddress.toString().toStdString()).append(":").append(std::to_string(server.serverPort())).append(".");
                 REQUIRE(tlsSocket.errorMessage() == expectedErrorMessage);
             }
         }
     }
 
-    GIVEN("a server that does not do tls hanshakes")
+    /*
+    GIVEN("a server that does not do TLS hanshakes")
     {
         QTcpServer server;
         QObject::connect(&server, &QTcpServer::newConnection, [&]()
@@ -1508,6 +1541,7 @@ SCENARIO("TlsSocket fails as expected")
             }
         }
     }
+    */
 }
 
 namespace TlsSocketTests

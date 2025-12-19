@@ -704,7 +704,6 @@ SCENARIO("TcpSocket fails as expected")
             TcpSocket socket;
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
-            socket.setConnectTimeout(std::chrono::milliseconds(5));
             auto hostName = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses().first;
             socket.connect(hostName, 5000);
 
@@ -726,37 +725,25 @@ SCENARIO("TcpSocket fails as expected")
         size_t connectionCount = 0;
         Object::connect(&server, &TcpServer::newConnection, [&](){++connectionCount;});
 
-        WHEN("a TcpSocket bounded to a IPV4 address is connected to the IPV6 server by host address")
+        WHEN("a TcpSocket bounded to a IPV4 address is connected to the IPV6 server")
         {
             TcpSocket socket;
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
             socket.setBindAddressAndPort("127.2.2.5");
-            socket.setConnectTimeout(std::chrono::milliseconds(5));
-            socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
+            const auto connectByName = GENERATE(AS(bool), true, false);
+            if (connectByName)
+                socket.connect(hostName, server.serverPort());
+            else
+                socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("connection fails")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
-                REQUIRE(socket.errorMessage().starts_with("Failed to connect to [::1]:"));
-            }
-        }
-
-        WHEN("a TcpSocket bounded to a IPV4 address is connected to the IPV6 server by host name")
-        {
-            TcpSocket socket;
-            QSemaphore socketFailedSemaphore;
-            Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
-            socket.setBindAddressAndPort("127.2.2.5");
-            socket.setConnectTimeout(std::chrono::milliseconds(5));
-            socket.connect(hostName, server.serverPort());
-
-            THEN("connection fails")
-            {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
-                REQUIRE(socket.state() == TcpSocket::State::Unconnected);
-                REQUIRE(socket.errorMessage().starts_with(std::string("Failed to connect to ").append(hostName).append(" at [::1]:")));
+                const auto expectedErrorMessage = connectByName ? std::string("Failed to connect to ").append(hostName).append(" at [::1]:") : std::string("Failed to connect to [::1]:");
+                REQUIRE(socket.errorMessage().starts_with(expectedErrorMessage));
+                REQUIRE(connectionCount == 0);
             }
         }
 
@@ -766,14 +753,18 @@ SCENARIO("TcpSocket fails as expected")
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
             socket.setBindAddressAndPort("::1", 443);
-            socket.setConnectTimeout(std::chrono::milliseconds(5));
-            socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
+            const auto connectByName = GENERATE(AS(bool), true, false);
+            if (connectByName)
+                socket.connect(hostName, server.serverPort());
+            else
+                socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("connection fails")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
                 REQUIRE(socket.errorMessage() == "Failed to bind socket to [::1]:443. POSIX error EACCES(13): Permission denied.");
+                REQUIRE(connectionCount == 0);
             }
         }
 
@@ -788,8 +779,11 @@ SCENARIO("TcpSocket fails as expected")
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
             socket.setBindAddressAndPort(previouslyConnectedSocket.localAddress(), previouslyConnectedSocket.localPort());
-            socket.setConnectTimeout(std::chrono::milliseconds(5));
-            socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
+            const auto connectByName = GENERATE(AS(bool), true, false);
+            if (connectByName)
+                socket.connect(hostName, server.serverPort());
+            else
+                socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("connection fails")
             {
@@ -811,38 +805,24 @@ SCENARIO("TcpSocket fails as expected")
         size_t connectionCount = 0;
         Object::connect(&server, &TcpServer::newConnection, [&](){++connectionCount;});
 
-        WHEN("a TcpSocket bounded to a IPV6 address is connected to the IPV4 server by host address")
+        WHEN("a TcpSocket bounded to a IPV6 address is connected to the IPV4 server")
         {
             TcpSocket socket;
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
             socket.setBindAddressAndPort("::1");
-            socket.setConnectTimeout(std::chrono::milliseconds(5));
-            socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
+            const auto connectByName = GENERATE(AS(bool), true, false);
+            if (connectByName)
+                socket.connect(hostName, server.serverPort());
+            else
+                socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("connection fails")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
-                REQUIRE(socket.errorMessage().starts_with(std::string("Failed to connect to ") + hostAddress.toString().toStdString() + std::string(":")));
-                REQUIRE(connectionCount == 0);
-            }
-        }
-
-        WHEN("a TcpSocket bounded to a IPV6 address is connected to the IPV4 server by host name")
-        {
-            TcpSocket socket;
-            QSemaphore socketFailedSemaphore;
-            Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
-            socket.setBindAddressAndPort("::1");
-            socket.setConnectTimeout(std::chrono::milliseconds(5));
-            socket.connect(hostName, server.serverPort());
-
-            THEN("connection fails")
-            {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
-                REQUIRE(socket.state() == TcpSocket::State::Unconnected);
-                REQUIRE(socket.errorMessage().starts_with(std::string("Failed to connect to ").append(hostName).append(" at ").append(hostAddress.toString().toStdString()).append(":")));
+                const auto expectedErrorMessage = connectByName ? std::string("Failed to connect to ").append(hostName).append(" at ").append(hostAddress.toString().toStdString()).append(":") : std::string("Failed to connect to ").append(hostAddress.toString().toStdString()).append(":");
+                REQUIRE(socket.errorMessage().starts_with(expectedErrorMessage));
                 REQUIRE(connectionCount == 0);
             }
         }
@@ -853,8 +833,11 @@ SCENARIO("TcpSocket fails as expected")
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
             socket.setBindAddressAndPort("127.0.0.1", 443);
-            socket.setConnectTimeout(std::chrono::milliseconds(5));
-            socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
+            const auto connectByName = GENERATE(AS(bool), true, false);
+            if (connectByName)
+                socket.connect(hostName, server.serverPort());
+            else
+                socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("connection fails")
             {
@@ -876,8 +859,11 @@ SCENARIO("TcpSocket fails as expected")
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
             socket.setBindAddressAndPort(previouslyConnectedSocket.localAddress(), previouslyConnectedSocket.localPort());
-            socket.setConnectTimeout(std::chrono::milliseconds(5));
-            socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
+            const auto connectByName = GENERATE(AS(bool), true, false);
+            if (connectByName)
+                socket.connect(hostName, server.serverPort());
+            else
+                socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("connection fails")
             {
@@ -957,7 +943,7 @@ SCENARIO("TcpSocket fails as expected")
             Object::connect(pSocket.get(), &TcpSocket::connected, [&connectedSemaphore](){connectedSemaphore.release();});
             Object::connect(pSocket.get(), &TcpSocket::error, [&errorSemaphore](){errorSemaphore.release();});
             pSocket->connect(server.serverAddress().toString().toStdString(), server.serverPort());
-            isServerAcceptingConnections = SemaphoreAwaiter::signalSlotAwareWait(connectedSemaphore, QDeadlineTimer(100));
+            isServerAcceptingConnections = SemaphoreAwaiter::signalSlotAwareWait(connectedSemaphore, QDeadlineTimer(10));
         }
         while (isServerAcceptingConnections);
         sockets.front()->abort();
