@@ -87,89 +87,12 @@ const static QByteArray largeData = []
 using namespace TcpSocketTests;
 
 
-SCENARIO("TcpSocket connects to server by host address")
-{
-    GIVEN("a running server")
-    {
-        const auto serverAddress = GENERATE(AS(QHostAddress), QHostAddress("127.10.20.30"), QHostAddress("::1"));
-        TcpServer server;
-        REQUIRE(server.listen(serverAddress));
-        std::unique_ptr<TcpSocket> serverPeer;
-        QSemaphore serverPeerConnectedSemaphore;
-        QSemaphore serverPeerDisconnectedSemaphore;
-        QSemaphore serverPeerReceivedPingSemaphore;
-        QByteArray serverPeerReceivedData;
-        Object::connect(&server, &TcpServer::newConnection, [&](TcpSocket *pNewSocket)
-            {
-                REQUIRE(!serverPeer);
-                serverPeer.reset(pNewSocket);
-                Object::connect(serverPeer.get(), &TcpSocket::disconnected, [&]{serverPeerDisconnectedSemaphore.release();});
-                Object::connect(serverPeer.get(), &TcpSocket::receivedData, [&]()
-                    {
-                        serverPeerReceivedData.append(serverPeer->readAll());
-                        if (serverPeerReceivedData == "PING")
-                        {
-                            serverPeer->write("PONG");
-                            serverPeer->disconnectFromPeer();
-                            serverPeerReceivedPingSemaphore.release();
-                        }
-                        else if (serverPeerReceivedData.size() >= 4)
-                        {
-                            FAIL("Server peer expects a single PING message.");
-                        }
-                    });
-                serverPeerConnectedSemaphore.release();
-            });
-
-        WHEN("TcpSocket connects to running server by address and port")
-        {
-            TcpSocket clientPeer;
-            QSemaphore clientPeerConnectedSemaphore;
-            QSemaphore clientPeerDisconnectedSemaphore;
-            QSemaphore clientPeerReceivedPongSemaphore;
-            QByteArray clientPeerReceivedData;
-            Object::connect(&clientPeer, &TcpSocket::connected, [&]{clientPeerConnectedSemaphore.release();});
-            Object::connect(&clientPeer, &TcpSocket::disconnected, [&]{clientPeerDisconnectedSemaphore.release();});
-            Object::connect(&clientPeer, &TcpSocket::receivedData, [&]()
-                {
-                    clientPeerReceivedData.append(clientPeer.readAll());
-                    if (clientPeerReceivedData == "PONG")
-                        clientPeerReceivedPongSemaphore.release();
-                    else if (clientPeerReceivedData.size() >= 4)
-                    {
-                        FAIL("Client peer expects a single PONG message.");
-                    }
-                });
-            clientPeer.connect(serverAddress.toString().toStdString(), server.serverPort());
-
-            THEN("server connects to client and client emits the connected signal")
-            {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-
-                AND_WHEN("client peer sends a ping message to the server peer")
-                {
-                    clientPeer.write("PING");
-
-                    THEN("server peer responds with a PONG message and closes the connection")
-                    {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerReceivedPingSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerReceivedPongSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
-                    }
-                }
-            }
-        }
-    }
-}
-
-
-SCENARIO("TcpSocket connects to server by host name")
+SCENARIO("TcpSocket connects to server, sends a PING and gets a PONG as response")
 {
     GIVEN("a running server")
     {
         auto [hostName, hostAddresses] = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses();
+        const auto connectByName = GENERATE(AS(bool), true, false);
         TcpServer server;
         const auto serverAddress = GENERATE(AS(QHostAddress),
                                                QHostAddress("127.10.20.50"),
@@ -207,7 +130,7 @@ SCENARIO("TcpSocket connects to server by host name")
                 serverPeerConnectedSemaphore.release();
             });
 
-        WHEN("TcpSocket connects to running server by hostname")
+        WHEN("TcpSocket connects to server")
         {
             TcpSocket clientPeer;
             QSemaphore clientPeerConnectedSemaphore;
@@ -226,14 +149,17 @@ SCENARIO("TcpSocket connects to server by host name")
                         FAIL("Client peer expects a single PONG message.");
                     }
                 });
-            clientPeer.connect(hostName, server.serverPort());
+            if (connectByName)
+                clientPeer.connect(hostName, server.serverPort());
+            else
+                 clientPeer.connect(serverAddress.toString().toStdString(), server.serverPort());
 
-            THEN("server connects to client and client emits the connected signal")
+            THEN("client connects to server peer")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
 
-                AND_WHEN("client peer sends a ping message to the server peer")
+                AND_WHEN("client peer sends a PING message to the server peer")
                 {
                     clientPeer.write("PING");
 
