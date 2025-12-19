@@ -9,7 +9,7 @@
             "type": "lldb-dap",
             "request": "launch",
             "program": "${command:cmake.launchTargetPath}",
-            "args": ["-r", "10", "-s", "Connected TlsSocket peers interact with each other"],
+            "args": ["-s", "Connected TlsSocket peers interact with each other"],
             "env": [],
             "cwd": "${workspaceRoot}",
             "internalConsoleOptions": "openOnSessionStart",
