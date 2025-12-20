@@ -39,6 +39,7 @@ TlsSocketPrivate::TlsSocketPrivate(RingBuffer &unencryptedIncomingDataBuffer,
     m_tlsDataSource(m_pSSL, m_encryptedIncomingDataBufferBIO.ringBuffer())
 {
     m_handshakeTimer.setSingleShot(true);
+    m_handshakeTimer.setInterval(handshakeTimeoutInMSecs);
     Object::connect(&m_handshakeTimer, &Timer::timeout, this, &TlsSocketPrivate::onHandshakeTimeout);
     try
     {
@@ -166,7 +167,7 @@ void TlsSocketPrivate::doHandshake()
     if (m_hasCompletedHandshake)
         return;
     if (!m_handshakeTimer.isActive())
-        m_handshakeTimer.start(handshakeTimeoutInMSecs);
+        m_handshakeTimer.start();
     switch (const auto ret = SSL_do_handshake(m_pSSL))
     {
         case 0:
@@ -486,6 +487,12 @@ const TlsConfiguration &TlsSocket::tlsConfiguration() const
 {
     Q_D(const TlsSocket);
     return d->tlsConfiguration();
+}
+
+void TlsSocket::setTlsHandshakeTimeout(std::chrono::milliseconds timeout)
+{
+    Q_D(TlsSocket);
+    d->setTlsHandshakeTimeout(timeout);
 }
 
 Signal TlsSocket::encrypted() KOURIER_SIGNAL(&TlsSocket::encrypted)

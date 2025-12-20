@@ -705,6 +705,12 @@ TcpSocket::~TcpSocket()
     d_ptr->scheduleForDeletion();
 }
 
+int64_t TcpSocket::fileDescriptor() const
+{
+    Q_D(const TcpSocket);
+    return d->fileDescriptor();
+}
+
 size_t TcpSocket::read(char *pBuffer, size_t maxSize)
 {
     Q_D(TcpSocket);

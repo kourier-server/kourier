@@ -40,6 +40,7 @@ public:
     std::string_view readAll() override;
     size_t skip(size_t maxSize) override;
     const TlsConfiguration &tlsConfiguration() const;
+    void setTlsHandshakeTimeout(std::chrono::milliseconds timeout);
     Signal encrypted();
 
 private:

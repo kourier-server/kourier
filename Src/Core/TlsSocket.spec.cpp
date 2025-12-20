@@ -32,6 +32,7 @@
 #include <QThread>
 #include <QElapsedTimer>
 #include <QRandomGenerator64>
+#include <chrono>
 #include <memory>
 #include <fstream>
 #include <netinet/in.h>
@@ -1047,21 +1048,21 @@ SCENARIO("TlsSocket fails as expected")
         }
     }
 
-    /*
     GIVEN("a server that does not do TLS hanshakes")
     {
-        QTcpServer server;
-        QObject::connect(&server, &QTcpServer::newConnection, [&]()
-        {
-            static bool firstRun = true;
-            REQUIRE(firstRun);
-            firstRun = false;
-            REQUIRE(server.nextPendingConnection() != nullptr); // socket has server as parent and will be destroyed by it
-            REQUIRE(server.nextPendingConnection() == nullptr);
-        });
-        REQUIRE(server.listen(QHostAddress("127.10.20.90")));
+        auto [hostName, hostAddresses] = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses();
+        const QHostAddress serverAddress("127.10.20.90");
+        REQUIRE(hostAddresses.contains(serverAddress));
+        TcpServer server;
+        std::unique_ptr<TcpSocket> pServerPeer;
+        Object::connect(&server, &TcpServer::newConnection, [&](TcpSocket *pSocket)
+            {
+                REQUIRE(!pServerPeer);
+                pServerPeer.reset(pSocket);
+            });
+        REQUIRE(server.listen(serverAddress));
 
-        WHEN("a TlsSocket with valid tls configuration tries to connect to server")
+        WHEN("a TlsSocket with valid TLS configuration tries to connect to server")
         {
             const auto certificateType = TlsTestCertificates::CertificateType::ECDSA;
             std::string certificateFile;
@@ -1069,27 +1070,33 @@ SCENARIO("TlsSocket fails as expected")
             std::string caCertificateFile;
             TlsTestCertificates::getFilesFromCertificateType(certificateType, certificateFile, privateKeyFile, caCertificateFile);
             TlsConfiguration tlsConfiguration;
-            tlsConfiguration.setCertificateKeyPair(certificateFile, privateKeyFile);
             tlsConfiguration.addCaCertificate(caCertificateFile);
             TlsSocket tlsSocket(tlsConfiguration);
+            tlsSocket.setTlsHandshakeTimeout(std::chrono::milliseconds(5));
             QSemaphore tlsSocketFailedSemaphore;
             Object::connect(&tlsSocket, &TlsSocket::error, [&]() {tlsSocketFailedSemaphore.release();});
-            tlsSocket.connect("test.onlocalhost.com", server.serverPort());
+            tlsSocket.connect(hostName, server.serverPort());
 
             THEN("TlsSocket handshake times out")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(tlsSocketFailedSemaphore, 70));
                 REQUIRE(tlsSocket.state() == TcpSocket::State::Unconnected);
-                std::string expectedErrorMessage("Failed to connect to test.onlocalhost.com at 127.10.20.90:");
-                expectedErrorMessage.append(std::to_string(server.serverPort()));
-                expectedErrorMessage.append(". TLS handshake timed out.");
+                const auto expectedErrorMessage = std::string("Failed to connect to ")
+                                                  .append(hostName)
+                                                  .append(" at ")
+                                                  .append(serverAddress.toString().toStdString()).append(":")
+                                                  .append(std::to_string(server.serverPort()))
+                                                  .append(". TLS handshake timed out.");
                 REQUIRE(tlsSocket.errorMessage() == expectedErrorMessage);
             }
         }
     }
 
-    GIVEN("a client that does not do tls hanshakes")
+    GIVEN("a client that does not do TLS hanshakes")
     {
+        auto [hostName, hostAddresses] = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses();
+        const QHostAddress serverAddress("127.10.20.90");
+        REQUIRE(hostAddresses.contains(serverAddress));
         const auto certificateType = TlsTestCertificates::CertificateType::ECDSA;
         std::string certificateFile;
         std::string privateKeyFile;
@@ -1105,12 +1112,10 @@ SCENARIO("TlsSocket fails as expected")
         {
             REQUIRE(!pSocket);
             pSocket.reset(pNewSocket);
+            pSocket->setTlsHandshakeTimeout(std::chrono::milliseconds(5));
             Object::connect(pSocket.get(), &TlsSocket::error, [&]() {tlsSocketFailedSemaphore.release();});
         });
-        const auto serverAddress = QHostAddress("127.10.20.90");
-        REQUIRE(server.listen(serverAddress, 0));
-        const auto serverPort = server.serverPort();
-        REQUIRE(serverPort >= 1024);
+        REQUIRE(server.listen(serverAddress));
 
         WHEN("client connects to server")
         {
@@ -1126,15 +1131,17 @@ SCENARIO("TlsSocket fails as expected")
                 tcpSocketConnectedSemaphore.release();
             });
             Object::connect(&tcpSocket, &TcpSocket::disconnected, [&]() {tcpSocketDisconnectedSemaphore.release();});
-            tcpSocket.connect("127.10.20.90", server.serverPort());
+            tcpSocket.connect(serverAddress.toString().toStdString(), server.serverPort());
 
             THEN("TcpSocket connects")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(tcpSocketConnectedSemaphore, 1));
 
-                AND_THEN("TlsSocket server peer handshake times out")
+                AND_THEN("TlsSocket server peer handshake times out and disconnects from client")
                 {
                     REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(tlsSocketFailedSemaphore, 70));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(tcpSocketDisconnectedSemaphore, 1));
+                    REQUIRE(tcpSocket.errorMessage().empty());
                     REQUIRE(pSocket->state() == TcpSocket::State::Unconnected);
                     std::string expectedErrorMessage("Failed to connect to ");
                     expectedErrorMessage.append(localAddress);
@@ -1142,12 +1149,6 @@ SCENARIO("TlsSocket fails as expected")
                     expectedErrorMessage.append(std::to_string(localPort));
                     expectedErrorMessage.append(". TLS handshake timed out.");
                     REQUIRE(pSocket->errorMessage() == expectedErrorMessage);
-
-                    AND_THEN("TcpSocket disconnects")
-                    {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(tcpSocketDisconnectedSemaphore, 1));
-                        REQUIRE(tcpSocket.errorMessage().empty());
-                    }
                 }
             }
         }
@@ -1185,14 +1186,14 @@ SCENARIO("TlsSocket fails as expected")
             Object::connect(pSocket.get(), &TlsSocket::disconnected, [&]() {serverPeerDisconnectedSemaphore.release();});
             Object::connect(pSocket.get(), &TlsSocket::receivedData, []() {FAIL("This code is supposed to be unreachable.");});
         });
-        const auto serverAddress = QHostAddress("127.10.20.50");
-        REQUIRE(server.listen(serverAddress, 0));
-        const auto serverPort = server.serverPort();
-        REQUIRE(serverPort >= 1024);
+        auto [hostName, hostAddresses] = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses();
+        const QHostAddress serverAddress("127.10.20.90");
+        REQUIRE(hostAddresses.contains(serverAddress));
+        REQUIRE(server.listen(serverAddress));
 
         WHEN("client peer tries to connect to server")
         {
-            clientPeer.connect("test.onlocalhost.com", serverPort);
+            clientPeer.connect(hostName, server.serverPort());
 
             THEN("client peer fails and disconnects from server")
             {
@@ -1224,80 +1225,71 @@ SCENARIO("TlsSocket fails as expected")
         std::string serverPrivateKeyPassword;
         std::string serverCaCertificateContents;
         TlsTestCertificates::getContentsFromCertificateType(serverCertificateType, serverCertificateContents, serverPrivateKeyContents, serverPrivateKeyPassword, serverCaCertificateContents);
-        auto sslCaCert = QSslCertificate::fromPath(QString::fromStdString(serverCaCertificateFile));
-        REQUIRE(!sslCaCert.isEmpty());
-        QSslConfiguration clientTlsConfiguration;
-        clientTlsConfiguration.setCaCertificates({sslCaCert});
-        auto certChain = QSslCertificate::fromPath(QString::fromStdString(clientCertificateFile));
-        REQUIRE(!certChain.isEmpty());
-        auto sslCert = QSslCertificate::fromPath(QString::fromStdString(clientCaCertificateFile));
-        REQUIRE(!sslCert.isEmpty());
-        clientTlsConfiguration.setLocalCertificateChain(certChain);
-        QSslKey sslKey(QByteArray(clientPrivateKeyContents.data(), clientPrivateKeyContents.size()), QSsl::Ec);
-        REQUIRE(!sslKey.isNull());
-        clientTlsConfiguration.setPrivateKey(sslKey);
+        TlsConfiguration clientTlsConfiguration;
+        clientTlsConfiguration.setCertificateKeyPair(clientCertificateFile, clientPrivateKeyFile, clientPrivateKeyPassword);
+        clientTlsConfiguration.addCaCertificate(clientCaCertificateFile);
+        clientTlsConfiguration.addCaCertificate(serverCaCertificateFile);
         TlsConfiguration serverTlsConfiguration;
         serverTlsConfiguration.setPeerVerifyMode(TlsConfiguration::PeerVerifyMode::On);
         serverTlsConfiguration.setCertificateKeyPair(serverCertificateFile, serverPrivateKeyFile, serverPrivateKeyPassword);
         serverTlsConfiguration.addCaCertificate(serverCaCertificateFile);
         TlsServer server(serverTlsConfiguration);
-        QSemaphore socketConnectedSemaphore;
-        QSemaphore socketFailedSemaphore;
-        QSemaphore socketDisconnectedSemaphore;
-        QSemaphore socketReceivedDataFromPeerSemaphore;
-        QByteArray socketReceivedData;
-        std::unique_ptr<TlsSocket> pSocket;
+        QSemaphore serverPeerConnectedSemaphore;
+        QSemaphore serverPeerFailedSemaphore;
+        QSemaphore serverPeerDisconnectedSemaphore;
+        QSemaphore serverPeerReceivedDataSemaphore;
+        QByteArray serverPeerReceivedData;
+        std::unique_ptr<TlsSocket> pServerPeer;
         Object::connect(&server, &TlsServer::newConnection, [&](TlsSocket *pNewSocket)
         {
-            pSocket.reset(pNewSocket);
-            Object::connect(pSocket.get(), &TlsSocket::encrypted, [&](){FAIL("This code is supposed to be unreachable.");});
-            Object::connect(pSocket.get(), &TlsSocket::error, [&]() {socketFailedSemaphore.release();});
-            Object::connect(pSocket.get(), &TlsSocket::disconnected, [&socketDisconnectedSemaphore]() {socketDisconnectedSemaphore.release();});
-            Object::connect(pSocket.get(), &TlsSocket::receivedData, [&]()
+            REQUIRE(!pServerPeer);
+            pServerPeer.reset(pNewSocket);
+            Object::connect(pServerPeer.get(), &TlsSocket::encrypted, [&](){FAIL("This code is supposed to be unreachable.");});
+            Object::connect(pServerPeer.get(), &TlsSocket::error, [&]() {serverPeerFailedSemaphore.release();});
+            Object::connect(pServerPeer.get(), &TlsSocket::disconnected, [&serverPeerDisconnectedSemaphore]() {serverPeerDisconnectedSemaphore.release();});
+            Object::connect(pServerPeer.get(), &TlsSocket::receivedData, [&]()
             {
                 QByteArray readData;
-                readData.resize(pSocket->dataAvailable());
-                pSocket->read(readData.data(), readData.size());
-                socketReceivedData.append(readData);
-                socketReceivedDataFromPeerSemaphore.release();
+                readData.resize(pServerPeer->dataAvailable());
+                pServerPeer->read(readData.data(), readData.size());
+                serverPeerReceivedData.append(readData);
+                serverPeerReceivedDataSemaphore.release();
             });
-            socketConnectedSemaphore.release();
+            serverPeerConnectedSemaphore.release();
         });
-        const auto serverAddress = QHostAddress("127.10.20.90");
-        REQUIRE(server.listen(serverAddress, 0));
-        const auto serverPort = server.serverPort();
-        REQUIRE(serverPort >= 1024);
+        auto [hostName, hostAddresses] = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses();
+        const QHostAddress serverAddress("127.10.20.90");
+        REQUIRE(hostAddresses.contains(serverAddress));
+        REQUIRE(server.listen(serverAddress));
 
         WHEN("client peer tries to connect to server")
         {
-            QSemaphore peerConnectedSemaphore;
-            QSemaphore peerCompletedHandshakeSemaphore;
-            QSemaphore peerFailedSemaphore;
-            QSemaphore peerDisconnectedSemaphore;
-            QSemaphore peerReceivedDataFromTcpSocketSemaphore;
-            QByteArray peerReceivedData;
-            std::unique_ptr<QSslSocket> pPeerSocket(new QSslSocket);
-            QObject::connect(pPeerSocket.get(), &QSslSocket::connected, [&]() {pPeerSocket->setSocketOption(QAbstractSocket::SocketOption::LowDelayOption, 1); peerConnectedSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QSslSocket::errorOccurred, [&](QAbstractSocket::SocketError error) {peerFailedSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QSslSocket::encrypted, [&](){peerCompletedHandshakeSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QSslSocket::disconnected, [&peerDisconnectedSemaphore](){peerDisconnectedSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QSslSocket::readyRead, [&]()
+            QSemaphore clientPeerConnectedSemaphore;
+            QSemaphore clientPeerCompletedHandshakeSemaphore;
+            QSemaphore clientPeerFailedSemaphore;
+            QSemaphore clientPeerDisconnectedSemaphore;
+            QSemaphore clientPeerReceivedDataSemaphore;
+            QByteArray clientPeerReceivedData;
+            std::unique_ptr<TlsSocket> pClientPeer(new TlsSocket(clientTlsConfiguration));
+            Object::connect(pClientPeer.get(), &TlsSocket::connected, [&]() {clientPeerConnectedSemaphore.release();});
+            Object::connect(pClientPeer.get(), &TlsSocket::error, [&]() {clientPeerFailedSemaphore.release();});
+            Object::connect(pClientPeer.get(), &TlsSocket::encrypted, [&](){clientPeerCompletedHandshakeSemaphore.release();});
+            Object::connect(pClientPeer.get(), &TlsSocket::disconnected, [&clientPeerDisconnectedSemaphore](){clientPeerDisconnectedSemaphore.release();});
+            Object::connect(pClientPeer.get(), &TlsSocket::receivedData, [&]()
             {
-                peerReceivedData.append(pPeerSocket->readAll());
-                peerReceivedDataFromTcpSocketSemaphore.release();
+                clientPeerReceivedData.append(pClientPeer->readAll());
+                clientPeerReceivedDataSemaphore.release();
             });
-            pPeerSocket->setSslConfiguration(clientTlsConfiguration);
-            pPeerSocket->connectToHostEncrypted("test.onlocalhost.com", serverPort);
+            pClientPeer->connect(hostName, server.serverPort());
 
-            THEN("client peer successfully connects and consider its tls handshake as completed, while server peer fails and closes connection")
+            THEN("client peer successfully connects and consider the TLS handshake as successfully completed, while server peer fails to complete TLS handshake and closes the connection disconnecting the client peer")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerCompletedHandshakeSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
-                REQUIRE(!pSocket->errorMessage().empty())
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerFailedSemaphore, 10));
-                REQUIRE(pPeerSocket->error() == QAbstractSocket::SocketError::RemoteHostClosedError);
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerCompletedHandshakeSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerFailedSemaphore, 10));
+                REQUIRE(!pServerPeer->errorMessage().empty())
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                REQUIRE(pClientPeer->errorMessage().empty());
             }
         }
     }
@@ -1324,73 +1316,69 @@ SCENARIO("TlsSocket fails as expected")
         std::string serverPrivateKeyPassword;
         std::string serverCaCertificateContents;
         TlsTestCertificates::getContentsFromCertificateType(serverCertificateType, serverCertificateContents, serverPrivateKeyContents, serverPrivateKeyPassword, serverCaCertificateContents);
-        auto sslCaCert = QSslCertificate::fromPath(QString::fromStdString(serverCaCertificateFile));
-        REQUIRE(!sslCaCert.isEmpty());
-        QSslConfiguration clientTlsConfiguration;
-        clientTlsConfiguration.setCaCertificates({sslCaCert});
+        TlsConfiguration clientTlsConfiguration;
+        clientTlsConfiguration.addCaCertificate(serverCaCertificateFile);
         TlsConfiguration serverTlsConfiguration;
         serverTlsConfiguration.setPeerVerifyMode(TlsConfiguration::PeerVerifyMode::On);
         serverTlsConfiguration.setCertificateKeyPair(serverCertificateFile, serverPrivateKeyFile, serverPrivateKeyPassword);
         serverTlsConfiguration.addCaCertificate(serverCaCertificateFile);
         serverTlsConfiguration.addCaCertificate(clientCaCertificateFile);
         TlsServer server(serverTlsConfiguration);
-        QSemaphore socketConnectedSemaphore;
-        QSemaphore socketFailedSemaphore;
-        QSemaphore socketDisconnectedSemaphore;
-        QSemaphore socketReceivedDataFromPeerSemaphore;
-        QByteArray socketReceivedData;
-        std::unique_ptr<TlsSocket> pSocket;
+        QSemaphore serverPeerConnectedSemaphore;
+        QSemaphore serverPeerFailedSemaphore;
+        QSemaphore serverPeerDisconnectedSemaphore;
+        QSemaphore serverPeerReceivedDataSemaphore;
+        QByteArray serverPeerReceivedData;
+        std::unique_ptr<TlsSocket> pServerPeer;
         Object::connect(&server, &TlsServer::newConnection, [&](TlsSocket *pNewSocket)
         {
-            pSocket.reset(pNewSocket);
-            Object::connect(pSocket.get(), &TlsSocket::encrypted, [&](){FAIL("This code is supposed to be unreachable.");});
-            Object::connect(pSocket.get(), &TlsSocket::error, [&]() {socketFailedSemaphore.release();});
-            Object::connect(pSocket.get(), &TlsSocket::disconnected, [&socketDisconnectedSemaphore]() {socketDisconnectedSemaphore.release();});
-            Object::connect(pSocket.get(), &TlsSocket::receivedData, [&]()
+            pServerPeer.reset(pNewSocket);
+            Object::connect(pServerPeer.get(), &TlsSocket::encrypted, [&](){FAIL("This code is supposed to be unreachable.");});
+            Object::connect(pServerPeer.get(), &TlsSocket::error, [&]() {serverPeerFailedSemaphore.release();});
+            Object::connect(pServerPeer.get(), &TlsSocket::disconnected, [&serverPeerDisconnectedSemaphore]() {serverPeerDisconnectedSemaphore.release();});
+            Object::connect(pServerPeer.get(), &TlsSocket::receivedData, [&]()
             {
                 QByteArray readData;
-                readData.resize(pSocket->dataAvailable());
-                pSocket->read(readData.data(), readData.size());
-                socketReceivedData.append(readData);
-                socketReceivedDataFromPeerSemaphore.release();
+                readData.resize(pServerPeer->dataAvailable());
+                pServerPeer->read(readData.data(), readData.size());
+                serverPeerReceivedData.append(readData);
+                serverPeerReceivedDataSemaphore.release();
             });
-            socketConnectedSemaphore.release();
+            serverPeerConnectedSemaphore.release();
         });
-        const auto serverAddress = QHostAddress("127.10.20.90");
-        REQUIRE(server.listen(serverAddress, 0));
-        const auto serverPort = server.serverPort();
-        REQUIRE(serverPort >= 1024);
+        auto [hostName, hostAddresses] = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses();
+        const QHostAddress serverAddress("127.10.20.90");
+        REQUIRE(hostAddresses.contains(serverAddress));
+        REQUIRE(server.listen(serverAddress));
 
-        WHEN("peer connects to host")
+        WHEN("client peer connects to host")
         {
-            QSemaphore peerConnectedSemaphore;
-            QSemaphore peerCompletedHandshakeSemaphore;
-            QSemaphore peerFailedSemaphore;
-            QSemaphore peerDisconnectedSemaphore;
-            QSemaphore peerReceivedDataFromTcpSocketSemaphore;
-            QByteArray peerReceivedData;
-            std::unique_ptr<QSslSocket> pPeerSocket(new QSslSocket);
-            QObject::connect(pPeerSocket.get(), &QSslSocket::connected, [&]() {pPeerSocket->setSocketOption(QAbstractSocket::SocketOption::LowDelayOption, 1); peerConnectedSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QSslSocket::errorOccurred, [&](QAbstractSocket::SocketError error) {peerFailedSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QSslSocket::encrypted, [&](){peerCompletedHandshakeSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QSslSocket::disconnected, [&peerDisconnectedSemaphore](){peerDisconnectedSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QSslSocket::readyRead, [&]()
+            QSemaphore clientPeerConnectedSemaphore;
+            QSemaphore clientPeerCompletedHandshakeSemaphore;
+            QSemaphore clientPeerFailedSemaphore;
+            QSemaphore clientPeerDisconnectedSemaphore;
+            QSemaphore clientPeerReceivedDataSemaphore;
+            QByteArray clientPeerReceivedData;
+            std::unique_ptr<TlsSocket> pClientPeer(new TlsSocket(clientTlsConfiguration));
+            Object::connect(pClientPeer.get(), &TlsSocket::connected, [&]() {clientPeerConnectedSemaphore.release();});
+            Object::connect(pClientPeer.get(), &TlsSocket::error, [&]() {clientPeerFailedSemaphore.release();});
+            Object::connect(pClientPeer.get(), &TlsSocket::encrypted, [&](){clientPeerCompletedHandshakeSemaphore.release();});
+            Object::connect(pClientPeer.get(), &TlsSocket::disconnected, [&clientPeerDisconnectedSemaphore](){clientPeerDisconnectedSemaphore.release();});
+            Object::connect(pClientPeer.get(), &TlsSocket::receivedData, [&]()
             {
-                peerReceivedData.append(pPeerSocket->readAll());
-                peerReceivedDataFromTcpSocketSemaphore.release();
+                clientPeerReceivedData.append(pClientPeer->readAll());
+                clientPeerReceivedDataSemaphore.release();
             });
-            pPeerSocket->setSslConfiguration(clientTlsConfiguration);
-            pPeerSocket->connectToHostEncrypted("test.onlocalhost.com", serverPort);
+            pClientPeer->connect(hostName, server.serverPort());
 
-            THEN("client peer successfully connects and consider its tls handshake as completed, while server peer fails and closes connection")
+            THEN("client peer successfully connects and consider it's TLS handshake as successfully completed, while server peer fails and closes connection disconnecting client peer")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerCompletedHandshakeSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
-                REQUIRE(!pSocket->errorMessage().empty())
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerFailedSemaphore, 10));
-                REQUIRE(pPeerSocket->error() == QAbstractSocket::SocketError::RemoteHostClosedError);
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerCompletedHandshakeSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerFailedSemaphore, 10));
+                REQUIRE(!pServerPeer->errorMessage().empty())
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                REQUIRE(pClientPeer->errorMessage().empty());
             }
         }
     }
@@ -1407,141 +1395,106 @@ SCENARIO("TlsSocket fails as expected")
         std::string privateKeyPassword;
         std::string caCertificateContents;
         TlsTestCertificates::getContentsFromCertificateType(certificateType, certificateContents, privateKeyContents, privateKeyPassword, caCertificateContents);
-        auto sslCaCert = QSslCertificate::fromPath(QString::fromStdString(caCertificateFile));
-        REQUIRE(!sslCaCert.isEmpty());
-        QSslConfiguration clientTlsConfiguration;
-        clientTlsConfiguration.setCaCertificates({sslCaCert});
+        TlsConfiguration clientTlsConfiguration;
+        clientTlsConfiguration.addCaCertificate(caCertificateFile);
         TlsConfiguration serverTlsConfiguration;
         serverTlsConfiguration.setCertificateKeyPair(certificateFile, privateKeyFile, privateKeyPassword);
         serverTlsConfiguration.addCaCertificate(caCertificateFile);
         TlsServer server(serverTlsConfiguration);
-        QSemaphore socketCompletedHandshakeSemaphore;
-        QSemaphore socketFailedSemaphore;
-        QSemaphore socketDisconnectedSemaphore;
-        QSemaphore socketReceivedDataFromPeerSemaphore;
-        QByteArray socketReceivedData;
-        std::unique_ptr<TlsSocket> pSocket;
+        QSemaphore serverPeerCompletedHandshakeSemaphore;
+        QSemaphore serverPeerFailedSemaphore;
+        QSemaphore serverPeerDisconnectedSemaphore;
+        QSemaphore serverPeerReceivedDataSemaphore;
+        QByteArray serverPeerReceivedData;
+        std::unique_ptr<TlsSocket> pServerPeer;
         Object::connect(&server, &TlsServer::newConnection, [&](TlsSocket *pNewSocket)
         {
-            pSocket.reset(pNewSocket);
-            Object::connect(pSocket.get(), &TlsSocket::connected, [](){FAIL("This code is supposed to be unreachable.");});
-            Object::connect(pSocket.get(), &TlsSocket::encrypted, [&](){socketCompletedHandshakeSemaphore.release();});
-            Object::connect(pSocket.get(), &TlsSocket::error, [&]() {socketFailedSemaphore.release();});
-            Object::connect(pSocket.get(), &TlsSocket::disconnected, [&socketDisconnectedSemaphore]() {socketDisconnectedSemaphore.release();});
-            Object::connect(pSocket.get(), &TlsSocket::receivedData, [&]()
+            pServerPeer.reset(pNewSocket);
+            Object::connect(pServerPeer.get(), &TlsSocket::connected, [](){FAIL("This code is supposed to be unreachable.");});
+            Object::connect(pServerPeer.get(), &TlsSocket::encrypted, [&](){serverPeerCompletedHandshakeSemaphore.release();});
+            Object::connect(pServerPeer.get(), &TlsSocket::error, [&]() {serverPeerFailedSemaphore.release();});
+            Object::connect(pServerPeer.get(), &TlsSocket::disconnected, [&serverPeerDisconnectedSemaphore]() {serverPeerDisconnectedSemaphore.release();});
+            Object::connect(pServerPeer.get(), &TlsSocket::receivedData, [&]()
             {
-                QByteArray readData;
-                readData.resize(pSocket->dataAvailable());
-                pSocket->read(readData.data(), readData.size());
-                socketReceivedData.append(readData);
-                socketReceivedDataFromPeerSemaphore.release();
+                serverPeerReceivedData.append(pServerPeer->readAll());
+                serverPeerReceivedDataSemaphore.release();
             });
         });
-        const auto serverAddress = QHostAddress("127.10.20.50");
-        REQUIRE(server.listen(serverAddress, 0));
-        const auto serverPort = server.serverPort();
-        REQUIRE(serverPort >= 1024);
+        auto [hostName, hostAddresses] = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses();
+        const QHostAddress serverAddress("127.10.20.90");
+        REQUIRE(hostAddresses.contains(serverAddress));
+        REQUIRE(server.listen(serverAddress));
 
         WHEN("peer connects to host")
         {
-            QSemaphore peerConnectedSemaphore;
-            QSemaphore peerCompletedHandshakeSemaphore;
-            QSemaphore peerFailedSemaphore;
-            QSemaphore peerDisconnectedSemaphore;
-            QSemaphore peerReceivedDataFromTcpSocketSemaphore;
-            QByteArray peerReceivedData;
-            std::unique_ptr<QSslSocket> pPeerSocket(new QSslSocket);
-            QObject::connect(pPeerSocket.get(), &QSslSocket::connected, [&]() {pPeerSocket->setSocketOption(QAbstractSocket::SocketOption::LowDelayOption, 1); peerConnectedSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QSslSocket::errorOccurred, [&](QAbstractSocket::SocketError error) {peerFailedSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QSslSocket::encrypted, [&peerCompletedHandshakeSemaphore](){peerCompletedHandshakeSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QSslSocket::disconnected, [&peerDisconnectedSemaphore](){peerDisconnectedSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QSslSocket::readyRead, [&]()
+            QSemaphore clientPeerConnectedSemaphore;
+            QSemaphore clientPeerCompletedHandshakeSemaphore;
+            QSemaphore clientPeerFailedSemaphore;
+            QSemaphore clientPeerDisconnectedSemaphore;
+            QSemaphore clientPeerReceivedDataSemaphore;
+            QByteArray clientPeerReceivedData;
+            std::unique_ptr<TlsSocket> pClientPeer(new TlsSocket(clientTlsConfiguration));
+            Object::connect(pClientPeer.get(), &TlsSocket::connected, [&]() {clientPeerConnectedSemaphore.release();});
+            Object::connect(pClientPeer.get(), &TlsSocket::error, [&]() {clientPeerFailedSemaphore.release();});
+            Object::connect(pClientPeer.get(), &TlsSocket::encrypted, [&clientPeerCompletedHandshakeSemaphore](){clientPeerCompletedHandshakeSemaphore.release();});
+            Object::connect(pClientPeer.get(), &TlsSocket::disconnected, [&clientPeerDisconnectedSemaphore](){clientPeerDisconnectedSemaphore.release();});
+            Object::connect(pClientPeer.get(), &TlsSocket::receivedData, [&]()
             {
-                peerReceivedData.append(pPeerSocket->readAll());
-                peerReceivedDataFromTcpSocketSemaphore.release();
+                clientPeerReceivedData.append(pClientPeer->readAll());
+                clientPeerReceivedDataSemaphore.release();
             });
-            pPeerSocket->setSslConfiguration(clientTlsConfiguration);
-            pPeerSocket->connectToHostEncrypted("test.onlocalhost.com", serverPort);
+            pClientPeer->connect(hostName, server.serverPort());
 
-            THEN("server emits newConnection with a connected socket that does not emit connected but emits encrypted when tls handshake completes")
+            THEN("both peers connect and complete TLS handshake successfully")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketCompletedHandshakeSemaphore, 10));
-                REQUIRE(pSocket->state() == TcpSocket::State::Connected);
-                REQUIRE(pSocket->isEncrypted());
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerCompletedHandshakeSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerCompletedHandshakeSemaphore, 10));
+                REQUIRE(pClientPeer->state() == TcpSocket::State::Connected);
+                REQUIRE(pClientPeer->isEncrypted());
+                REQUIRE(pServerPeer->state() == TcpSocket::State::Connected);
+                REQUIRE(pServerPeer->isEncrypted());
+                REQUIRE(pClientPeer->localAddress() == pServerPeer->peerAddress());
+                REQUIRE(pClientPeer->localPort() == pServerPeer->peerPort());
+                REQUIRE(pClientPeer->peerAddress() == pServerPeer->localAddress());
+                REQUIRE(pClientPeer->peerPort() == pServerPeer->localPort());
 
-                AND_THEN("connecting peer socket emits connected and encrypted when tls handshake completes")
+                AND_WHEN("client peer sends an invalid TLS record to server peer")
                 {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerCompletedHandshakeSemaphore, 10));
-                    REQUIRE(pPeerSocket->localAddress() == QHostAddress(QString::fromStdString(std::string(pSocket->peerAddress()))));
-                    REQUIRE(pPeerSocket->localPort() == pSocket->peerPort());
-                    REQUIRE(pPeerSocket->peerAddress() == QHostAddress(QString::fromStdString(std::string(pSocket->localAddress()))));
-                    REQUIRE(pPeerSocket->peerPort() == pSocket->localPort());
-
-                    AND_WHEN("client peer sends data to server peer")
+                    const auto sendValidDataFirst = GENERATE(AS(bool), true, false);
+                    if (sendValidDataFirst)
                     {
                         const QByteArray dataToSend("This is some data that will be sent in a valid TLS record");
-                        pPeerSocket->write(dataToSend);
-
-                        THEN("server peer receives sent data")
+                        pClientPeer->write(dataToSend);
+                        do
                         {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketReceivedDataFromPeerSemaphore, 10));
-                            REQUIRE(socketReceivedData == dataToSend);
-
-                            AND_WHEN("client peer sends an invalid TLS record to server peer")
-                            {
-                                const QByteArray invalidTlsRecord("This is an invalid TLS record for sure.");
-                                const auto clientPeerSocketDescriptor = pPeerSocket->socketDescriptor();
-                                REQUIRE(clientPeerSocketDescriptor >= 0);
-                                size_t bytesSent = 0;
-                                while (bytesSent != invalidTlsRecord.size())
-                                {
-                                    const auto currentBytesSent = ::write(clientPeerSocketDescriptor, invalidTlsRecord.data() + bytesSent, invalidTlsRecord.size() - bytesSent);
-                                    if (currentBytesSent > 0)
-                                    {
-                                        bytesSent += currentBytesSent;
-                                        if (bytesSent == invalidTlsRecord.size())
-                                            break;
-                                    }
-                                }
-
-                                THEN("server fails and disconnects from client peer")
-                                {
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
-                                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                                }
-                            }
+                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerReceivedDataSemaphore, 10));
+                        } while (serverPeerReceivedData != dataToSend);
+                    }
+                    const QByteArray invalidTlsRecord("This is an invalid TLS record for sure.");
+                    const auto clientPeerSocketDescriptor = pClientPeer->fileDescriptor();
+                    REQUIRE(clientPeerSocketDescriptor >= 0);
+                    size_t bytesSent = 0;
+                    while (bytesSent != invalidTlsRecord.size())
+                    {
+                        const auto currentBytesSent = ::write(clientPeerSocketDescriptor, invalidTlsRecord.data() + bytesSent, invalidTlsRecord.size() - bytesSent);
+                        if (currentBytesSent > 0)
+                        {
+                            bytesSent += currentBytesSent;
+                            if (bytesSent == invalidTlsRecord.size())
+                                break;
                         }
                     }
 
-                    AND_WHEN("client peer sends an invalid TLS record to server peer")
+                    THEN("server fails and disconnects from client peer")
                     {
-                        const QByteArray invalidTlsRecord("This is an invalid TLS record for sure.");
-                        const auto clientPeerSocketDescriptor = pPeerSocket->socketDescriptor();
-                        REQUIRE(clientPeerSocketDescriptor >= 0);
-                        size_t bytesSent = 0;
-                        while (bytesSent != invalidTlsRecord.size())
-                        {
-                            const auto currentBytesSent = ::write(clientPeerSocketDescriptor, invalidTlsRecord.data() + bytesSent, invalidTlsRecord.size() - bytesSent);
-                            if (currentBytesSent > 0)
-                            {
-                                bytesSent += currentBytesSent;
-                                if (bytesSent == invalidTlsRecord.size())
-                                    break;
-                            }
-                        }
-
-                        THEN("server fails and disconnects from client peer")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                        }
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerFailedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
                     }
                 }
             }
         }
     }
-    */
 }
 
 namespace TlsSocketTests

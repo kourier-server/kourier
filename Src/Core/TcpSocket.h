@@ -34,6 +34,7 @@ public:
     TcpSocket();
     TcpSocket(int64_t socketDescriptor);
     ~TcpSocket() override;
+    int64_t fileDescriptor() const;
     size_t read(char *pBuffer, size_t maxSize) override;
     size_t write(std::string_view data) {return !data.empty() ? write(data.data(), data.size()) : 0;}
     size_t write(const char *pData, size_t maxSize) override;

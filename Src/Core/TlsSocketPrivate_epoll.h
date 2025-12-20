@@ -44,6 +44,7 @@ public:
     void connect(std::string_view host, uint16_t port) override;
     void disconnectFromPeer() override;
     void abort() override;
+    void setTlsHandshakeTimeout(std::chrono::milliseconds timeout) {m_handshakeTimer.setInterval(timeout);}
     const TlsConfiguration &tlsConfiguration() const {return m_tlsContext.tlsConfiguration();}
 
 private:
