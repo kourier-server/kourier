@@ -17,6 +17,7 @@
 
 #include "TlsSocket.h"
 #include "AsyncQObject.h"
+#include "Core/TlsConfiguration.h"
 #include <Tests/Resources/TcpServer.h>
 #include <Tests/Resources/TlsServer.h>
 #include <Tests/Resources/TlsTestCertificates.h>
@@ -1396,8 +1397,10 @@ SCENARIO("TlsSocket fails as expected")
         std::string caCertificateContents;
         TlsTestCertificates::getContentsFromCertificateType(certificateType, certificateContents, privateKeyContents, privateKeyPassword, caCertificateContents);
         TlsConfiguration clientTlsConfiguration;
+        clientTlsConfiguration.setTlsVersion(TlsConfiguration::TlsVersion::TLS_1_3);
         clientTlsConfiguration.addCaCertificate(caCertificateFile);
         TlsConfiguration serverTlsConfiguration;
+        serverTlsConfiguration.setTlsVersion(TlsConfiguration::TlsVersion::TLS_1_3);
         serverTlsConfiguration.setCertificateKeyPair(certificateFile, privateKeyFile, privateKeyPassword);
         serverTlsConfiguration.addCaCertificate(caCertificateFile);
         TlsServer server(serverTlsConfiguration);
@@ -1471,7 +1474,23 @@ SCENARIO("TlsSocket fails as expected")
                             REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerReceivedDataSemaphore, 10));
                         } while (serverPeerReceivedData != dataToSend);
                     }
-                    const QByteArray invalidTlsRecord("This is an invalid TLS record for sure.");
+                    enum class TlsRecordElement {Type, Version, Length};
+                    const auto invalidTlsRecordElement = GENERATE(AS(TlsRecordElement),
+                                                                  TlsRecordElement::Type,
+                                                                  TlsRecordElement::Version,
+                                                                  TlsRecordElement::Length);
+                    const QByteArray invalidTlsRecord = [](TlsRecordElement tlsRecordElement)
+                    {
+                        switch(tlsRecordElement)
+                        {
+                            case TlsRecordElement::Type:
+                                return QByteArray::fromHex("aa03040500");
+                            case TlsRecordElement::Version:
+                                return QByteArray::fromHex("1703ff0500");
+                            case TlsRecordElement::Length:
+                                return QByteArray::fromHex("170304ffff");
+                            }
+                    }(invalidTlsRecordElement);
                     const auto clientPeerSocketDescriptor = pClientPeer->fileDescriptor();
                     REQUIRE(clientPeerSocketDescriptor >= 0);
                     size_t bytesSent = 0;
@@ -1490,6 +1509,7 @@ SCENARIO("TlsSocket fails as expected")
                     {
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerFailedSemaphore, 10));
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                        REQUIRE(pServerPeer->errorMessage().starts_with("Failed to decrypt data."));
                     }
                 }
             }
