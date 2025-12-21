@@ -33,6 +33,7 @@ public:
     static std::pair<std::string_view, QList<QHostAddress>> hostNameWithIpv4Ipv6Addresses();
     static std::pair<std::string_view, QList<QHostAddress>> hostNameWithIpv4Address();
     static std::pair<std::string_view, QList<QHostAddress>> hostNameWithIpv6Address();
+    static std::pair<std::string_view, QList<QHostAddress>> hostNameWithIpv4Addresses();
 };
 
 }

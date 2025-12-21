@@ -76,19 +76,25 @@ private:
 
 std::pair<std::string_view, QList<QHostAddress>> TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses()
 {
-    static HostAddressesFetcher hostAddressesFetcher("ipv4_ipv6_addresses.onlocalhost");
+    static HostAddressesFetcher hostAddressesFetcher("ipv4-ipv6-addresses.test.local");
     return {hostAddressesFetcher.hostName(), hostAddressesFetcher.hostAddresses()};
 }
 
 std::pair<std::string_view, QList<QHostAddress>> TestHostNamesFetcher::hostNameWithIpv4Address()
 {
-    static HostAddressesFetcher hostAddressesFetcher("ipv4_address.onlocalhost");
+    static HostAddressesFetcher hostAddressesFetcher("ipv4-address.test.local");
     return {hostAddressesFetcher.hostName(), hostAddressesFetcher.hostAddresses()};
 }
 
 std::pair<std::string_view, QList<QHostAddress>> TestHostNamesFetcher::hostNameWithIpv6Address()
 {
-    static HostAddressesFetcher hostAddressesFetcher("ipv6_address.onlocalhost");
+    static HostAddressesFetcher hostAddressesFetcher("ipv6-address.test.local");
+    return {hostAddressesFetcher.hostName(), hostAddressesFetcher.hostAddresses()};
+}
+
+std::pair<std::string_view, QList<QHostAddress>> TestHostNamesFetcher::hostNameWithIpv4Addresses()
+{
+    static HostAddressesFetcher hostAddressesFetcher("ipv4-addresses.test.local");
     return {hostAddressesFetcher.hostName(), hostAddressesFetcher.hostAddresses()};
 }
 
