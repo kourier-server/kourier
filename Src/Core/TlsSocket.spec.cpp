@@ -1810,524 +1810,534 @@ SCENARIO("TlsSocket allows connected slots to take any action")
             }
         }
 
-        /*
         WHEN("client peer connects to server and completes TLS handshake")
         {
-            Object::connect(pClientPeer.get(), &TlsSocket::connected, [&]()
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                    clientPeerConnectedSemaphore.release();
-                });
             pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
             REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerCompletedHandshakeSemaphore, 10));
             REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerCompletedHandshakeSemaphore, 10));
             REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerCompletedHandshakeSemaphore, 10));
-            REQUIRE(!clientPeerDisconnectedSemaphore.tryAcquire());
-            REQUIRE(!serverPeerDisconnectedSemaphore.tryAcquire());
-            REQUIRE(!clientPeerFailedSemaphore.tryAcquire());
-            REQUIRE(!serverPeerFailedSemaphore.tryAcquire());
 
             THEN("connected peers can start exchanging data")
             {
-                AND_WHEN("connected peer sends some data to TcpSocket")
+                AND_WHEN("server peer sends some data to client peer which disconnects while handling the receivedData signal")
                 {
+                    Object::connect(pClientPeer.get(), &TlsSocket::receivedData, [&](){pClientPeer->disconnectFromPeer();});
                     pServerPeer->write("abcdefgh");
 
-                    AND_WHEN("TlsSocket disconnects while handling the receivedData signal")
+                    THEN("peers disconnect")
                     {
-                        Object::connect(pClientPeer.get(), &TlsSocket::receivedData, [&](){pClientPeer->disconnectFromPeer();});
-
-                        THEN("TlsSocket disconnects from peer")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                            REQUIRE(pClientPeer->errorMessage().empty());
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerFailedSemaphore, 10));
-                            REQUIRE(pServerPeer->error() == QAbstractSocket::SocketError::RemoteHostClosedError);
-                        }
-                    }
-
-
-                    AND_WHEN("TlsSocket aborts connection while handling the receivedData signal")
-                    {
-                        Object::connect(pClientPeer.get(), &TlsSocket::receivedData, [&](){pClientPeer->abort();});
-
-                        THEN("TlsSocket disconnects from peer")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
-                            REQUIRE(pClientPeer->state() == TcpSocket::State::Unconnected);
-                            REQUIRE(pClientPeer->errorMessage().empty());
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerFailedSemaphore, 10));
-                            REQUIRE(pServerPeer->error() == QAbstractSocket::SocketError::RemoteHostClosedError);
-                        }
-                    }
-
-                    AND_WHEN("TlsSocket is destroyed while handling the receivedData signal")
-                    {
-                        Object::connect(pClientPeer.get(), &TlsSocket::receivedData, [&](){pClientPeer.release()->scheduleForDeletion();});
-
-                        THEN("TlsSocket disconnects from peer")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerFailedSemaphore, 10));
-                            REQUIRE(pServerPeer->error() == QAbstractSocket::SocketError::RemoteHostClosedError);
-                        }
-                    }
-
-                    AND_WHEN("TlsSocket is reconnected while handling the receivedData signal")
-                    {
-                        QObject::connect(pServerPeer.get(), &QTcpSocket::disconnected, pServerPeer.get(), &QObject::deleteLater);
-                        pServerPeer.release();
-
-                        Object::connect(pClientPeer.get(), &TlsSocket::receivedData, [&]()
-                        {
-                            pClientPeer->connect("ipv4_ipv6_addresses.local", serverPort);
-                        });
-
-                        THEN("TcpSocket aborts and then reconnects")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerCompletedHandshakeSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                        }
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                     }
                 }
 
-                AND_WHEN("TlsSocket sends more data than the socket's send buffer can store")
+
+                AND_WHEN("server peer sends some data to client peer which aborts the connection while handling the receivedData signal")
                 {
+                    Object::connect(pClientPeer.get(), &TlsSocket::receivedData, [&](){pClientPeer->abort();});
+                    pServerPeer->write("abcdefgh");
+
+                    THEN("client peer aborts and server peer disconnects")
+                    {
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(pClientPeer->state() == TcpSocket::State::Unconnected);
+                    }
+                }
+
+                AND_WHEN("server peer sends some data to client peer which is destroyed while handling the receivedData signal")
+                {
+                    auto *pReleasedSocket = pClientPeer.release();
+                    Object::connect(pReleasedSocket, &TlsSocket::receivedData, [=](){pReleasedSocket->scheduleForDeletion();});
+                    pServerPeer->write("abcdefgh");
+
+                    THEN("client peer is destroyed and server peer disconnects")
+                    {
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                    }
+                }
+
+                AND_WHEN("server peer sends some data to client peer which reconnects while handling the receivedData signal")
+                {
+                    Object::connect(pServerPeer.get(), &TlsSocket::disconnected, [pPeer = pServerPeer.get()](){pPeer->scheduleForDeletion();});
+                    Object::connect(pClientPeer.get(), &TlsSocket::receivedData, [&]()
+                    {
+                        pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
+                    });
+                    pServerPeer->write("abcdefgh");
+                    pServerPeer.release();
+
+                    THEN("client peer aborts connection and disconnects server peer before reconnecting to another server peer")
+                    {
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));   
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerCompletedHandshakeSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerCompletedHandshakeSemaphore, 10));
+                        pClientPeer->disconnectFromPeer();
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                    }
+                }
+
+                AND_WHEN("client peer sends more data the underlying socket's send buffer can store and disconnects while handling the sentData signal with data still to be written")
+                {
+                    auto *pObject = new Object;
+                    Object::connect(pClientPeer.get(), &TlsSocket::sentData, pObject, [&, pCtxObject = pObject]()
+                    {
+                        if (pClientPeer->dataToWrite())
+                        {
+                            pClientPeer->disconnectFromPeer();
+                            delete pCtxObject;
+                        }
+                    });
                     const auto socketSendBufferSize = pClientPeer->getSocketOption(TcpSocket::SocketOption::SendBufferSize);
                     REQUIRE(socketSendBufferSize > 1);
-                    const size_t dataSizeToSend = qCeil<double>((3.0 * socketSendBufferSize)/sizeof(quint32))*sizeof(quint32);
-                    REQUIRE((dataSizeToSend % sizeof(quint32)) == 0);
-                    REQUIRE(dataSizeToSend > socketSendBufferSize);
-                    QByteArray dataToSend(dataSizeToSend, ' ');
-                    QRandomGenerator64::global()->fillRange<quint32>((quint32*)dataToSend.data(), dataToSend.size()/sizeof(quint32));
+                    QByteArray dataToSend(3 * socketSendBufferSize, ' ');
                     pClientPeer->write(dataToSend.data(), dataToSend.size());
 
-                    AND_WHEN("TlsSocket disconnects while handling the sentData signal with data still to be written")
+                    THEN("peers disconnect")
                     {
-                        Object::connect(pClientPeer.get(), &TlsSocket::sentData, [&]()
-                        {
-                            if (pClientPeer->dataToWrite())
-                                pClientPeer->disconnectFromPeer();
-                        });
-
-                        THEN("TlsSocket disconnects from peer")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerFailedSemaphore, 10));
-                            REQUIRE(pServerPeer->error() == QAbstractSocket::SocketError::RemoteHostClosedError);
-                        }
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                     }
+                }
 
-                    AND_WHEN("TcpSocket disconnects while handling the sentData signal with no more data still to be written")
+                AND_WHEN("client peer sends more data the underlying socket's send buffer can store and disconnects while handling the sentData signal with  no more data still to be written")
+                {
+                    auto *pObject = new Object;
+                    Object::connect(pClientPeer.get(), &TlsSocket::sentData, pObject, [&, pCtxObject = pObject]()
                     {
-                        Object::connect(pClientPeer.get(), &TlsSocket::sentData, [&]()
+                        if (!pClientPeer->dataToWrite())
                         {
-                            if (!pClientPeer->dataToWrite())
-                                pClientPeer->disconnectFromPeer();
-                        });
-
-                        THEN("TcpSocket disconnects from peer")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerFailedSemaphore, 10));
-                            REQUIRE(pServerPeer->error() == QAbstractSocket::SocketError::RemoteHostClosedError);
+                            pClientPeer->disconnectFromPeer();
+                            delete pCtxObject;
                         }
+                    });
+                    const auto socketSendBufferSize = pClientPeer->getSocketOption(TcpSocket::SocketOption::SendBufferSize);
+                    REQUIRE(socketSendBufferSize > 1);
+                    QByteArray dataToSend(3 * socketSendBufferSize, ' ');
+                    pClientPeer->write(dataToSend.data(), dataToSend.size());
+
+                    THEN("peers disconnect")
+                    {
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                     }
+                }
 
-                    AND_WHEN("TlsSocket aborts connection while handling the sentData signal with data still to be written")
+                AND_WHEN("client peer sends more data the underlying socket's send buffer can store and aborts the connection while handling the sentData signal with data still to be written")
+                {
+                    auto *pObject = new Object;
+                    Object::connect(pClientPeer.get(), &TlsSocket::sentData, pObject, [&, pCtxObject = pObject]()
                     {
-                        Object::connect(pClientPeer.get(), &TlsSocket::sentData, [&]()
+                        if (pClientPeer->dataToWrite())
                         {
-                            if (pClientPeer->dataToWrite())
-                                pClientPeer->abort();
-                        });
-
-                        THEN("TlsSocket disconnects from peer")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
-                            REQUIRE(pClientPeer->state() == TcpSocket::State::Unconnected);
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerFailedSemaphore, 10));
-                            REQUIRE(pServerPeer->error() == QAbstractSocket::SocketError::RemoteHostClosedError);
+                            pClientPeer->abort();
+                            delete pCtxObject;
                         }
+                    });
+                    const auto socketSendBufferSize = pClientPeer->getSocketOption(TcpSocket::SocketOption::SendBufferSize);
+                    REQUIRE(socketSendBufferSize > 1);
+                    QByteArray dataToSend(3 * socketSendBufferSize, ' ');
+                    pClientPeer->write(dataToSend.data(), dataToSend.size());
+
+                    THEN("client peer aborts the connection, disconnecting the server peer")
+                    {
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(pClientPeer->state() == TcpSocket::State::Unconnected);
                     }
+                }
 
-                    AND_WHEN("TlsSocket aborts connection while handling the sentData signal with no more data data still to be written")
+                AND_WHEN("client peer sends more data the underlying socket's send buffer can store and aborts the connection while handling the sentData signal with no more data data still to be written")
+                {
+                    auto *pObject = new Object;
+                    Object::connect(pClientPeer.get(), &TlsSocket::sentData, pObject, [&, pCtxObject = pObject]()
                     {
-                        Object::connect(pClientPeer.get(), &TlsSocket::sentData, [&]()
+                        if (!pClientPeer->dataToWrite())
                         {
-                            if (!pClientPeer->dataToWrite())
-                                pClientPeer->abort();
-                        });
-
-                        THEN("TlsSocket disconnects from peer")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
-                            REQUIRE(pClientPeer->state() == TcpSocket::State::Unconnected);
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerFailedSemaphore, 10));
-                            REQUIRE(pServerPeer->error() == QAbstractSocket::SocketError::RemoteHostClosedError);
+                            pClientPeer->abort();
+                            delete pCtxObject;
                         }
+                    });
+                    const auto socketSendBufferSize = pClientPeer->getSocketOption(TcpSocket::SocketOption::SendBufferSize);
+                    REQUIRE(socketSendBufferSize > 1);
+                    QByteArray dataToSend(3 * socketSendBufferSize, ' ');
+                    pClientPeer->write(dataToSend.data(), dataToSend.size());
+
+                    THEN("client peer aborts the connection, disconnecting the server peer")
+                    {
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(pClientPeer->state() == TcpSocket::State::Unconnected);
                     }
+                }
 
-                    AND_WHEN("TlsSocket is destroyed while handling the sentData signal with data still to be written")
+                AND_WHEN("client peer sends more data the underlying socket's send buffer can store and is destroyed while handling the sentData signal with data still to be written")
+                {
+                    auto *pObject = new Object;
+                    Object::connect(pClientPeer.get(), &TlsSocket::sentData, [&, pCtxObject = pObject, ptrSocket = pClientPeer.get()]()
                     {
-                        Object::connect(pClientPeer.get(), &TlsSocket::sentData, [&]()
+                        if (ptrSocket->dataToWrite())
                         {
-                            if (pClientPeer->dataToWrite())
-                                pClientPeer.release()->scheduleForDeletion();
-                        });
-
-                        THEN("TlsSocket disconnects from peer")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerFailedSemaphore, 10));
-                            REQUIRE(pServerPeer->error() == QAbstractSocket::SocketError::RemoteHostClosedError);
+                            ptrSocket->scheduleForDeletion();
+                            pClientPeer.release();
+                            delete pCtxObject;
                         }
+                    });
+                    const auto socketSendBufferSize = pClientPeer->getSocketOption(TcpSocket::SocketOption::SendBufferSize);
+                    REQUIRE(socketSendBufferSize > 1);
+                    QByteArray dataToSend(3 * socketSendBufferSize, ' ');
+                    pClientPeer->write(dataToSend.data(), dataToSend.size());
+
+                    THEN("client peer aborts the connection during destruction, disconnecting the server peer")
+                    {
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                     }
+                }
 
-                    AND_WHEN("TlsSocket is destroyed while handling the sentData signal with no more data still to be written")
+                AND_WHEN("client peer sends more data the underlying socket's send buffer can store and is destroyed while handling the sentData signal with no more data still to be written")
+                {
+                    auto *pObject = new Object;
+                    Object::connect(pClientPeer.get(), &TlsSocket::sentData, pObject, [&, pCtxObject = pObject]()
                     {
-                        Object::connect(pClientPeer.get(), &TlsSocket::sentData, [&]()
+                        if (!pClientPeer->dataToWrite())
                         {
-                            if (!pClientPeer->dataToWrite())
-                                pClientPeer.release()->scheduleForDeletion();
-                        });
-
-                        THEN("TlsSocket disconnects from peer")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerFailedSemaphore, 10));
-                            REQUIRE(pServerPeer->error() == QAbstractSocket::SocketError::RemoteHostClosedError);
+                            pClientPeer.release()->scheduleForDeletion();
+                            delete pCtxObject;
                         }
+                    });
+                    const auto socketSendBufferSize = pClientPeer->getSocketOption(TcpSocket::SocketOption::SendBufferSize);
+                    REQUIRE(socketSendBufferSize > 1);
+                    QByteArray dataToSend(3 * socketSendBufferSize, ' ');
+                    pClientPeer->write(dataToSend.data(), dataToSend.size());
+
+                    THEN("client peer aborts the connection during destruction, disconnecting the server peer")
+                    {
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                     }
+                }
 
-                    AND_WHEN("TlsSocket is reconnected while handling the sentData signal with data still to be written")
+                AND_WHEN("client peer sends more data the underlying socket's send buffer can store and is reconnected while handling the sentData signal with data still to be written")
+                {
+                    auto *pPeer = pServerPeer.release();
+                    Object::connect(pPeer, &TlsSocket::disconnected, [=](){pPeer->scheduleForDeletion();});
+                    auto *pObject = new Object;
+                    Object::connect(pClientPeer.get(), &TlsSocket::sentData, pObject, [&, pCtxObject = pObject]()
                     {
-                        QObject::connect(pServerPeer.get(), &QSslSocket::disconnected, pServerPeer.get(), &QObject::deleteLater);
-                        pServerPeer.release();
-
-                        Object::connect(pClientPeer.get(), &TlsSocket::sentData, [&]()
+                        if (pClientPeer->dataToWrite())
                         {
-                            if (pClientPeer->dataToWrite())
-                                pClientPeer->connect("ipv4_ipv6_addresses.local", serverPort);
-                        });
-
-                        THEN("TlsSocket reconnects after disconnecting")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerCompletedHandshakeSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-
+                            pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
+                            delete pCtxObject;
                         }
+                    });
+                    const auto socketSendBufferSize = pClientPeer->getSocketOption(TcpSocket::SocketOption::SendBufferSize);
+                    REQUIRE(socketSendBufferSize > 1);
+                    QByteArray dataToSend(3 * socketSendBufferSize, ' ');
+                    pClientPeer->write(dataToSend.data(), dataToSend.size());
+
+                    THEN("client peer aborts the connection disconnecting the server peer and reconnects to another server peer")
+                    {
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerCompletedHandshakeSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerCompletedHandshakeSemaphore, 10));
+                        pClientPeer->disconnectFromPeer();
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                     }
+                }
 
-                    AND_WHEN("TlsSocket is reconnected while handling the sentData signal with no more data still to be written")
+                AND_WHEN("client peer sends more data the underlying socket's send buffer can store and is reconnected while handling the sentData signal with no more data still to be written")
+                {
+                    auto *pPeer = pServerPeer.release();
+                    Object::connect(pPeer, &TlsSocket::disconnected, [=](){pPeer->scheduleForDeletion();});
+                    auto *pObject = new Object;
+                    Object::connect(pClientPeer.get(), &TlsSocket::sentData, pObject, [&, pCtxObject = pObject]()
                     {
-                        QObject::connect(pServerPeer.get(), &QSslSocket::disconnected, pServerPeer.get(), &QObject::deleteLater);
-                        pServerPeer.release();
-
-                        Object::connect(pClientPeer.get(), &TlsSocket::sentData, [&]()
+                        if (!pClientPeer->dataToWrite())
                         {
-                            if (!pClientPeer->dataToWrite())
-                                pClientPeer->connect("ipv4_ipv6_addresses.local", serverPort);
-                        });
-
-                        THEN("TlsSocket reconnects after disconnecting")
-                        {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerCompletedHandshakeSemaphore, 10));
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                            pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
+                            delete pCtxObject;
                         }
+                    });
+                    const auto socketSendBufferSize = pClientPeer->getSocketOption(TcpSocket::SocketOption::SendBufferSize);
+                    REQUIRE(socketSendBufferSize > 1);
+                    QByteArray dataToSend(3 * socketSendBufferSize, ' ');
+                    pClientPeer->write(dataToSend.data(), dataToSend.size());
+
+                    THEN("client peer aborts the connection disconnecting the server peer and reconnects to another server peer")
+                    {
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerCompletedHandshakeSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerCompletedHandshakeSemaphore, 10));
+                        pClientPeer->disconnectFromPeer();
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                     }
                 }
             }
 
-            AND_WHEN("connected peer disconnects")
+            AND_WHEN("server peer disconnects and client peer is disconnected while handling the disconnected signal")
             {
-                pServerPeer->disconnectFromHost();
                 QSemaphore socketDisconnectedFromPeerSemaphore;
-
-                AND_WHEN("TlsSocket is disconnected while handling the disconnected signal")
+                Object::connect(pClientPeer.get(), &TlsSocket::disconnected, [&]()
                 {
-                    Object::connect(pClientPeer.get(), &TlsSocket::disconnected, [&]()
-                    {
-                        pClientPeer->disconnectFromPeer();
-                        socketDisconnectedFromPeerSemaphore.release();
-                    });
+                    pClientPeer->disconnectFromPeer();
+                    socketDisconnectedFromPeerSemaphore.release();
+                });
+                pServerPeer->disconnectFromPeer();
 
-                    THEN("no exception is thrown")
-                    {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedFromPeerSemaphore, 10));
-                    }
+                THEN("peers disconnect")
+                {
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedFromPeerSemaphore, 10));
                 }
+            }
 
-                AND_WHEN("TcpSocket aborts connection while handling the disconnected signal")
+            AND_WHEN("server peer disconnects and client peer aborts connection while handling the disconnected signal")
+            {
+                QSemaphore socketDisconnectedFromPeerSemaphore;
+                Object::connect(pClientPeer.get(), &TlsSocket::disconnected, [&]()
                 {
-                    Object::connect(pClientPeer.get(), &TlsSocket::disconnected, [&]()
-                    {
-                        pClientPeer->abort();
-                        socketDisconnectedFromPeerSemaphore.release();
-                    });
+                    pClientPeer->abort();
+                    socketDisconnectedFromPeerSemaphore.release();
+                });
+                pServerPeer->disconnectFromPeer();
 
-                    THEN("no exception is thrown")
-                    {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedFromPeerSemaphore, 10));
-                    }
+                THEN("peers disconnect")
+                {
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedFromPeerSemaphore, 10));
                 }
+            }
 
-                AND_WHEN("TlsSocket is destroyed while handling the disconnected signal")
+            AND_WHEN("server peer disconnects and client peer is destroyed while handling the disconnected signal")
+            {
+                QSemaphore socketDisconnectedFromPeerSemaphore;
+                Object::connect(pClientPeer.get(), &TlsSocket::disconnected, [&]()
                 {
-                    Object::connect(pClientPeer.get(), &TlsSocket::disconnected, [&]()
-                    {
-                        pClientPeer.release()->scheduleForDeletion();
-                        socketDisconnectedFromPeerSemaphore.release();
-                    });
+                    pClientPeer.release()->scheduleForDeletion();
+                    socketDisconnectedFromPeerSemaphore.release();
+                });
+                pServerPeer->disconnectFromPeer();
 
-                    THEN("no exception is thrown")
-                    {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedFromPeerSemaphore, 10));
-                    }
+                THEN("peers disconnect")
+                {
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedFromPeerSemaphore, 10));
                 }
+            }
 
-                AND_WHEN("TlsSocket is reconnected while handling the disconnected signal")
+            AND_WHEN("server peer disconnects and client peer is reconnected while handling the disconnected signal")
+            {
+                QSemaphore socketDisconnectedFromPeerSemaphore;
+                auto *pCtxObject = new Object;
+                Object::connect(pClientPeer.get(), &TlsSocket::disconnected, pCtxObject, [&, ptrCtxObject = pCtxObject]()
                 {
-                    pServerPeer.release()->deleteLater();
-                    Object::connect(pClientPeer.get(), &TlsSocket::disconnected, [&]()
-                    {
-                        socketDisconnectedFromPeerSemaphore.release();
-                        pClientPeer->connect("ipv4_ipv6_addresses.local", serverPort);
-                    });
+                    socketDisconnectedFromPeerSemaphore.release();
+                    pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
+                    delete ptrCtxObject;
+                });
+                auto *ptrServerPeer = pServerPeer.release();
+                ptrServerPeer->disconnectFromPeer();
+                ptrServerPeer->scheduleForDeletion();
 
-                    THEN("TlsSocket disconnects and then reconnects")
-                    {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedFromPeerSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerCompletedHandshakeSemaphore, 10));
-                    }
+                THEN("peers disconnect and client peer reconnects to another server peer")
+                {
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedFromPeerSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerCompletedHandshakeSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerCompletedHandshakeSemaphore, 10));
+                    pClientPeer->disconnectFromPeer();
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                 }
             }
         }
 
-        WHEN("TlsSocket tries to connect to a non-existent server by address")
+        WHEN("client peer tries to connect to a non-existent server by address and is disconnected while handling the error signal")
         {
+            QSemaphore socketHandledErrorSemaphore;
+            Object::connect(pClientPeer.get(), &TlsSocket::error, [&]()
+            {
+                REQUIRE(!pClientPeer->errorMessage().empty());
+                pClientPeer->disconnectFromPeer();
+                socketHandledErrorSemaphore.release();
+            });
             auto const serverAddress = QHostAddress("127.1.2.3");
             QTcpSocket socket;
             REQUIRE(socket.bind(serverAddress));
             const auto unusedPortForNow = socket.localPort();
             socket.abort();
             pClientPeer->connect(serverAddress.toString().toStdString(), unusedPortForNow);
-            QSemaphore socketHandledErrorSemaphore;
 
-            AND_WHEN("TlsSocket is disconnected while handling the error signal")
+            THEN("client peer handles error")
             {
-                Object::connect(pClientPeer.get(), &TlsSocket::error, [&]()
-                {
-                    REQUIRE(!pClientPeer->errorMessage().empty());
-                    pClientPeer->disconnectFromPeer();
-                    socketHandledErrorSemaphore.release();
-                });
-
-                THEN("no exception is thrown")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                }
-            }
-
-            AND_WHEN("TlsSocket aborts connection while handling the error signal")
-            {
-                Object::connect(pClientPeer.get(), &TlsSocket::error, [&]()
-                {
-                    REQUIRE(!pClientPeer->errorMessage().empty());
-                    pClientPeer->abort();
-                    socketHandledErrorSemaphore.release();
-                });
-
-                THEN("no exception is thrown")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                }
-            }
-
-            AND_WHEN("TlsSocket is destroyed while handling the error signal")
-            {
-                Object::connect(pClientPeer.get(), &TlsSocket::error, [&]()
-                {
-                    REQUIRE(!pClientPeer->errorMessage().empty());
-                    pClientPeer.release()->scheduleForDeletion();
-                    socketHandledErrorSemaphore.release();
-                });
-
-                THEN("no exception is thrown")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                }
-            }
-
-            AND_WHEN("TlsSocket is reconnected to the running server while handling the error signal")
-            {
-                Object::connect(pClientPeer.get(), &TcpSocket::error, [&]()
-                {
-                    REQUIRE(!pClientPeer->errorMessage().empty());
-                    REQUIRE(!clientPeerConnectedSemaphore.tryAcquire());
-                    pClientPeer->connect("ipv4_ipv6_addresses.local", serverPort);
-                    socketHandledErrorSemaphore.release();
-                });
-
-                THEN("TlsSocket reconnects after disconnecting")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerCompletedHandshakeSemaphore, 10));
-                }
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
             }
         }
 
-        WHEN("TlsSocket tries to connect to a non-existent server by name")
+        WHEN("client peer tries to connect to a non-existent server by address and aborts connection while handling the error signal")
         {
-            pClientPeer->connect("This.domain.name.does.not.exist.for.sure", 3008);
             QSemaphore socketHandledErrorSemaphore;
-
-            AND_WHEN("TlsSocket is disconnected while handling the error signal")
+            Object::connect(pClientPeer.get(), &TlsSocket::error, [&]()
             {
-                Object::connect(pClientPeer.get(), &TlsSocket::error, [&]()
-                {
-                    REQUIRE(!pClientPeer->errorMessage().empty());
-                    pClientPeer->disconnectFromPeer();
-                    socketHandledErrorSemaphore.release();
-                });
+                REQUIRE(!pClientPeer->errorMessage().empty());
+                pClientPeer->abort();
+                socketHandledErrorSemaphore.release();
+            });
+            auto const serverAddress = QHostAddress("127.1.2.3");
+            QTcpSocket socket;
+            REQUIRE(socket.bind(serverAddress));
+            const auto unusedPortForNow = socket.localPort();
+            socket.abort();
+            pClientPeer->connect(serverAddress.toString().toStdString(), unusedPortForNow);
 
-                THEN("no exception is thrown")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                }
-            }
-
-            AND_WHEN("TlsSocket aborts connection while handling the error signal")
+            THEN("client peer handles error")
             {
-                Object::connect(pClientPeer.get(), &TlsSocket::error, [&]()
-                {
-                    REQUIRE(!pClientPeer->errorMessage().empty());
-                    pClientPeer->abort();
-                    socketHandledErrorSemaphore.release();
-                });
-
-                THEN("no exception is thrown")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                }
-            }
-
-            AND_WHEN("TlsSocket is destroyed while handling the error signal")
-            {
-                Object::connect(pClientPeer.get(), &TcpSocket::error, [&]()
-                {
-                    REQUIRE(!pClientPeer->errorMessage().empty());
-                    pClientPeer.release()->scheduleForDeletion();
-                    socketHandledErrorSemaphore.release();
-                });
-
-                THEN("no exception is thrown")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                }
-            }
-
-            AND_WHEN("TlsSocket is reconnected to the running server while handling the error signal")
-            {
-                Object::connect(pClientPeer.get(), &TcpSocket::error, [&]()
-                {
-                    REQUIRE(!pClientPeer->errorMessage().empty());
-                    REQUIRE(!clientPeerConnectedSemaphore.tryAcquire());
-                    pClientPeer->connect("ipv4_ipv6_addresses.local", serverPort);
-                    socketHandledErrorSemaphore.release();
-                });
-
-                THEN("TcpSocket reconnects after aborting")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerCompletedHandshakeSemaphore, 10));
-                }
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
             }
         }
 
-        WHEN("TcpSocket tries to connect to ipv4_ipv6_addresses.local without any server running")
+        WHEN("client peer tries to connect to a non-existent server by address and is destroyed while handling the error signal")
         {
-            pClientPeer->connect("ipv4_ipv6_addresses.local", 3008);
             QSemaphore socketHandledErrorSemaphore;
-
-            AND_WHEN("TlsSocket is disconnected while handling the error signal")
+            Object::connect(pClientPeer.get(), &TlsSocket::error, [&]()
             {
-                Object::connect(pClientPeer.get(), &TlsSocket::error, [&]()
+                REQUIRE(!pClientPeer->errorMessage().empty());
+                pClientPeer.release()->scheduleForDeletion();
+                socketHandledErrorSemaphore.release();
+            });
+            auto const serverAddress = QHostAddress("127.1.2.3");
+            QTcpSocket socket;
+            REQUIRE(socket.bind(serverAddress));
+            const auto unusedPortForNow = socket.localPort();
+            socket.abort();
+            pClientPeer->connect(serverAddress.toString().toStdString(), unusedPortForNow);
+
+            THEN("client peer handles error")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
+            }
+        }
+
+        WHEN("client peer tries to connect to a non-existent server by address and connects to the running server while handling the error signal")
+        {
+            QSemaphore socketHandledErrorSemaphore;
+            Object::connect(pClientPeer.get(), &TlsSocket::error, [&]()
+                {
+                    REQUIRE(!pClientPeer->errorMessage().empty());
+                    REQUIRE(!clientPeerConnectedSemaphore.tryAcquire());
+                    pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
+                    socketHandledErrorSemaphore.release();
+                });
+            auto const serverAddress = QHostAddress("127.1.2.3");
+            QTcpSocket socket;
+            REQUIRE(socket.bind(serverAddress));
+            const auto unusedPortForNow = socket.localPort();
+            socket.abort();
+            pClientPeer->connect(serverAddress.toString().toStdString(), unusedPortForNow);
+
+            THEN("client peer handles error, aborts and connects to server peer")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerCompletedHandshakeSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerCompletedHandshakeSemaphore, 10));
+                REQUIRE(pClientPeer->errorMessage().empty());
+                pClientPeer->disconnectFromPeer();
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+            }
+        }
+
+        WHEN("client peer tries to connect to host name with IPV4/IPV6 addresses without any server running and disconnects while handling the error signal")
+        {
+            QSemaphore socketHandledErrorSemaphore;
+            Object::connect(pClientPeer.get(), &TlsSocket::error, [&]()
                 {
                     REQUIRE(!pClientPeer->errorMessage().empty());
                     pClientPeer->disconnectFromPeer();
                     socketHandledErrorSemaphore.release();
                 });
+            pClientPeer->setConnectTimeout(std::chrono::milliseconds(5));
+            auto hostName = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses().first;
+            pClientPeer->connect(hostName, 3008);
 
-                THEN("no exception is thrown")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                }
-            }
-
-            AND_WHEN("TlsSocket aborts connection while handling the error signal")
+            THEN("client peer handles error")
             {
-                Object::connect(pClientPeer.get(), &TlsSocket::error, [&]()
-                {
-                    REQUIRE(!pClientPeer->errorMessage().empty());
-                    pClientPeer->abort();
-                    socketHandledErrorSemaphore.release();
-                });
-
-                THEN("no exception is thrown")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                }
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
             }
+        }
 
-            AND_WHEN("TlsSocket is destroyed while handling the error signal")
+        WHEN("client peer tries to connect to host name with IPV4/IPV6 addresses without any server running and aborts connection while handling the error signal")
+        {
+            QSemaphore socketHandledErrorSemaphore;
+            Object::connect(pClientPeer.get(), &TlsSocket::error, [&]()
             {
-                Object::connect(pClientPeer.get(), &TcpSocket::error, [&]()
-                {
-                    REQUIRE(!pClientPeer->errorMessage().empty());
-                    pClientPeer.release()->scheduleForDeletion();
-                    socketHandledErrorSemaphore.release();
-                });
+                REQUIRE(!pClientPeer->errorMessage().empty());
+                pClientPeer->abort();
+                socketHandledErrorSemaphore.release();
+            });
+            auto hostName = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses().first;
+            pClientPeer->connect(hostName, 3008);
 
-                THEN("no exception is thrown")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                }
+            THEN("client peer handles error")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
             }
+        }
 
-            AND_WHEN("TlsSocket is reconnected to the running server while handling the error signal")
+        WHEN("client peer tries to connect to host name with IPV4/IPV6 addresses without any server running and is destroyed while handling the error signal")
+        {
+            QSemaphore socketHandledErrorSemaphore;
+            Object::connect(pClientPeer.get(), &TlsSocket::error, [&]()
             {
-                Object::connect(pClientPeer.get(), &TcpSocket::error, [&]()
-                {
-                    REQUIRE(!pClientPeer->errorMessage().empty());
-                    REQUIRE(!clientPeerConnectedSemaphore.tryAcquire());
-                    pClientPeer->connect("ipv4_ipv6_addresses.local", serverPort);
-                    socketHandledErrorSemaphore.release();
-                });
+                REQUIRE(!pClientPeer->errorMessage().empty());
+                pClientPeer.release()->scheduleForDeletion();
+                socketHandledErrorSemaphore.release();
+            });
+            auto hostName = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses().first;
+            pClientPeer->connect(hostName, 3008);
 
-                THEN("TcpSocket reconnects after aborting")
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerCompletedHandshakeSemaphore, 10));
-                }
+            THEN("client peer handles error")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
+            }
+        }
+
+        WHEN("client peer tries to connect to host name with IPV4/IPV6 addresses without any server running and is reconnected to the running server while handling the error signal")
+        {
+            QSemaphore socketHandledErrorSemaphore;
+            Object::connect(pClientPeer.get(), &TlsSocket::error, [&]()
+            {
+                REQUIRE(!pClientPeer->errorMessage().empty());
+                REQUIRE(!clientPeerConnectedSemaphore.tryAcquire());
+                pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
+                socketHandledErrorSemaphore.release();
+            });
+            auto hostName = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses().first;
+            pClientPeer->connect(hostName, 3008);
+
+            THEN("client peer handles error and aborts before connecting to server peer")
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerCompletedHandshakeSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerCompletedHandshakeSemaphore, 10));
+                pClientPeer->disconnectFromPeer();
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
             }
         }
     }
@@ -2615,7 +2625,6 @@ SCENARIO("TlsSockets can be reused")
                 }
             }
         }
-        */
     }
 }
 

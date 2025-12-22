@@ -266,6 +266,7 @@ void TlsSocketPrivate::onEvent(uint32_t epollEvents)
         size_t receivedDataSize = 0;
         size_t sentDataSize = 0;
         bool hasDisconnected = false;
+        const auto hasCompletedHandshake = m_hasCompletedHandshake;
         if (epollEvents & EPOLLOUT)
         {
             if (m_state == TcpSocket::State::Connected)
@@ -340,7 +341,7 @@ void TlsSocketPrivate::onEvent(uint32_t epollEvents)
         const auto contextId = m_contextId;
         if (receivedDataSize > 0)
             q->receivedData();
-        if (contextId == m_contextId && sentDataSize > 0)
+        if (contextId == m_contextId && sentDataSize > 0 && hasCompletedHandshake)
             q->sentData(sentDataSize);
         if (contextId == m_contextId && hasDisconnected)
         {

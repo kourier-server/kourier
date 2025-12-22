@@ -1125,43 +1125,43 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
             THEN("connected peers can start exchanging data")
             {
-                AND_WHEN("connected peer sends some data to TcpSocket and TcpSocket disconnects while handling the receivedData signal")
+                AND_WHEN("server peer sends some data to client peer which disconnects while handling the receivedData signal")
                 {
                     Object::connect(pClientPeer.get(), &TcpSocket::receivedData, [&](){pClientPeer->disconnectFromPeer();});
                     pServerPeer->write("abcdefgh");
 
-                    THEN("TcpSocket and peer disconnect")
+                    THEN("peers disconnect")
                     {
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                     }
                 }
 
-                AND_WHEN("connected peer sends some data to TcpSocket and TcpSocket aborts connection while handling the receivedData signal")
+                AND_WHEN("server peer sends some data to client peer which aborts the connection while handling the receivedData signal")
                 {
                     Object::connect(pClientPeer.get(), &TcpSocket::receivedData, [&](){pClientPeer->abort();});
                     pServerPeer->write("abcdefgh");
 
-                    THEN("TcpSocket aborts and peer disconnects")
+                    THEN("client peer aborts and server peer disconnects")
                     {
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                         REQUIRE(pClientPeer->state() == TcpSocket::State::Unconnected);
                     }
                 }
 
-                AND_WHEN("connected peer sends some data to TcpSocket and TcpSocket is destroyed while handling the receivedData signal")
+                AND_WHEN("server peer sends some data to client peer which is destroyed while handling the receivedData signal")
                 {
                     auto *pReleasedSocket = pClientPeer.release();
                     Object::connect(pReleasedSocket, &TcpSocket::receivedData, [=](){pReleasedSocket->scheduleForDeletion();});
                     pServerPeer->write("abcdefgh");
 
-                    THEN("peer disconnects")
+                    THEN("client peer is destroyed and server peer disconnects")
                     {
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                     }
                 }
 
-                AND_WHEN("connected peer sends some data to TcpSocket and TcpSocket is reconnected while handling the receivedData signal")
+                AND_WHEN("server peer sends some data to client peer which reconnects while handling the receivedData signal")
                 {
                     Object::connect(pServerPeer.get(), &TcpSocket::disconnected, [pPeer = pServerPeer.get()](){pPeer->scheduleForDeletion();});
                     Object::connect(pClientPeer.get(), &TcpSocket::receivedData, [&]()
@@ -1171,7 +1171,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                     pServerPeer->write("abcdefgh");
                     pServerPeer.release();
 
-                    THEN("TcpSocket aborts and peer disconnects and then TcpSocket reconnects to another peer")
+                    THEN("client peer aborts connection and disconnects server peer before reconnecting to another server peer")
                     {
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
@@ -1182,7 +1182,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                     }
                 }
 
-                AND_WHEN("TcpSocket sends more data than the socket's send buffer can store and TcpSocket disconnects while handling the sentData signal with data still to be written")
+                AND_WHEN("client peer sends more data the underlying socket's send buffer can store and disconnects while handling the sentData signal with data still to be written")
                 {
                     Object::connect(pClientPeer.get(), &TcpSocket::sentData, [&]()
                     {
@@ -1194,14 +1194,14 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                     QByteArray dataToSend(3 * socketSendBufferSize, ' ');
                     pClientPeer->write(dataToSend.data(), dataToSend.size());
 
-                    THEN("TcpSocket and peer disconnect")
+                    THEN("peers disconnect")
                     {
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                     }
                 }
 
-                AND_WHEN("TcpSocket sends more data than the socket's send buffer can store and TcpSocket disconnects while handling the sentData signal with no more data still to be written")
+                AND_WHEN("client peer sends more data the underlying socket's send buffer can store and disconnects while handling the sentData signal with  no more data still to be written")
                 {
                     Object::connect(pClientPeer.get(), &TcpSocket::sentData, [&]()
                     {
@@ -1213,14 +1213,14 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                     QByteArray dataToSend(3 * socketSendBufferSize, ' ');
                     pClientPeer->write(dataToSend.data(), dataToSend.size());
 
-                    THEN("TcpSocket and peer disconnect")
+                    THEN("peers disconnect")
                     {
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                     }
                 }
 
-                AND_WHEN("TcpSocket sends more data than the socket's send buffer can store and TcpSocket aborts connection while handling the sentData signal with data still to be written")
+                AND_WHEN("client peer sends more data the underlying socket's send buffer can store and aborts the connection while handling the sentData signal with data still to be written")
                 {
                     Object::connect(pClientPeer.get(), &TcpSocket::sentData, [&]()
                     {
@@ -1232,14 +1232,14 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                     QByteArray dataToSend(3 * socketSendBufferSize, ' ');
                     pClientPeer->write(dataToSend.data(), dataToSend.size());
 
-                    THEN("peer disconnects")
+                    THEN("client peer aborts the connection, disconnecting the server peer")
                     {
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                         REQUIRE(pClientPeer->state() == TcpSocket::State::Unconnected);
                     }
                 }
 
-                AND_WHEN("TcpSocket sends more data than the socket's send buffer can store and TcpSocket aborts connection while handling the sentData signal with no more data data still to be written")
+                AND_WHEN("client peer sends more data the underlying socket's send buffer can store and aborts the connection while handling the sentData signal with no more data data still to be written")
                 {
                     Object::connect(pClientPeer.get(), &TcpSocket::sentData, [&]()
                     {
@@ -1251,14 +1251,14 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                     QByteArray dataToSend(3 * socketSendBufferSize, ' ');
                     pClientPeer->write(dataToSend.data(), dataToSend.size());
 
-                    THEN("peer disconnects")
+                    THEN("client peer aborts the connection, disconnecting the server peer")
                     {
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                         REQUIRE(pClientPeer->state() == TcpSocket::State::Unconnected);
                     }
                 }
 
-                AND_WHEN("TcpSocket sends more data than the socket's send buffer can store and TcpSocket is destroyed while handling the sentData signal with data still to be written")
+                AND_WHEN("client peer sends more data the underlying socket's send buffer can store and is destroyed while handling the sentData signal with data still to be written")
                 {
                     Object::connect(pClientPeer.get(), &TcpSocket::sentData, [&, ptrSocket = pClientPeer.get()]()
                     {
@@ -1273,13 +1273,13 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                     QByteArray dataToSend(3 * socketSendBufferSize, ' ');
                     pClientPeer->write(dataToSend.data(), dataToSend.size());
 
-                    THEN("peer disconnects")
+                    THEN("client peer aborts the connection during destruction, disconnecting the server peer")
                     {
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                     }
                 }
 
-                AND_WHEN("TcpSocket sends more data than the socket's send buffer can store and TcpSocket is destroyed while handling the sentData signal with no more data still to be written")
+                AND_WHEN("client peer sends more data the underlying socket's send buffer can store and is destroyed while handling the sentData signal with no more data still to be written")
                 {
                     Object::connect(pClientPeer.get(), &TcpSocket::sentData, [&]()
                     {
@@ -1291,17 +1291,16 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                     QByteArray dataToSend(3 * socketSendBufferSize, ' ');
                     pClientPeer->write(dataToSend.data(), dataToSend.size());
 
-                    THEN("peer disconnects")
+                    THEN("client peer aborts the connection during destruction, disconnecting the server peer")
                     {
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                     }
                 }
 
-                AND_WHEN("TcpSocket sends more data than the socket's send buffer can store and TcpSocket is reconnected while handling the sentData signal with data still to be written")
+                AND_WHEN("client peer sends more data the underlying socket's send buffer can store and is reconnected while handling the sentData signal with data still to be written")
                 {
                     auto *pPeer = pServerPeer.release();
                     Object::connect(pPeer, &TcpSocket::disconnected, [=](){pPeer->scheduleForDeletion();});
-
                     Object::connect(pClientPeer.get(), &TcpSocket::sentData, [&]()
                     {
                         if (pClientPeer->dataToWrite())
@@ -1312,7 +1311,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                     QByteArray dataToSend(3 * socketSendBufferSize, ' ');
                     pClientPeer->write(dataToSend.data(), dataToSend.size());
 
-                    THEN("peer disconnects and TcpSocket aborts and reconnects")
+                    THEN("client peer aborts the connection disconnecting the server peer and reconnects to another server peer")
                     {
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
@@ -1323,11 +1322,10 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                     }
                 }
 
-                AND_WHEN("TcpSocket sends more data than the socket's send buffer can store and TcpSocket is reconnected while handling the sentData signal with no more data still to be written")
+                AND_WHEN("client peer sends more data the underlying socket's send buffer can store and is reconnected while handling the sentData signal with no more data still to be written")
                 {
                     auto *pPeer = pServerPeer.release();
                     Object::connect(pPeer, &TcpSocket::disconnected, [=](){pPeer->scheduleForDeletion();});
-
                     Object::connect(pClientPeer.get(), &TcpSocket::sentData, [&]()
                     {
                         if (!pClientPeer->dataToWrite())
@@ -1338,7 +1336,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                     QByteArray dataToSend(3 * socketSendBufferSize, ' ');
                     pClientPeer->write(dataToSend.data(), dataToSend.size());
 
-                    THEN("peer disconnects and TcpSocket aborts and reconnects")
+                    THEN("client peer aborts the connection disconnecting the server peer and reconnects to another server peer")
                     {
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
@@ -1350,7 +1348,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                 }
             }
 
-            AND_WHEN("connected peer disconnects and TcpSocket is disconnected while handling the disconnected signal")
+            AND_WHEN("server peer disconnects and client peer is disconnected while handling the disconnected signal")
             {
                 QSemaphore socketDisconnectedFromPeerSemaphore;
                 Object::connect(pClientPeer.get(), &TcpSocket::disconnected, [&]()
@@ -1360,7 +1358,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                 });
                 pServerPeer->disconnectFromPeer();
 
-                THEN("TcpSocket and peer disconnect")
+                THEN("peers disconnect")
                 {
                     REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
                     REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
@@ -1368,7 +1366,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                 }
             }
 
-            AND_WHEN("connected peer disconnects and TcpSocket aborts connection while handling the disconnected signal")
+            AND_WHEN("server peer disconnects and client peer aborts connection while handling the disconnected signal")
             {
                 QSemaphore socketDisconnectedFromPeerSemaphore;
                 Object::connect(pClientPeer.get(), &TcpSocket::disconnected, [&]()
@@ -1378,7 +1376,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                 });
                 pServerPeer->disconnectFromPeer();
 
-                THEN("TcpSocket and peer disconnect")
+                THEN("peers disconnect")
                 {
                     REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
                     REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
@@ -1386,7 +1384,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                 }
             }
 
-            AND_WHEN("connected peer disconnects and TcpSocket is destroyed while handling the disconnected signal")
+            AND_WHEN("server peer disconnects and client peer is destroyed while handling the disconnected signal")
             {
                 QSemaphore socketDisconnectedFromPeerSemaphore;
                 Object::connect(pClientPeer.get(), &TcpSocket::disconnected, [&]()
@@ -1396,7 +1394,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                 });
                 pServerPeer->disconnectFromPeer();
 
-                THEN("TcpSocket and peer disconnect")
+                THEN("peers disconnect")
                 {
                     REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
                     REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
@@ -1404,7 +1402,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                 }
             }
 
-            AND_WHEN("connected peer disconnects and TcpSocket is reconnected while handling the disconnected signal")
+            AND_WHEN("server peer disconnects and client peer is reconnected while handling the disconnected signal")
             {
                 QSemaphore socketDisconnectedFromPeerSemaphore;
                 auto *pCtxObject = new Object;
@@ -1414,10 +1412,11 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                     pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
                     delete ptrCtxObject;
                 });
-                pServerPeer->disconnectFromPeer();
-                pServerPeer.release()->scheduleForDeletion();
+                auto *ptrServerPeer = pServerPeer.release();
+                ptrServerPeer->disconnectFromPeer();
+                ptrServerPeer->scheduleForDeletion();
 
-                THEN("TcpSocket and peer disconnect and then TcpSocket reconnects to another peer")
+                THEN("peers disconnect and client peer reconnects to another server peer")
                 {
                     REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
                     REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedFromPeerSemaphore, 10));
