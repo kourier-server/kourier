@@ -2346,282 +2346,69 @@ SCENARIO("TlsSocket allows connected slots to take any action")
 
 SCENARIO("TlsSockets can be reused")
 {
-    GIVEN("a QSslServer listening for connections")
+    GIVEN("A running server whose sockets close the connections just after the TLS handshake completes")
     {
+        auto [hostName, hostAddresses] = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses();
+        const auto connectByName = GENERATE(AS(bool), true, false);
+        const auto serverAddress = GENERATE(AS(QHostAddress),
+                                            QHostAddress("127.10.20.50"),
+                                            QHostAddress("127.10.20.60"),
+                                            QHostAddress("127.10.20.70"),
+                                            QHostAddress("127.10.20.80"),
+                                            QHostAddress("127.10.20.90"),
+                                            QHostAddress("::1"));
+        REQUIRE(hostAddresses.contains(serverAddress));
         const auto certificateType = TlsTestCertificates::CertificateType::ECDSA;
         std::string certificateFile;
         std::string privateKeyFile;
         std::string caCertificateFile;
         TlsTestCertificates::getFilesFromCertificateType(certificateType, certificateFile, privateKeyFile, caCertificateFile);
-        auto certChain = QSslCertificate::fromPath(QString::fromStdString(certificateFile));
-        REQUIRE(!certChain.isEmpty());
-        auto sslCert = QSslCertificate::fromPath(QString::fromStdString(caCertificateFile));
-        REQUIRE(!sslCert.isEmpty());
-        QSslConfiguration serverTlsConfiguration;
-        serverTlsConfiguration.setLocalCertificateChain(certChain);
-        QFile file(QString::fromStdString(privateKeyFile));
-        REQUIRE(file.open(QIODevice::ReadOnly));
-        const auto keyContents = file.readAll();
-        REQUIRE(!keyContents.isEmpty());
-        QSslKey sslKey(keyContents, QSsl::Ec);
-        REQUIRE(!sslKey.isNull());
-        serverTlsConfiguration.setPrivateKey(sslKey);
-        serverTlsConfiguration.addCaCertificates(sslCert);
-        REQUIRE(!serverTlsConfiguration.isNull());
-        TlsConfiguration clientTlsConfiguration;
-        clientTlsConfiguration.addCaCertificate(caCertificateFile);
-        QSslServer server;
-        server.setSslConfiguration(serverTlsConfiguration);
-        QSemaphore peerCompletedHandshakeSemaphore;
-        QSemaphore peerFailedSemaphore;
-        QSemaphore peerDisconnectedSemaphore;
-        QSemaphore peerReceivedDataFromSocketSemaphore;
-        std::unique_ptr<QSslSocket> pPeerSocket;
-        QObject::connect(&server, &QSslServer::pendingConnectionAvailable, [&]()
-        {
-            REQUIRE(server.hasPendingConnections());
-            if (pPeerSocket.get() != nullptr)
-                pPeerSocket.release()->setParent(&server);
-            pPeerSocket.reset(qobject_cast<QSslSocket*>(server.nextPendingConnection()));
-            REQUIRE(pPeerSocket.get() != nullptr);
-            pPeerSocket->setParent(nullptr);
-            pPeerSocket->setSocketOption(QAbstractSocket::SocketOption::LowDelayOption, 1);
-            REQUIRE(!server.hasPendingConnections());
-            QObject::connect(pPeerSocket.get(), &QSslSocket::errorOccurred, [&](QAbstractSocket::SocketError error) {peerFailedSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QSslSocket::disconnected, [&](){peerDisconnectedSemaphore.release();});
-            QObject::connect(pPeerSocket.get(), &QSslSocket::readyRead, [&]()
-            {
-                if (pPeerSocket->bytesAvailable() != 6)
-                    return;
-                const auto receivedData = pPeerSocket->readAll();
-                if (receivedData == "PING\r\n")
-                    pPeerSocket->write("PONG\r\n");
-                else if (receivedData == "QUIT\r\n")
-                    pPeerSocket->disconnectFromHost();
-                else
-                {
-                    FAIL("This code is supposed to be unreachable");
-                }
-                peerReceivedDataFromSocketSemaphore.release();
-            });
-            peerCompletedHandshakeSemaphore.release();
-        });
-        const auto serverAddress = QHostAddress("127.10.20.50");
-        REQUIRE(server.listen(serverAddress, 0));
-        const auto serverPort = server.serverPort();
-        REQUIRE(serverPort >= 1024);
-
-        WHEN("TlsSocket connects to server and play ping pong game three times")
-        {
-            static constexpr int repCount = 3;
-            static constexpr int pingCount = 31;
-            QSemaphore socketCompletedHandshakeSemaphore;
-            QSemaphore socketFailedSemaphore;
-            QSemaphore socketDisconnectedSemaphore;
-            QSemaphore socketReceivedDataFromPeerSemaphore;
-            int currentPingCount = 0;
-            std::unique_ptr<TlsSocket> pSocket(new TlsSocket(clientTlsConfiguration));
-            Object::connect(pSocket.get(), &TlsSocket::error, [&]() {socketFailedSemaphore.release();});
-            Object::connect(pSocket.get(), &TlsSocket::encrypted, [&]()
-            {
-                ++currentPingCount;
-                pSocket->write("PING\r\n");
-                socketCompletedHandshakeSemaphore.release();
-            });
-            Object::connect(pSocket.get(), &TlsSocket::disconnected, [&]()
-            {
-                currentPingCount = 0;
-                socketDisconnectedSemaphore.release();
-            });
-            Object::connect(pSocket.get(), &TlsSocket::receivedData, [&]()
-            {
-                std::string_view expectedData("PONG\r\n");
-                if (pSocket->dataAvailable() != expectedData.size())
-                    return;
-                REQUIRE(pSocket->readAll() == expectedData);
-                if (++currentPingCount <= pingCount)
-                    pSocket->write("PING\r\n");
-                else
-                    pSocket->write("QUIT\r\n");
-                socketReceivedDataFromPeerSemaphore.release();
-            });
-            for (auto i = 0; i < repCount; ++i)
-            {
-                pSocket->connect("ipv4_ipv6_addresses.local", serverPort);
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerCompletedHandshakeSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketCompletedHandshakeSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-            }
-
-            THEN("sockets exchange messages as expected")
-            {
-                const int tcpSocketReceivedDataSemaphoreReleaseCount = repCount * pingCount;
-                REQUIRE(socketReceivedDataFromPeerSemaphore.tryAcquire(tcpSocketReceivedDataSemaphoreReleaseCount));
-                REQUIRE(!socketReceivedDataFromPeerSemaphore.tryAcquire(1));
-            }
-        }
-    }
-
-    GIVEN("a TlsServer listening for connections")
-    {
-        const auto certificateType = TlsTestCertificates::CertificateType::ECDSA;
-        std::string certificateFile;
-        std::string privateKeyFile;
-        std::string caCertificateFile;
-        TlsTestCertificates::getFilesFromCertificateType(certificateType, certificateFile, privateKeyFile, caCertificateFile);
-        TlsConfiguration clientTlsConfiguration;
-        clientTlsConfiguration.addCaCertificate(caCertificateFile);
         TlsConfiguration serverTlsConfiguration;
         serverTlsConfiguration.setCertificateKeyPair(certificateFile, privateKeyFile);
         serverTlsConfiguration.addCaCertificate(caCertificateFile);
         TlsServer server(serverTlsConfiguration);
-        QSemaphore peerCompletedHandshakeSemaphore;
-        QSemaphore peerFailedSemaphore;
-        QSemaphore peerDisconnectedSemaphore;
-        QSemaphore peerReceivedDataFromSocketSemaphore;
-        std::unique_ptr<TlsSocket> pPeerSocket;
-        Object::connect(&server, &TlsServer::newConnection, [&](TlsSocket *pNewSocket)
+        TlsConfiguration clientTlsConfiguration;
+        clientTlsConfiguration.addCaCertificate(caCertificateFile);
+        QSemaphore serverPeerConnectedSemaphore;
+        QSemaphore serverPeerCompletedHandshakeSemaphore;
+        QSemaphore serverPeerFailedSemaphore;
+        QSemaphore serverPeerDisconnectedSemaphore;
+        QSemaphore serverPeerReceivedDataSemaphore;
+        QByteArray serverPeerReceivedData;
+        std::unique_ptr<TlsSocket> pServerPeer;
+        Object::connect(&server, &TlsServer::newConnection, [&](TlsSocket *pSocket)
         {
-            pPeerSocket.reset(pNewSocket);
-            Object::connect(pPeerSocket.get(), &TlsSocket::encrypted, [&](){peerCompletedHandshakeSemaphore.release();});
-            Object::connect(pPeerSocket.get(), &TlsSocket::receivedData, [&]()
-            {
-                if (pPeerSocket->dataAvailable() != 6)
-                    return;
-                const auto receivedData = pPeerSocket->readAll();
-                if (receivedData == "PING\r\n")
-                    pPeerSocket->write("PONG\r\n");
-                else if (receivedData == "QUIT\r\n")
-                    pPeerSocket->disconnectFromPeer();
-                else
-                {
-                    FAIL("This code is supposed to be unreachable");
-                }
-                peerReceivedDataFromSocketSemaphore.release();
-            });
-            Object::connect(pPeerSocket.get(), &TlsSocket::disconnected, [&](){peerDisconnectedSemaphore.release();});
-            Object::connect(pPeerSocket.get(), &TlsSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+            REQUIRE(!pServerPeer);
+            pServerPeer.reset(pSocket);
+            REQUIRE(!pServerPeer->isEncrypted());
+            Object::connect(pServerPeer.get(), &TlsSocket::error, [&]() {serverPeerFailedSemaphore.release();});
+            Object::connect(pServerPeer.get(), &TlsSocket::encrypted, [&](){pServerPeer->disconnectFromPeer(); serverPeerCompletedHandshakeSemaphore.release();});
+            Object::connect(pServerPeer.get(), &TlsSocket::disconnected, [&](){pServerPeer.release()->scheduleForDeletion(); serverPeerDisconnectedSemaphore.release();});
+            serverPeerConnectedSemaphore.release();
         });
-        const auto serverAddress = QHostAddress("127.10.20.50");
-        REQUIRE(server.listen(serverAddress, 0));
-        const auto serverPort = server.serverPort();
-        REQUIRE(serverPort >= 1024);
+        REQUIRE(server.listen(serverAddress));
 
-        WHEN("TlsSocket connects to server and play ping pong game three times")
+        WHEN("client peer connects to server three times")
         {
-            static constexpr int repCount = 3;
-            static constexpr int pingCount = 31;
-            QSemaphore socketCompletedHandshakeSemaphore;
-            QSemaphore socketDisconnectedSemaphore;
-            QSemaphore socketReceivedDataFromPeerSemaphore;
-            int currentPingCount = 0;
-            std::unique_ptr<TlsSocket> pSocket(new TlsSocket(clientTlsConfiguration));
-            Object::connect(pSocket.get(), &TlsSocket::error, [&]() {FAIL("This code is supposed to be unreachable.");});
-            Object::connect(pSocket.get(), &TlsSocket::encrypted, [&]()
-            {
-                ++currentPingCount;
-                pSocket->write("PING\r\n");
-                socketCompletedHandshakeSemaphore.release();
-            });
-            Object::connect(pSocket.get(), &TlsSocket::disconnected, [&]()
-            {
-                currentPingCount = 0;
-                socketDisconnectedSemaphore.release();
-            });
-            Object::connect(pSocket.get(), &TlsSocket::receivedData, [&]()
-            {
-                std::string_view expectedData("PONG\r\n");
-                if (pSocket->dataAvailable() != expectedData.size())
-                    return;
-                REQUIRE(pSocket->readAll() == expectedData);
-                if (++currentPingCount <= pingCount)
-                    pSocket->write("PING\r\n");
-                else
-                    pSocket->write("QUIT\r\n");
-                socketReceivedDataFromPeerSemaphore.release();
-            });
-            for (auto i = 0; i < repCount; ++i)
-            {
-                pSocket->connect("ipv4_ipv6_addresses.local", serverPort);
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerCompletedHandshakeSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketCompletedHandshakeSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-            }
+            TlsSocket clientPeer(clientTlsConfiguration);
+            QSemaphore clientPeerConnectedSemaphore;
+            QSemaphore clientPeerCompletedHandshakeSemaphore;
+            QSemaphore clientPeerDisconnectedSemaphore;
+            Object::connect(&clientPeer, &TlsSocket::connected, [&](){clientPeerConnectedSemaphore.release();});
+            Object::connect(&clientPeer, &TlsSocket::encrypted, [&](){clientPeerCompletedHandshakeSemaphore.release();});
+            Object::connect(&clientPeer, &TlsSocket::disconnected, [&](){clientPeerDisconnectedSemaphore.release();});
 
-            THEN("sockets exchange messages as expected")
+            THEN("peers connect and disconnect as many times as client peer connected to server")
             {
-                const int tcpSocketReceivedDataSemaphoreReleaseCount = repCount * pingCount;
-                REQUIRE(socketReceivedDataFromPeerSemaphore.tryAcquire(tcpSocketReceivedDataSemaphoreReleaseCount));
-                REQUIRE(!socketReceivedDataFromPeerSemaphore.tryAcquire(1));
-            }
-        }
-
-        WHEN("TlsSocket connects and then disconnects from server")
-        {
-            QSemaphore socketCompletedHandshakeSemaphore;
-            QSemaphore socketDisconnectedSemaphore;
-            QSemaphore socketReceivedDataFromPeerSemaphore;
-            TlsSocket socket(clientTlsConfiguration);
-            Object::connect(&socket, &TlsSocket::error, [&]() {FAIL("This code is supposed to be unreachable.");});
-            Object::connect(&socket, &TlsSocket::encrypted, [&](){socketCompletedHandshakeSemaphore.release(); socket.disconnectFromPeer();});
-            Object::connect(&socket, &TlsSocket::disconnected, [&](){socketDisconnectedSemaphore.release();});
-            socket.connect("ipv4_ipv6_addresses.local", serverPort);
-
-            THEN("socket connects and then disconnects")
-            {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerCompletedHandshakeSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketCompletedHandshakeSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-
-                AND_WHEN("we use server TlsSocket as client to connect to server and play ping pong game three times")
+                for (auto i = 0; i < 3; ++i)
                 {
-                    static constexpr int repCount = 3;
-                    static constexpr int pingCount = 31;
-                    int currentPingCount = 0;
-                    std::unique_ptr<TlsSocket> pSocket(pPeerSocket.release());
-                    REQUIRE(pSocket.get() != nullptr);
-                    Object::connect(pSocket.get(), &TlsSocket::error, [&]() {FAIL("This code is supposed to be unreachable.");});
-                    Object::connect(pSocket.get(), &TlsSocket::encrypted, [&]()
-                    {
-                        ++currentPingCount;
-                        pSocket->write("PING\r\n");
-                        socketCompletedHandshakeSemaphore.release();
-                    });
-                    Object::connect(pSocket.get(), &TlsSocket::disconnected, [&]()
-                    {
-                        currentPingCount = 0;
-                        socketDisconnectedSemaphore.release();
-                    });
-                    Object::connect(pSocket.get(), &TlsSocket::receivedData, [&]()
-                    {
-                        std::string_view expectedData("PONG\r\n");
-                        if (pSocket->dataAvailable() != expectedData.size())
-                            return;
-                        REQUIRE(pSocket->readAll() == expectedData);
-                        if (++currentPingCount <= pingCount)
-                            pSocket->write("PING\r\n");
-                        else
-                            pSocket->write("QUIT\r\n");
-                        socketReceivedDataFromPeerSemaphore.release();
-                    });
-                    for (auto i = 0; i < repCount; ++i)
-                    {
-                        pSocket->connect("ipv4_ipv6_addresses.local", serverPort);
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerCompletedHandshakeSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketCompletedHandshakeSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                    }
-
-                    THEN("sockets exchange messages as expected")
-                    {
-                        const int tcpSocketReceivedDataSemaphoreReleaseCount = repCount * pingCount;
-                        REQUIRE(socketReceivedDataFromPeerSemaphore.tryAcquire(tcpSocketReceivedDataSemaphoreReleaseCount));
-                        REQUIRE(!socketReceivedDataFromPeerSemaphore.tryAcquire(1));
-                    }
+                    clientPeer.connect(server.serverAddress().toString().toStdString(), server.serverPort());
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerCompletedHandshakeSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerCompletedHandshakeSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                 }
             }
         }

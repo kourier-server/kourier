@@ -1611,36 +1611,36 @@ SCENARIO("TcpSockets can be reused")
     GIVEN("A running server whose sockets close the connections just after they get established")
     {
         TcpServer server;
-        QSemaphore peerConnectedSemaphore;
-        QSemaphore peerDisconnectedSemaphore;
-        std::unique_ptr<TcpSocket> pPeerSocket;
+        QSemaphore serverPeerConnectedSemaphore;
+        QSemaphore serverPeerDisconnectedSemaphore;
+        std::unique_ptr<TcpSocket> pServerPeer;
         Object::connect(&server, &TcpServer::newConnection, [&](TcpSocket *pSocket)
             {
-                REQUIRE(!pPeerSocket);
-                pPeerSocket.reset(pSocket);
-                Object::connect(pPeerSocket.get(), &TcpSocket::disconnected, [&](){pPeerSocket.release()->scheduleForDeletion(); peerDisconnectedSemaphore.release();});
-                pPeerSocket->disconnectFromPeer();
-                peerConnectedSemaphore.release();
+                REQUIRE(!pServerPeer);
+                pServerPeer.reset(pSocket);
+                Object::connect(pServerPeer.get(), &TcpSocket::disconnected, [&](){pServerPeer.release()->scheduleForDeletion(); serverPeerDisconnectedSemaphore.release();});
+                pServerPeer->disconnectFromPeer();
+                serverPeerConnectedSemaphore.release();
             });
         REQUIRE(server.listen(QHostAddress::LocalHost));
 
-        WHEN("the same socket connects with server three times")
+        WHEN("client peer connects with server three times")
         {
-            TcpSocket socket;
-            QSemaphore socketConnectedSemaphore;
-            QSemaphore socketDisconnectedSemaphore;
-            Object::connect(&socket, &TcpSocket::connected, [&](){socketConnectedSemaphore.release();});
-            Object::connect(&socket, &TcpSocket::disconnected, [&](){socketDisconnectedSemaphore.release();});
+            TcpSocket clientPeer;
+            QSemaphore clientPeerConnectedSemaphore;
+            QSemaphore clientPeerDisconnectedSemaphore;
+            Object::connect(&clientPeer, &TcpSocket::connected, [&](){clientPeerConnectedSemaphore.release();});
+            Object::connect(&clientPeer, &TcpSocket::disconnected, [&](){clientPeerDisconnectedSemaphore.release();});
 
-            THEN("socket connects and then disconnects from server as many times as socket was connected to server")
+            THEN("peers connect and disconnect as many times as client peer connected to server")
             {
                 for (auto i = 0; i < 3; ++i)
                 {
-                    socket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketConnectedSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerConnectedSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(peerDisconnectedSemaphore, 10));
+                    clientPeer.connect(server.serverAddress().toString().toStdString(), server.serverPort());
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
                 }
             }
         }
