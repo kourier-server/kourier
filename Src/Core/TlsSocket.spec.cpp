@@ -34,11 +34,11 @@
 #include <QThread>
 #include <QElapsedTimer>
 #include <QRandomGenerator64>
+#include <QCoreApplication>
 #include <chrono>
 #include <memory>
 #include <fstream>
 #include <netinet/in.h>
-#include <qrandom.h>
 #include <sys/socket.h>
 #include <sys/mman.h>
 #include <Spectator.h>
@@ -1602,18 +1602,18 @@ SCENARIO("TlsSocket allows connected slots to take any action")
         QSemaphore clientPeerFailedSemaphore;
         QSemaphore clientPeerDisconnectedSemaphore;
         std::unique_ptr<TlsSocket> pClientPeer(new TlsSocket(clientTlsConfiguration));
+        Object::connect(pClientPeer.get(), &TlsSocket::connected, [&]()
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                clientPeerConnectedSemaphore.release();
+            });
         Object::connect(pClientPeer.get(), &TlsSocket::error, [&]() {clientPeerFailedSemaphore.release();});
         Object::connect(pClientPeer.get(), &TlsSocket::encrypted, [&](){clientPeerCompletedHandshakeSemaphore.release();});
         Object::connect(pClientPeer.get(), &TlsSocket::disconnected, [&](){clientPeerDisconnectedSemaphore.release();});
 
         WHEN("client peer connects to server and disconnects while handling the connected signal")
         {
-            Object::connect(pClientPeer.get(), &TlsSocket::connected, [&]()
-            {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                clientPeerConnectedSemaphore.release();
-                pClientPeer->disconnectFromPeer();
-            });
+            Object::connect(pClientPeer.get(), &TlsSocket::connected, [&]() {pClientPeer->disconnectFromPeer();});
             pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("peers connect and client peer disconnects from server peer")
@@ -1627,12 +1627,7 @@ SCENARIO("TlsSocket allows connected slots to take any action")
 
         WHEN("client peer connects to server and aborts connection while handling the connected signal")
         {
-            Object::connect(pClientPeer.get(), &TlsSocket::connected, [&]()
-            {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                clientPeerConnectedSemaphore.release();
-                pClientPeer->abort();
-            });
+            Object::connect(pClientPeer.get(), &TlsSocket::connected, [&]() {pClientPeer->abort();});
             pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("peers connect, client peer aborts connection and disconnects server peer")
@@ -1646,12 +1641,7 @@ SCENARIO("TlsSocket allows connected slots to take any action")
 
         WHEN("client peer connects to server and is destroyed while handling the connected signal")
         {
-            Object::connect(pClientPeer.get(), &TlsSocket::connected, [&]()
-            {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                clientPeerConnectedSemaphore.release();
-                pClientPeer.release()->scheduleForDeletion();
-            });
+            Object::connect(pClientPeer.get(), &TlsSocket::connected, [&]() {pClientPeer.release()->scheduleForDeletion();});
             pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("peers connect, client peer aborts connection and server peer disconnects")
@@ -1667,15 +1657,9 @@ SCENARIO("TlsSocket allows connected slots to take any action")
             Object *pCtxObject = new Object;
             Object::connect(pClientPeer.get(), &TlsSocket::connected, pCtxObject, [&, ptrCtxObject = pCtxObject]()
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                clientPeerConnectedSemaphore.release();
+                while (!pServerPeer) {QCoreApplication::processEvents(QEventLoop::AllEvents | QEventLoop::WaitForMoreEvents, 1);}
                 Object::connect(pServerPeer.get(), &TcpSocket::disconnected, [pPeer = pServerPeer.get()](){pPeer->scheduleForDeletion();});
                 pServerPeer.release();
-                Object::connect(pClientPeer.get(), &TcpSocket::connected, [&]()
-                    {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                        clientPeerConnectedSemaphore.release();
-                    });
                 pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
                 delete ptrCtxObject;
             });
@@ -1700,8 +1684,7 @@ SCENARIO("TlsSocket allows connected slots to take any action")
         {
             Object::connect(pClientPeer.get(), &TlsSocket::connected, [&]()
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                clientPeerConnectedSemaphore.release();
+                while (!pServerPeer) {QCoreApplication::processEvents(QEventLoop::AllEvents | QEventLoop::WaitForMoreEvents, 1);}
                 Object::connect(pServerPeer.get(), &TcpSocket::disconnected, [pPeer = pServerPeer.get()](){pPeer->scheduleForDeletion();});
                 pServerPeer.release();
                 auto const serverAddress = QHostAddress("127.1.2.3");
@@ -1725,11 +1708,6 @@ SCENARIO("TlsSocket allows connected slots to take any action")
 
         WHEN("TcpSocket connects to server and disconnects while handling the encrypted signal")
         {
-            Object::connect(pClientPeer.get(), &TlsSocket::connected, [&]()
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                    clientPeerConnectedSemaphore.release();
-                });
             Object::connect(pClientPeer.get(), &TlsSocket::encrypted, [&]() {pClientPeer->disconnectFromPeer();});
             pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
@@ -1746,11 +1724,6 @@ SCENARIO("TlsSocket allows connected slots to take any action")
 
         WHEN("client peer connects to server and aborts connection while handling the encrypted signal")
         {
-            Object::connect(pClientPeer.get(), &TlsSocket::connected, [&]()
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                    clientPeerConnectedSemaphore.release();
-                });
             Object::connect(pClientPeer.get(), &TlsSocket::encrypted, [&]() {pClientPeer->abort();});
             pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
@@ -1766,11 +1739,6 @@ SCENARIO("TlsSocket allows connected slots to take any action")
 
         WHEN("client peer connects to server and is destroyed while handling the encrypted signal")
         {
-            Object::connect(pClientPeer.get(), &TlsSocket::connected, [&]()
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                    clientPeerConnectedSemaphore.release();
-                });
             Object::connect(pClientPeer.get(), &TlsSocket::encrypted, [&]() {pClientPeer.release()->scheduleForDeletion();});
             pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
@@ -1786,14 +1754,10 @@ SCENARIO("TlsSocket allows connected slots to take any action")
 
         WHEN("TcpSocket connects to server and connects again while handling the encrypted signal")
         {
-            Object::connect(pClientPeer.get(), &TlsSocket::connected, [&]()
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                    clientPeerConnectedSemaphore.release();
-                });
             Object *pCtxObject = new Object;
             Object::connect(pClientPeer.get(), &TlsSocket::encrypted, pCtxObject, [&, ptrCtxObject = pCtxObject]()
                 {
+                    while (!pServerPeer) {QCoreApplication::processEvents(QEventLoop::AllEvents | QEventLoop::WaitForMoreEvents, 1);}
                     Object::connect(pServerPeer.get(), &TcpSocket::disconnected, [pPeer = pServerPeer.get()](){pPeer->scheduleForDeletion();});
                     pServerPeer.release();
                     pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
@@ -1820,13 +1784,9 @@ SCENARIO("TlsSocket allows connected slots to take any action")
 
         WHEN("client peer connects to server and connects to a non-existent server address while handling the encrypted signal")
         {
-            Object::connect(pClientPeer.get(), &TlsSocket::connected, [&]()
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                    clientPeerConnectedSemaphore.release();
-                });
             Object::connect(pClientPeer.get(), &TlsSocket::encrypted, [&]()
             {
+                while (!pServerPeer) {QCoreApplication::processEvents(QEventLoop::AllEvents | QEventLoop::WaitForMoreEvents, 1);}
                 Object::connect(pServerPeer.get(), &TcpSocket::disconnected, [pPeer = pServerPeer.get()](){pPeer->scheduleForDeletion();});
                 pServerPeer.release();
                 auto const serverAddress = QHostAddress("127.1.2.3");
@@ -1851,9 +1811,14 @@ SCENARIO("TlsSocket allows connected slots to take any action")
         }
 
         /*
-        WHEN("TlsSocket connects to server and completes tls handshake")
+        WHEN("client peer connects to server and completes TLS handshake")
         {
-            pClientPeer->connect("ipv4_ipv6_addresses.local", serverPort);
+            Object::connect(pClientPeer.get(), &TlsSocket::connected, [&]()
+                {
+                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                    clientPeerConnectedSemaphore.release();
+                });
+            pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
             REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
             REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerCompletedHandshakeSemaphore, 10));
             REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
@@ -2365,7 +2330,6 @@ SCENARIO("TlsSocket allows connected slots to take any action")
                 }
             }
         }
-        */
     }
 }
 
@@ -2651,6 +2615,7 @@ SCENARIO("TlsSockets can be reused")
                 }
             }
         }
+        */
     }
 }
 

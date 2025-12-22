@@ -1014,17 +1014,17 @@ SCENARIO("TcpSocket allows connected slots to take any action")
         QSemaphore clientPeerDisconnectedSemaphore;
         QSemaphore clientPeerFailedSemaphore;
         std::unique_ptr<TcpSocket> pClientPeer(new TcpSocket);
+        Object::connect(pClientPeer.get(), &TcpSocket::connected, [&]()
+            {
+                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                clientPeerConnectedSemaphore.release();
+            });
         Object::connect(pClientPeer.get(), &TcpSocket::disconnected, [&](){clientPeerDisconnectedSemaphore.release();});
         Object::connect(pClientPeer.get(), &TcpSocket::error, [&](){clientPeerFailedSemaphore.release();});
 
         WHEN("client peer connects to server and disconnects while handling the connected signal")
         {
-            Object::connect(pClientPeer.get(), &TcpSocket::connected, [&]()
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                    clientPeerConnectedSemaphore.release();
-                    pClientPeer->disconnectFromPeer();
-                });
+            Object::connect(pClientPeer.get(), &TcpSocket::connected, [&]() {pClientPeer->disconnectFromPeer();});
             pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("peers connect and then disconnect")
@@ -1039,12 +1039,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
         WHEN("client peer connects to server and aborts connection while handling the connected signal")
         {
-            Object::connect(pClientPeer.get(), &TcpSocket::connected, [&]()
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                    clientPeerConnectedSemaphore.release();
-                    pClientPeer->abort();
-                });
+            Object::connect(pClientPeer.get(), &TcpSocket::connected, [&]() {pClientPeer->abort();});
             pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("peers connect and then server peer disconnects")
@@ -1058,12 +1053,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
         WHEN("client peer connects to server and is destroyed while handling the connected signal")
         {
-            Object::connect(pClientPeer.get(), &TcpSocket::connected, [&]()
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                    clientPeerConnectedSemaphore.release();
-                    pClientPeer.release()->scheduleForDeletion();
-                });
+            Object::connect(pClientPeer.get(), &TcpSocket::connected, [&]() {pClientPeer.release()->scheduleForDeletion();});
             pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
             THEN("peers connect, client peer aborts connection and server peer disconnects")
@@ -1079,15 +1069,9 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             Object *pCtxObject = new Object;
             Object::connect(pClientPeer.get(), &TcpSocket::connected, pCtxObject, [&, ptrCtxObject = pCtxObject]()
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                clientPeerConnectedSemaphore.release();
+                while (!pServerPeer) {QCoreApplication::processEvents(QEventLoop::AllEvents | QEventLoop::WaitForMoreEvents, 1);}
                 Object::connect(pServerPeer.get(), &TcpSocket::disconnected, [pPeer = pServerPeer.get()](){pPeer->scheduleForDeletion();});
                 pServerPeer.release();
-                Object::connect(pClientPeer.get(), &TcpSocket::connected, [&]()
-                    {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                        clientPeerConnectedSemaphore.release();
-                    });
                 pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
                 delete ptrCtxObject;
             });
@@ -1111,8 +1095,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
         {
             Object::connect(pClientPeer.get(), &TcpSocket::connected, [&]()
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                clientPeerConnectedSemaphore.release();
+                while (!pServerPeer) {QCoreApplication::processEvents(QEventLoop::AllEvents | QEventLoop::WaitForMoreEvents, 1);}
                 Object::connect(pServerPeer.get(), &TcpSocket::disconnected, [pPeer = pServerPeer.get()](){pPeer->scheduleForDeletion();});
                 pServerPeer.release();
                 auto const serverAddress = QHostAddress("127.1.2.3");
@@ -1134,13 +1117,8 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             }
         }
 
-        WHEN("TcpSocket connects to server")
+        WHEN("client peer connects to server")
         {
-            Object::connect(pClientPeer.get(), &TcpSocket::connected, [&]()
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                    clientPeerConnectedSemaphore.release();
-                });
             pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
             REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
             REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
@@ -1452,7 +1430,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             }
         }
 
-        WHEN("TcpSocket tries to connect to a non-existent server by address and TcpSocket is disconnected while handling the error signal")
+        WHEN("client peer tries to connect to a non-existent server by address and is disconnected while handling the error signal")
         {
             QSemaphore socketHandledErrorSemaphore;
             Object::connect(pClientPeer.get(), &TcpSocket::error, [&]()
@@ -1468,13 +1446,13 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             socket.abort();
             pClientPeer->connect(serverAddress.toString().toStdString(), unusedPortForNow);
 
-            THEN("socket handles error")
+            THEN("client peer handles error")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
             }
         }
 
-        WHEN("TcpSocket tries to connect to a non-existent server by address and TcpSocket aborts connection while handling the error signal")
+        WHEN("client peer tries to connect to a non-existent server by address and aborts connection while handling the error signal")
         {
             QSemaphore socketHandledErrorSemaphore;
             Object::connect(pClientPeer.get(), &TcpSocket::error, [&]()
@@ -1490,13 +1468,13 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             socket.abort();
             pClientPeer->connect(serverAddress.toString().toStdString(), unusedPortForNow);
 
-            THEN("socket handles error")
+            THEN("client peer handles error")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
             }
         }
 
-        WHEN("TcpSocket tries to connect to a non-existent server by address and TcpSocket is destroyed while handling the error signal")
+        WHEN("client peer tries to connect to a non-existent server by address and is destroyed while handling the error signal")
         {
             QSemaphore socketHandledErrorSemaphore;
             Object::connect(pClientPeer.get(), &TcpSocket::error, [&]()
@@ -1512,20 +1490,15 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             socket.abort();
             pClientPeer->connect(serverAddress.toString().toStdString(), unusedPortForNow);
 
-            THEN("socket handles error")
+            THEN("client peer handles error")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
             }
         }
 
-        WHEN("TcpSocket tries to connect to a non-existent server by address and TcpSocket is reconnected to the running server while handling the error signal")
+        WHEN("client peer tries to connect to a non-existent server by address and connects to the running server while handling the error signal")
         {
             QSemaphore socketHandledErrorSemaphore;
-            Object::connect(pClientPeer.get(), &TcpSocket::connected, [&]()
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                    clientPeerConnectedSemaphore.release();
-                });
             Object::connect(pClientPeer.get(), &TcpSocket::error, [&]()
                 {
                     REQUIRE(!pClientPeer->errorMessage().empty());
@@ -1540,7 +1513,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             socket.abort();
             pClientPeer->connect(serverAddress.toString().toStdString(), unusedPortForNow);
 
-            THEN("TcpSocket handles error, aborts and connects to peer")
+            THEN("client peer handles error, aborts and connects to server peer")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
@@ -1552,7 +1525,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             }
         }
 
-        WHEN("TcpSocket tries to connect to host name with IPV4/IPV6 addresses without any server running and disconnects while handling the error signal")
+        WHEN("client peer tries to connect to host name with IPV4/IPV6 addresses without any server running and disconnects while handling the error signal")
         {
             QSemaphore socketHandledErrorSemaphore;
             Object::connect(pClientPeer.get(), &TcpSocket::error, [&]()
@@ -1565,13 +1538,13 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             auto hostName = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses().first;
             pClientPeer->connect(hostName, 3008);
 
-            THEN("TcpSocket handles error")
+            THEN("client peer handles error")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
             }
         }
 
-        WHEN("TcpSocket tries to connect to host name with IPV4/IPV6 addresses without any server running and aborts connection while handling the error signal")
+        WHEN("client peer tries to connect to host name with IPV4/IPV6 addresses without any server running and aborts connection while handling the error signal")
         {
             QSemaphore socketHandledErrorSemaphore;
             Object::connect(pClientPeer.get(), &TcpSocket::error, [&]()
@@ -1583,13 +1556,13 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             auto hostName = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses().first;
             pClientPeer->connect(hostName, 3008);
 
-            THEN("TcpSocket handles error")
+            THEN("client peer handles error")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
             }
         }
 
-        WHEN("TcpSocket tries to connect to host name with IPV4/IPV6 addresses without any server running and is destroyed while handling the error signal")
+        WHEN("client peer tries to connect to host name with IPV4/IPV6 addresses without any server running and is destroyed while handling the error signal")
         {
             QSemaphore socketHandledErrorSemaphore;
             Object::connect(pClientPeer.get(), &TcpSocket::error, [&]()
@@ -1601,13 +1574,13 @@ SCENARIO("TcpSocket allows connected slots to take any action")
             auto hostName = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses().first;
             pClientPeer->connect(hostName, 3008);
 
-            THEN("TcpSocket handles error")
+            THEN("client peer handles error")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
             }
         }
 
-        WHEN("TcpSocket tries to connect to host name with IPV4/IPV6 addresses without any server running and is reconnected to the running server while handling the error signal")
+        WHEN("client peer tries to connect to host name with IPV4/IPV6 addresses without any server running and is reconnected to the running server while handling the error signal")
         {
             QSemaphore socketHandledErrorSemaphore;
             Object::connect(pClientPeer.get(), &TcpSocket::error, [&]()
@@ -1617,15 +1590,10 @@ SCENARIO("TcpSocket allows connected slots to take any action")
                 pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
                 socketHandledErrorSemaphore.release();
             });
-            Object::connect(pClientPeer.get(), &TcpSocket::connected, [&]()
-                {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                    clientPeerConnectedSemaphore.release();
-                });
             auto hostName = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses().first;
             pClientPeer->connect(hostName, 3008);
 
-            THEN("TcpSocket handles error and aborts before connecting to peer")
+            THEN("client peer handles error and aborts before connecting to server peer")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
