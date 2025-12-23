@@ -33,6 +33,7 @@
 #include <memory>
 #include <fstream>
 #include <netinet/in.h>
+#include <qtcpserver.h>
 #include <sys/socket.h>
 #include <sys/mman.h>
 #include <Spectator.h>
@@ -55,7 +56,7 @@ class ClientTlsSockets : public QObject
 {
 Q_OBJECT
 public:
-    ClientTlsSockets(TlsConfiguration tlsClientConfiguration,
+    ClientTlsSockets(TlsConfiguration clientTlsConfiguration,
                      std::string_view serverHostname,
                      uint16_t serverPort,
                      std::string_view bindAddress,
@@ -64,7 +65,7 @@ public:
                      size_t requestsPerWorkingConnection,
                      int a,
                      int b) :
-        m_tlsClientConfiguration(tlsClientConfiguration),
+        m_tlsClientConfiguration(clientTlsConfiguration),
         m_serverHostname(serverHostname),
         m_serverPort(serverPort),
         m_bindAddress(bindAddress),
@@ -75,7 +76,7 @@ public:
         m_b(b)
     {
         REQUIRE(!m_serverHostname.empty()
-                && (m_serverPort >= 1024)
+                && (m_serverPort != 0)
                 && m_totalConnections > 0
                 && m_workingConnections > 0
                 && (m_totalConnections >= m_workingConnections)
@@ -179,10 +180,10 @@ private:
     std::vector<TlsSocket*> m_sockets;
     size_t m_currentConnectIndex = 0;
     size_t m_batchConnectionCount = 0;
-    const size_t m_connectionsPerBatch = 250;
+    const size_t m_connectionsPerBatch = 1250;
     std::string m_serverHostname;
     std::string m_bindAddress;
-    uint16_t m_currentBindPort = 1024;
+    uint16_t m_currentBindPort = 1025;
     const uint16_t m_serverPort;
     const size_t m_totalConnections;
     const size_t m_workingConnections;
@@ -197,11 +198,11 @@ class ServerTlsSockets : public QObject
 {
     Q_OBJECT
 public:
-    ServerTlsSockets(TlsConfiguration tlsServerConfiguration,
+    ServerTlsSockets(TlsConfiguration serverTlsConfiguration,
                      std::string_view serverAddress,
                      size_t totalConnections,
                      size_t requestsPerWorkingConnection) :
-        m_tlsServerConfiguration(tlsServerConfiguration),
+        m_tlsServerConfiguration(serverTlsConfiguration),
         m_serverAddress(serverAddress),
         m_totalConnections(totalConnections),
         m_requestsPerWorkingConnection(requestsPerWorkingConnection)
@@ -309,13 +310,13 @@ SCENARIO("TlsSocket benchmarks")
     serverTlsConfiguration.addCaCertificate(caCertificateFile);
     TlsConfiguration clientTlsConfiguration;
     clientTlsConfiguration.addCaCertificate(caCertificateFile);
-    static constexpr std::string_view serverHostname("test.onlocalhost.com");
+    static constexpr std::string_view serverHostname("ipv4-ipv6-addresses.test.local");
     static constexpr std::string_view serverAddress("127.10.20.50");
-    static constexpr size_t totalConnectionsPerThread = 10000;
-    static constexpr size_t workingConnectionsPerThread = 10000;
+    static constexpr size_t totalConnectionsPerThread = 100;
+    static constexpr size_t workingConnectionsPerThread = 100;
     static constexpr size_t clientThreadCount = 5;
     static constexpr size_t totalConnections = totalConnectionsPerThread * clientThreadCount;
-    static constexpr size_t requestsPerWorkingConnection = 1000;
+    static constexpr size_t requestsPerWorkingConnection = 1;
     static constexpr int a = 5;
     static constexpr int b = 3;
     size_t memoryConsumedAfterCreatingClientSockets = 0;
@@ -474,8 +475,6 @@ private slots:
             auto *pSocket = m_sockets[i];
             QObject::connect(pSocket, &QSslSocket::encrypted, [this, pSocket]()
             {
-                pSocket->setSocketOption(QAbstractSocket::SocketOption::LowDelayOption, 1);
-                pSocket->setSocketOption(QAbstractSocket::SocketOption::KeepAliveOption, 1);
                 if (++m_connectionCount == m_totalConnections)
                 {
                     m_hasConnectedAllClients = true;
@@ -511,6 +510,8 @@ private slots:
                     emit disconnectedFromServer();
             });
             while (!pSocket->bind(m_bindAddress, ++m_currentBindPort)) {}
+            pSocket->setSocketOption(QAbstractSocket::SocketOption::LowDelayOption, 1);
+            pSocket->setSocketOption(QAbstractSocket::SocketOption::KeepAliveOption, 1);
             QObject::connect(pSocket, &QSslSocket::errorOccurred, [this, pSocket]()
             {
                 REQUIRE(!m_hasConnectedAllClients);
@@ -525,6 +526,8 @@ private slots:
     void reconnectSocket(QSslSocket *pSocket)
     {
         while (!pSocket->bind(m_bindAddress, ++m_currentBindPort)) {}
+        pSocket->setSocketOption(QAbstractSocket::SocketOption::LowDelayOption, 1);
+        pSocket->setSocketOption(QAbstractSocket::SocketOption::KeepAliveOption, 1);
         pSocket->connectToHostEncrypted(m_serverHostname, m_serverPort);
     }
 
@@ -536,10 +539,10 @@ private:
     std::vector<QSslSocket*> m_sockets;
     size_t m_currentConnectIndex = 0;
     size_t m_batchConnectionCount = 0;
-    const size_t m_connectionsPerBatch = 250;
+    const size_t m_connectionsPerBatch = 1250;
     QString m_serverHostname;
     QHostAddress m_bindAddress;
-    uint16_t m_currentBindPort = 1024;
+    uint16_t m_currentBindPort = 1025;
     const uint16_t m_serverPort;
     const size_t m_totalConnections;
     const size_t m_workingConnections;
@@ -547,6 +550,20 @@ private:
     const int m_a;
     const int m_b;
     bool m_hasConnectedAllClients = false;
+};
+
+
+class Server : public QTcpServer
+{
+Q_OBJECT
+public:
+    Server() = default;
+    ~Server() override = default;
+signals:
+    void newTcpConnection(qintptr socketDescriptor);
+
+private:
+    void incomingConnection(qintptr socketDescriptor) override {emit newTcpConnection(socketDescriptor);}
 };
 
 
@@ -565,61 +582,61 @@ public:
     {
         REQUIRE(!m_serverAddress.empty()
                 && m_totalConnections > 0);
-        m_pServer = new QSslServer;
+        m_pServer = new Server;
         m_pServer->setListenBacklogSize(30000);
         m_pServer->setMaxPendingConnections(30000);
-        m_pServer->setHandshakeTimeout(300000);
-        m_pServer->setSslConfiguration(m_serverSslConfiguration);
-        QObject::connect(m_pServer, &QSslServer::pendingConnectionAvailable, [this]()
+        QObject::connect(m_pServer, &Server::newTcpConnection, [this](qintptr socketDescriptor)
         {
-            while (m_pServer->hasPendingConnections())
+            auto *pSocket = new QSslSocket;
+            pSocket->setSslConfiguration(m_serverSslConfiguration);
+            pSocket->setSocketDescriptor(socketDescriptor);
+            pSocket->setSocketOption(QAbstractSocket::SocketOption::LowDelayOption, 1);
+            pSocket->setSocketOption(QAbstractSocket::SocketOption::KeepAliveOption, 1);
+            REQUIRE(pSocket->state() == QAbstractSocket::ConnectedState);
+            REQUIRE(!pSocket->isEncrypted());
+            QObject::connect(pSocket, &QSslSocket::encrypted, [this]()
             {
-                auto *pSocket = qobject_cast<QSslSocket*>(m_pServer->nextPendingConnection());
-                REQUIRE(pSocket != nullptr);
-                REQUIRE(pSocket->state() == QAbstractSocket::ConnectedState);
-                REQUIRE(pSocket->isEncrypted());
-                pSocket->setSocketOption(QAbstractSocket::SocketOption::LowDelayOption, 1);
-                pSocket->setSocketOption(QAbstractSocket::SocketOption::KeepAliveOption, 1);
-                QObject::connect(pSocket, &QSslSocket::readyRead, [this, pSocket]()
-                {
-                    if (pSocket->bytesAvailable() != (2 * m_requestsPerWorkingConnection * sizeof(int)))
-                        return;
-                    else
-                    {
-                        for (auto i = 0; i < m_requestsPerWorkingConnection; ++i)
-                        {
-                            int a = 0;
-                            pSocket->read((char*)&a, sizeof(a));
-                            int b = 0;
-                            pSocket->read((char*)&b, sizeof(b));
-                            const int sum = a + b;
-                            pSocket->write((char*)&sum, sizeof(sum));
-                        }
-                    }
-                });
-                QObject::connect(pSocket, &QSslSocket::disconnected, [this, pSocket]()
-                {
-                    REQUIRE(m_hasConnectedToAllClients);
-                    pSocket->deleteLater();
-                    if (++m_disconnectionCount == m_totalConnections)
-                    {
-                        m_pServer->deleteLater();
-                        m_pServer = nullptr;
-                        emit disconnectedFromClients();
-                    }
-                });
-                QObject::connect(pSocket, &QSslSocket::errorOccurred, [this, pSocket]()
-                {
-                    REQUIRE(m_hasConnectedToAllClients);
-                    REQUIRE(pSocket->error() == QAbstractSocket::SocketError::RemoteHostClosedError);
-                });
                 if (++m_connectionCount == m_totalConnections)
                 {
                     m_pServer->close();
                     m_hasConnectedToAllClients = true;
                     emit connectedToClients();
                 }
-            }
+            });
+            pSocket->startServerEncryption();
+            QObject::connect(pSocket, &QSslSocket::readyRead, [this, pSocket]()
+            {
+                if (pSocket->bytesAvailable() != (2 * m_requestsPerWorkingConnection * sizeof(int)))
+                    return;
+                else
+                {
+                    for (auto i = 0; i < m_requestsPerWorkingConnection; ++i)
+                    {
+                        int a = 0;
+                        pSocket->read((char*)&a, sizeof(a));
+                        int b = 0;
+                        pSocket->read((char*)&b, sizeof(b));
+                        const int sum = a + b;
+                        pSocket->write((char*)&sum, sizeof(sum));
+                    }
+                }
+            });
+            QObject::connect(pSocket, &QSslSocket::disconnected, [this, pSocket]()
+            {
+                REQUIRE(m_hasConnectedToAllClients);
+                pSocket->deleteLater();
+                if (++m_disconnectionCount == m_totalConnections)
+                {
+                    m_pServer->deleteLater();
+                    m_pServer = nullptr;
+                    emit disconnectedFromClients();
+                }
+            });
+            QObject::connect(pSocket, &QSslSocket::errorOccurred, [this, pSocket]()
+            {
+                REQUIRE(m_hasConnectedToAllClients);
+                REQUIRE(pSocket->error() == QAbstractSocket::SocketError::RemoteHostClosedError);
+            });           
         });
         REQUIRE(m_pServer->listen(QHostAddress(QString::fromStdString(std::string(m_serverAddress)))));
         m_serverPort = m_pServer->serverPort();
@@ -634,7 +651,7 @@ signals:
 
 private:
     QSslConfiguration m_serverSslConfiguration;
-    QSslServer *m_pServer = nullptr;
+    Server *m_pServer = nullptr;
     size_t m_newIncomingConnectionCount = 0;
     size_t m_connectionCount = 0;
     std::set<QSslSocket*> m_sockets;
@@ -674,13 +691,13 @@ SCENARIO("QSslSocket benchmarks")
     serverTlsConfiguration.setPrivateKey(sslKey);
     QSslConfiguration clientTlsConfiguration;
     clientTlsConfiguration.addCaCertificates(caCertificateChain);
-    const std::string_view serverHostname("test.onlocalhost.com");
+    const std::string_view serverHostname("ipv4-ipv6-addresses.test.local");
     const std::string_view serverAddress("127.10.20.50");
-    const size_t totalConnectionsPerThread = 10000;
-    const size_t workingConnectionsPerThread = 10000;
+    const size_t totalConnectionsPerThread = 100;
+    const size_t workingConnectionsPerThread = 100;
     const size_t clientThreadCount = 5;
     const size_t totalConnections = totalConnectionsPerThread * clientThreadCount;
-    const size_t requestsPerWorkingConnection = 1000;
+    const size_t requestsPerWorkingConnection = 1;
     const int a = 5;
     const int b = 3;
     size_t memoryConsumedAfterCreatingClientSockets = 0;

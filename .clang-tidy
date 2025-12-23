@@ -1,5 +1,6 @@
 Checks: '-*,
         clang-*,
+        misc-include-cleaner,
         qbytearray-conversion-to-c-style,
         qt-keywords,
         qt-keyword-emit,
