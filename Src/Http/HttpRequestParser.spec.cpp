@@ -5429,32 +5429,3 @@ SCENARIO("HttpRequestParser enforces limit on chunk metadata")
         }
     }
 }
-
-
-// SCENARIO("HttpRequestParser parses the same http request without headers and body sequentially")
-// {
-//    GIVEN("a get request")
-//    {
-//        std::string_view request("GET /plaintext HTTP/1.1\r\nHost: host.com\r\n\r\n");
-//        IOChannelTest ioChannel(request);
-//        HttpRequestParser parser(ioChannel, std::make_shared<HttpRequestLimits>());
-
-//        WHEN("the request is parsed sequentially")
-//        {
-//            int64_t iterations = 5000000;
-//            int64_t counter = 0;
-//            QElapsedTimer timer;
-//            timer.start();
-//            do
-//            {
-//                if (HttpRequestParser::ParserStatus::ParsedRequest == parser.parse())
-//                    ioChannel.readBuffer().write(request);
-//                else
-//                    FAIL("Failed to parse request");
-
-//            }
-//            while(++counter < iterations);
-//            WARN(QByteArray("Parser processed ").append(QByteArray::number((1000000000.0*iterations)/timer.nsecsElapsed())).append(" req/s.").constData());
-//        }
-//    }
-// }

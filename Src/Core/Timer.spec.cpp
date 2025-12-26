@@ -16,10 +16,8 @@
 //
 
 #include "Timer.h"
-#include <QTimer>
 #include <QCoreApplication>
 #include <QThread>
-#include <QDateTime>
 #include <QSemaphore>
 #include <QElapsedTimer>
 #include <QDeadlineTimer>
@@ -33,7 +31,7 @@ using Spectator::SemaphoreAwaiter;
 using namespace std::chrono_literals;
 
 
-SCENARIO("Timer with non-zero interval times out after given interval with 1ms of error")
+SCENARIO("Timer times out within 1ms of error")
 {
     GIVEN("a timer set to expire")
     {
@@ -63,7 +61,7 @@ SCENARIO("Timer with non-zero interval times out after given interval with 1ms o
 }
 
 
-SCENARIO("Active Timer reschedules its timeout upon changes on timer's interval")
+SCENARIO("Active Timer reschedules it's timeout upon changes to the timer's interval")
 {
     GIVEN("a single-shot timer with a given interval")
     {
@@ -99,7 +97,7 @@ SCENARIO("Active Timer reschedules its timeout upon changes on timer's interval"
                     REQUIRE(newIntervalInMSecs == timer.interval())
                     REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(semaphore, 10));
 
-                    THEN("timer timeout after given interval")
+                    THEN("timer timeout after changed interval")
                     {
                         REQUIRE(std::abs(newIntervalInMSecs.count() - elapsedTimeInMSecs) <= 1);
                     }
@@ -154,7 +152,7 @@ SCENARIO("Active Timer reschedules its timeout upon changes on timer's interval"
 }
 
 
-SCENARIO("Active Timer reschedules it's timeout if it is started again")
+SCENARIO("Active Timer reschedules it's timeout if timer is started again")
 {
     GIVEN("a single-shot timer with a given interval")
     {
@@ -554,7 +552,7 @@ SCENARIO("Non single-shot Timer emits timeout repeatedly")
 }
 
 
-SCENARIO("Changing active Timer to single shot makes it emit timeout signal only one more time")
+SCENARIO("Changing active Timer to single shot makes it emit timeout signal only once more")
 {
     GIVEN("a timer with given interval")
     {
@@ -598,7 +596,7 @@ SCENARIO("Changing active Timer to single shot makes it emit timeout signal only
                     if (changeInterval)
                         timer.setInterval(newInterval);
 
-                    THEN("timer emits timeout only one more time")
+                    THEN("timer emits timeout only once more")
                     {
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, 10));
                         REQUIRE(timeoutEmissionCounter == 4);
@@ -612,7 +610,7 @@ SCENARIO("Changing active Timer to single shot makes it emit timeout signal only
 }
 
 
-SCENARIO("Changing expired Timer to single shot makes it emit timeout signal only one more time")
+SCENARIO("Changing expired Timer to single shot makes it emit timeout signal only once more")
 {
     GIVEN("a timer with given interval")
     {
@@ -655,7 +653,7 @@ SCENARIO("Changing expired Timer to single shot makes it emit timeout signal onl
                     QThread::msleep(interval.count() + 1);
                     timer.setSingleShot(true);
 
-                    THEN("timer emits timeout only one more time")
+                    THEN("timer emits timeout only once more")
                     {
                         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, 10));
                         REQUIRE(timeoutEmissionCounter == 4);
@@ -931,68 +929,3 @@ SCENARIO("Timers can be deleted while being processed after expiration")
         }
     }
 }
-
-
-// SCENARIO("Timers fire at the right time")
-// {
-//     GIVEN("multiple timers each with a different interval")
-//     {
-//         static constexpr size_t timersCount = 384;
-//         QSemaphore semaphore;
-//         size_t counter = 0;
-//         Timer timers[timersCount];
-//         QElapsedTimer elapsedTimer;
-//         for (auto i = 0; i < timersCount; ++i)
-//         {
-//             timers[i].setSingleShot(true);
-//             timers[i].setInterval(std::chrono::milliseconds(i * 1000));
-//             auto *pTimer = &timers[i];
-//             Object::connect(pTimer, &Timer::timeout, [&counter, &semaphore, &elapsedTimer, pTimer]()
-//             {
-//                 const auto elapsedTime = elapsedTimer.elapsed();
-//                 const auto interval = pTimer->interval().count();
-//                 REQUIRE(std::abs(pTimer->interval().count() - elapsedTime) <= 64);
-//                 if (++counter == timersCount)
-//                     semaphore.release();
-//             });
-//         }
-
-//         WHEN("timers are started")
-//         {
-//             elapsedTimer.start();
-//             for (auto &timer : timers)
-//                 timer.start();
-
-//             THEN("all timers fire at expected time")
-//             {
-//                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(semaphore, 512));
-//             }
-//         }
-//     }
-// }
-
-
-// SCENARIO("Memory consumption of Qt timers")
-// {
-//     const size_t counter = 1000000;
-//     std::vector<QTimer> timers(counter);
-//     static constexpr auto pFcn = []() {std::cout << "I'm here";};
-//     for (auto &timer : timers)
-//         QObject::connect(&timer, &QTimer::timeout, pFcn);
-//     for (auto &timer : timers)
-//         timer.start(100000);
-//     timers.clear();
-// }
-
-
-// SCENARIO("Memory consumption of Kourier timers")
-// {
-//     const size_t counter = 1000000;
-//     std::vector<Timer> timers(counter);
-//     static constexpr auto pFcn = []() {std::cout << "I'm here";};
-//     for (auto &timer : timers)
-//         Object::connect(&timer, &Timer::timeout, pFcn);
-//     for (auto &timer : timers)
-//         timer.start(100000ms);
-//     timers.clear();
-// }

@@ -1322,7 +1322,7 @@ SCENARIO("HttpBrokerPrivate must be reset before writing next response")
 }
 
 
-SCENARIO("HttpBrokerPrivate deletes any QObject set when reseting writer")
+SCENARIO("HttpBrokerPrivate deletes any QObject set when resetting writer")
 {
     GIVEN("a broker with a QObject set")
     {
