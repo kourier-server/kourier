@@ -21,6 +21,7 @@
 #include "../Core/TcpSocket.h"
 #include "../Core/TlsSocket.h"
 #include <Tests/Resources/TlsTestCertificates.h>
+#include <Tests/Resources/TestHostNamesFetcher.h>
 #include <Spectator.h>
 #include <QProcess>
 #include <QTemporaryFile>
@@ -47,6 +48,7 @@ using Kourier::HttpBroker;
 using Kourier::TlsConfiguration;
 using TlsVersion = Kourier::TlsConfiguration::TlsVersion;
 using Kourier::TestResources::TlsTestCertificates;
+using Kourier::TestResources::TestHostNamesFetcher;
 using Spectator::SemaphoreAwaiter;
 
 
@@ -476,6 +478,9 @@ SCENARIO("HttpServer does not accept TLS 1.2 clients if it is configured to acce
 {
     GIVEN("a running server that only accepts TLS 1.3")
     {
+        const auto [hostName, hostAddresses] = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses();
+        REQUIRE(!hostAddresses.isEmpty());
+        const auto serverAddress = hostAddresses[0];
         HttpServer server;
         TlsConfiguration serverTlsConfiguration;
         const auto serverTlsVersion = GENERATE(AS(TlsConfiguration::TlsVersion),
@@ -496,7 +501,7 @@ SCENARIO("HttpServer does not accept TLS 1.2 clients if it is configured to acce
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
         QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
-        server.start(QHostAddress("127.10.20.50"), 0);
+        server.start(serverAddress, 0);
         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
 
@@ -513,9 +518,9 @@ SCENARIO("HttpServer does not accept TLS 1.2 clients if it is configured to acce
             Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
             QSemaphore clientFailedSemaphore;
             Object::connect(&clientSocket, &TlsSocket::error, [&](){clientFailedSemaphore.release();});
-            clientSocket.connect("test.onlocalhost.com", server.serverPort());
+            clientSocket.connect(hostName, server.serverPort());
 
-            THEN("client establishes tcp connection before server closes it after receiving the client hello tls message")
+            THEN("client establishes TCP connection before server closes it after receiving client's TLS hello message")
             {
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
                 REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, 10));
@@ -543,7 +548,7 @@ SCENARIO("HttpServer does not accept TLS 1.2 clients if it is configured to acce
             QSemaphore clientDisconnectedSemaphore;
             Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
             Object::connect(&clientSocket, &TlsSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
-            clientSocket.connect("test.onlocalhost.com", server.serverPort());
+            clientSocket.connect(hostName, server.serverPort());
 
             THEN("client establishes encrypted connection")
             {
@@ -564,6 +569,9 @@ SCENARIO("HttpServer does not accept TLS 1.3 clients if it is configured to acce
 {
     GIVEN("a running server that only accepts TLS 1.2")
     {
+        const auto [hostName, hostAddresses] = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses();
+        REQUIRE(!hostAddresses.isEmpty());
+        const auto serverAddress = hostAddresses[0];
         HttpServer server;
         TlsConfiguration serverTlsConfiguration;
         serverTlsConfiguration.setTlsVersion(TlsConfiguration::TlsVersion::TLS_1_2);
@@ -581,7 +589,7 @@ SCENARIO("HttpServer does not accept TLS 1.3 clients if it is configured to acce
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
         QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
-        server.start(QHostAddress("127.10.20.50"), 0);
+        server.start(serverAddress, 0);
         REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
 
@@ -598,7 +606,7 @@ SCENARIO("HttpServer does not accept TLS 1.3 clients if it is configured to acce
             Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
             QSemaphore clientFailedSemaphore;
             Object::connect(&clientSocket, &TlsSocket::error, [&](){clientFailedSemaphore.release();});
-            clientSocket.connect("test.onlocalhost.com", server.serverPort());
+            clientSocket.connect(hostName, server.serverPort());
 
             THEN("client establishes tcp connection before server closes it after receiving the client hello tls message")
             {
@@ -628,7 +636,7 @@ SCENARIO("HttpServer does not accept TLS 1.3 clients if it is configured to acce
             QSemaphore clientDisconnectedSemaphore;
             Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
             Object::connect(&clientSocket, &TlsSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
-            clientSocket.connect("test.onlocalhost.com", server.serverPort());
+            clientSocket.connect(hostName, server.serverPort());
 
             THEN("client establishes encrypted connection")
             {
