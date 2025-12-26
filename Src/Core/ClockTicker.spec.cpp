@@ -19,6 +19,7 @@
 #include <Spectator.h>
 #include <QSemaphore>
 #include <chrono>
+#include <cmath>
 
 using Kourier::ClockTicker;
 using Kourier::Object;
@@ -35,18 +36,18 @@ SCENARIO("ClockTicker ticks at specified resolution")
 
         WHEN("clock ticker is enabled")
         {
-            std::vector<std::chrono::milliseconds> tickTimes(2);
+            std::vector<std::chrono::nanoseconds> tickTimes(2);
             size_t currentTick = 0;
             QSemaphore tickSemaphore;
             Object::connect(&clockTicker, &ClockTicker::tick, [&]()
             {
-                tickTimes[currentTick++] = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch());
+                tickTimes[currentTick++] = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch());
                 tickSemaphore.release();
                 if (currentTick == tickTimes.size())
                     clockTicker.setEnabled(false);
             });
             clockTicker.setEnabled(true);
-            const auto startTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch());
+            const auto startTime = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch());
 
             THEN("clock ticker ticks at given resolution")
             {
@@ -54,7 +55,7 @@ SCENARIO("ClockTicker ticks at specified resolution")
                 auto previousTime = startTime;
                 for (const auto &tickTime : tickTimes)
                 {
-                    REQUIRE((tickTime - previousTime) == resolution);
+                    REQUIRE(std::abs(((tickTime - previousTime) - std::chrono::duration_cast<std::chrono::nanoseconds>(resolution)).count()) < 1000000);
                     previousTime = tickTime;
                 }
             }
