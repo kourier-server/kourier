@@ -29,7 +29,6 @@
 #include <QCoreApplication>
 #include <chrono>
 #include <memory>
-#include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/mman.h>
 
