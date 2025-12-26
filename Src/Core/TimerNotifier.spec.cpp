@@ -627,7 +627,7 @@ SCENARIO("TimerNotifier moves timer on timer wheels until timer's timeout reache
                             REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idxTopWheel).timerCount() == 0);
                         }
 
-                        AND_THEN("timer is moved either to lowest wheel of directly to timers to notify")
+                        AND_THEN("timer is moved either to lowest wheel or directly to timers to notify")
                         {
                             if (moveToWheel0)
                             {
