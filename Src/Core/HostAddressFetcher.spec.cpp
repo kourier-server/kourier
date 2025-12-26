@@ -17,6 +17,7 @@
 
 #include "HostAddressFetcher.h"
 #include "Object.h"
+#include <Tests/Resources/TestHostNamesFetcher.h>
 #include <Spectator.h>
 #include <QThread>
 #include <QCoreApplication>
@@ -24,7 +25,7 @@
 using Kourier::HostAddressFetcher;
 using Spectator::SemaphoreAwaiter;
 using Kourier::Object;
-
+using Kourier::TestResources::TestHostNamesFetcher;
 
 static std::vector<std::string> fetchedAddresses;
 static std::list<void*> givenCallbackData;
@@ -44,7 +45,8 @@ SCENARIO("HostAddressFetcher fetches addresses for domains on hosts file")
 {
     GIVEN("a domain located on the hosts file")
     {
-        const std::string_view domain("test.onlocalhost.com");
+        const auto [hostName, hostAddresses] = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses();
+        const std::string_view domain(hostName);
 
         WHEN("the addresses associated with the domain are fetched")
         {
@@ -58,13 +60,11 @@ SCENARIO("HostAddressFetcher fetches addresses for domains on hosts file")
                 REQUIRE(givenCallbackData.size() == 1);
                 REQUIRE(*givenCallbackData.begin() == pStaticData);
                 givenCallbackData.clear();
-                REQUIRE(fetchedAddresses.size() == 6);
-                REQUIRE(std::erase(fetchedAddresses, "127.10.20.50") == 1);
-                REQUIRE(std::erase(fetchedAddresses, "127.10.20.60") == 1);
-                REQUIRE(std::erase(fetchedAddresses, "127.10.20.70") == 1);
-                REQUIRE(std::erase(fetchedAddresses, "127.10.20.80") == 1);
-                REQUIRE(std::erase(fetchedAddresses, "127.10.20.90") == 1);
-                REQUIRE(std::erase(fetchedAddresses, "::1") == 1);
+                REQUIRE(!hostAddresses.isEmpty() && fetchedAddresses.size() == hostAddresses.size());
+                for (const auto &hostAddress : hostAddresses)
+                {
+                    REQUIRE(std::erase(fetchedAddresses, hostAddress.toString().toStdString()) == 1);
+                }
                 REQUIRE(fetchedAddresses.empty());
             }
         }
@@ -74,14 +74,15 @@ SCENARIO("HostAddressFetcher fetches addresses for domains on hosts file")
 static std::vector<void*> addedReceiversData;
 static void onHostFoundWithDeletions(const std::vector<std::string> &addresses, void *pData)
 {
+    const auto hostName = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses().first;
     givenCallbackData.push_back(pData);
     threadId = QThread::currentThreadId();
     fetchedAddresses = addresses;
-    REQUIRE((addedReceiversData.size() - 1) == HostAddressFetcher::receiverCount("test.onlocalhost.com"));
+    REQUIRE((addedReceiversData.size() - 1) == HostAddressFetcher::receiverCount(hostName));
     for (auto pReceiverData : addedReceiversData)
     {
         if (pReceiverData != pData)
-            HostAddressFetcher::removeHostLookup("test.onlocalhost.com", &onHostFoundWithDeletions, pReceiverData);
+            HostAddressFetcher::removeHostLookup(hostName, &onHostFoundWithDeletions, pReceiverData);
     }
     fetchedAddressesSemaphore.release();
 }
@@ -91,7 +92,8 @@ SCENARIO("HostAddressFetcher supports deletions while calling callback")
 {
     GIVEN("a domain located on the hosts file")
     {
-        const std::string_view domain("test.onlocalhost.com");
+        const auto [hostName, hostAddresses] = TestHostNamesFetcher::hostNameWithIpv4Ipv6Addresses();
+        const std::string_view domain(hostName);
 
         WHEN("the first receiver called removes all other receivers")
         {
@@ -107,13 +109,11 @@ SCENARIO("HostAddressFetcher supports deletions while calling callback")
                 REQUIRE(givenCallbackData.size() == 1);
                 REQUIRE(*givenCallbackData.begin() == addedReceiversData[0]);
                 givenCallbackData.clear();
-                REQUIRE(fetchedAddresses.size() == 6);
-                REQUIRE(std::erase(fetchedAddresses, "127.10.20.50") == 1);
-                REQUIRE(std::erase(fetchedAddresses, "127.10.20.60") == 1);
-                REQUIRE(std::erase(fetchedAddresses, "127.10.20.70") == 1);
-                REQUIRE(std::erase(fetchedAddresses, "127.10.20.80") == 1);
-                REQUIRE(std::erase(fetchedAddresses, "127.10.20.90") == 1);
-                REQUIRE(std::erase(fetchedAddresses, "::1") == 1);
+                REQUIRE(!hostAddresses.isEmpty() && fetchedAddresses.size() == hostAddresses.size());
+                for (const auto &hostAddress : hostAddresses)
+                {
+                    REQUIRE(std::erase(fetchedAddresses, hostAddress.toString().toStdString()) == 1);
+                }
                 REQUIRE(fetchedAddresses.empty());
             }
         }

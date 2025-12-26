@@ -55,14 +55,25 @@ private:
             FAIL(R"(
                 Failed to fetch addresses associated with test host name.
                 Please, add the following to /etc/hosts:
-                127.10.20.50 ipv4_ipv6_addresses.onlocalhost
-                127.10.20.60 ipv4_ipv6_addresses.onlocalhost
-                127.10.20.70 ipv4_ipv6_addresses.onlocalhost
-                127.10.20.80 ipv4_ipv6_addresses.onlocalhost
-                127.10.20.90 ipv4_ipv6_addresses.onlocalhost
-                ::1 ipv4_ipv6_addresses.onlocalhost
-                127.10.20.100 ipv4_address.onlocalhost
-                ::1 ipv6_address.onlocalhost)");
+                127.10.20.50 ipv4-ipv6-addresses.test.local
+                127.10.20.60 ipv4-ipv6-addresses.test.local
+                127.10.20.70 ipv4-ipv6-addresses.test.local
+                127.10.20.80 ipv4-ipv6-addresses.test.local
+                127.10.20.90 ipv4-ipv6-addresses.test.local
+                ::1 ipv4-ipv6-addresses.test.local
+                127.10.20.100 ipv4-address.test.local
+                ::1 ipv6-address.test.local
+                127.127.127.10 ipv4-addresses.test.local
+                127.127.127.20 ipv4-addresses.test.local
+                127.127.127.30 ipv4-addresses.test.local
+                127.127.127.40 ipv4-addresses.test.local
+                127.127.127.50 ipv4-addresses.test.local
+                127.127.127.60 ipv4-addresses.test.local
+                127.127.127.70 ipv4-addresses.test.local
+                127.127.127.80 ipv4-addresses.test.local
+                127.127.127.90 ipv4-addresses.test.local
+                127.127.127.100 ipv4-addresses.test.local
+            )");
         }
         return hostInfo.addresses();
     }
