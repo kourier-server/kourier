@@ -17,25 +17,29 @@
 
 #include "TlsSocket.h"
 #include "AsyncQObject.h"
+#include "TlsConfiguration.h"
 #include <Tests/Resources/TlsServer.h>
 #include <Tests/Resources/TlsTestCertificates.h>
+#include <QString>
+#include <QHostAddress>
+#include <QTcpServer>
+#include <QByteArray>
 #include <QSslSocket>
-#include <QSslServer>
 #include <QSslKey>
 #include <QSslCertificate>
 #include <QSslConfiguration>
-#include <QList>
 #include <QSemaphore>
-#include <QFile>
-#include <QThread>
 #include <QElapsedTimer>
-#include <QRandomGenerator64>
+#include <QtMinMax>
+#include <atomic>
+#include <string>
+#include <string_view>
+#include <vector>
 #include <memory>
+#include <cstddef>
+#include <cstdint>
 #include <fstream>
-#include <netinet/in.h>
-#include <qtcpserver.h>
-#include <sys/socket.h>
-#include <sys/mman.h>
+#include <unistd.h>
 #include <Spectator.h>
 
 using Kourier::TlsServer;
@@ -654,7 +658,6 @@ private:
     Server *m_pServer = nullptr;
     size_t m_newIncomingConnectionCount = 0;
     size_t m_connectionCount = 0;
-    std::set<QSslSocket*> m_sockets;
     size_t m_disconnectionCount = 0;
     size_t m_errorCount = 0;
     std::string_view m_serverAddress;
