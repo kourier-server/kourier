@@ -26,6 +26,7 @@
 #include <chrono>
 #include <vector>
 #include <set>
+#include <utility>
 #include <stack>
 
 using Kourier::TimerNotifier;
@@ -50,6 +51,7 @@ namespace Test::TimerNotifier
         inline static TimerWheel &timerWheel(class TimerNotifier &timerNotifier, size_t idx) {REQUIRE(idx < 7); return timerNotifier.m_timerWheels[idx];}
         inline static void increaseLowResolutionTickCounter(class TimerNotifier &timerNotifier, uint64_t tickCount) {timerNotifier.m_lowResolutionTickCounter += tickCount; timerNotifier.m_lowResolutionTime += std::chrono::milliseconds(tickCount << 6);}
         inline static TimerList &timersToNotify(class TimerNotifier &timerNotifier) {return timerNotifier.m_timersToNotify;}
+        inline static std::chrono::nanoseconds highResolutionTime(class TimerNotifier &timerNotifier) {return timerNotifier.m_highResolutionTime;}
     };
 }
 
@@ -62,16 +64,17 @@ SCENARIO("TimerNotifier starts low resolution time to time elapsed since epoch")
     {
         std::shared_ptr<ClockTicker> pLowResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
         std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
+        const auto timeElapsedSinceEpochBefore = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch());
         TimerNotifier timerNotifier(pLowResolutionClockTicker, pHighResolutionClockTicker);
-        const auto timeElapsedSinceEpoch = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch());
+        const auto timeElapsedSinceEpochAfter = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch());
 
-        WHEN("current low resolution time is fetched for time wheels")
+        WHEN("current low resolution time is fetched from time notifier")
         {
             const auto lowResolutionTime = timerNotifier.lowResolutionTime();
 
-            THEN("timer wheel gives elapsed time since epoch")
+            THEN("timer notifier gives elapsed time since epoch")
             {
-                REQUIRE(std::abs((lowResolutionTime - timeElapsedSinceEpoch).count()) <= 1000000);
+                REQUIRE(timeElapsedSinceEpochBefore <= lowResolutionTime && lowResolutionTime <= timeElapsedSinceEpochAfter);
             }
         }
     }
@@ -176,7 +179,7 @@ SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms
             timer.start(std::chrono::milliseconds(5));
             pHighResolutionClockTicker->tick();
 
-            THEN("timer notifier does not trigger timer nor disable high resolution clock ticker")
+            THEN("timer notifier does not trigger timer nor disables high resolution clock ticker")
             {
                 REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, QDeadlineTimer(1)));
                 REQUIRE(pHighResolutionClockTicker->isEnabled());
@@ -186,7 +189,7 @@ SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms
                     for (auto i = 0; i < 3; ++i)
                         pHighResolutionClockTicker->tick();
 
-                    THEN("timer notifier does not trigger timer nor disable high resolution clock ticker")
+                    THEN("timer notifier does not trigger timer nor disables high resolution clock ticker")
                     {
                         REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, QDeadlineTimer(1)));
                         REQUIRE(pHighResolutionClockTicker->isEnabled());
@@ -207,7 +210,7 @@ SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms
             }
         }
 
-        WHEN("a timer with 5ms timeout is added to wheel with 64ms time span")
+        WHEN("high resolution clock ticker ticks after stopping timer with 5ms interval")
         {
             pHighResolutionClockTicker->setEnabled(true);
             Timer timer;
@@ -295,33 +298,41 @@ SCENARIO("TimerNotifier times out timers when their timeout reaches zero")
 
         WHEN("timers with intervals up to 64ms are added to the timer notifier")
         {
-            std::vector<Timer> timers(3);
-            timers[0].setInterval(std::chrono::milliseconds(1));
-            timers[1].setInterval(std::chrono::milliseconds(31));
-            timers[2].setInterval(std::chrono::milliseconds(64));
+            std::vector<std::pair<std::chrono::milliseconds::rep, Timer>> timersInfo(3);
+            timersInfo[0].second.setInterval(std::chrono::milliseconds(1));
+            timersInfo[1].second.setInterval(std::chrono::milliseconds(31));
+            timersInfo[2].second.setInterval(std::chrono::milliseconds(64));
             QSemaphore timeoutSemaphore;
             std::set<Timer*> timedOutTimers;
-            for (auto &timer : timers)
+            for (auto &timerInfo : timersInfo)
             {
-                timer.setSingleShot(true);
-                TimerNotifierTest::setTimerNotifier(timer, timerNotifier);
-                Object::connect(&timer, &Timer::timeout, [&, pTimer = &timer]()
+                timerInfo.second.setSingleShot(true);
+                TimerNotifierTest::setTimerNotifier(timerInfo.second, timerNotifier);
+                Object::connect(&timerInfo.second, &Timer::timeout, [&, pTimer = &timerInfo.second]()
                 {
                     REQUIRE(!timedOutTimers.contains(pTimer))
                     timedOutTimers.insert(pTimer);
                     timeoutSemaphore.release();
                 });
-                timer.start();
+                timerInfo.second.start();
+                auto *pTimerPrivate = TimerNotifierTest::fetchTimerPrivate(&timerInfo.second);
+                // OS Scheduler may interrupt execution, leaving TimerNotifier's high resolution 
+                // time behind current time for more than 1ms, making TimeNotifier add an extra 
+                // timeout under these circunstances.
+                timerInfo.first = (pTimerPrivate->timeout() + pTimerPrivate->extraTimeout()).count();
             }
 
-            THEN("time notifier triggers timer after high resolution clock ticker ticks until timeout reaches zero")
+            THEN("time notifier triggers timer after high resolution clock ticker ticks until timeout + extra timeout reaches zero")
             {
-                for (auto tickCounter = 1; tickCounter < 128; ++tickCounter)
+                size_t maxTickValue = 0;
+                for (auto &timerInfo : timersInfo)
+                    maxTickValue = timerInfo.first > maxTickValue ? timerInfo.first : maxTickValue;
+                for (auto tickCounter = 1; tickCounter < std::max<size_t>(128, maxTickValue + 16); ++tickCounter)
                 {
                     pHighResolutionClockTicker->tick();
-                    for (auto &timer : timers)
+                    for (auto &timerInfo : timersInfo)
                     {
-                        if (tickCounter == timer.interval().count())
+                        if (tickCounter == timerInfo.first)
                         {
                             REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(timeoutSemaphore, 10));
                         }
@@ -329,8 +340,8 @@ SCENARIO("TimerNotifier times out timers when their timeout reaches zero")
                 }
                 REQUIRE(!timeoutSemaphore.tryAcquire());
                 std::set<Timer*> expectedTimers;
-                for (auto &timer : timers)
-                    expectedTimers.insert(&timer);
+                for (auto &timerInfo : timersInfo)
+                    expectedTimers.insert(&timerInfo.second);
                 REQUIRE(timedOutTimers == expectedTimers);
             }
         }
@@ -369,13 +380,17 @@ SCENARIO("TimerNotifier ajdusts timeout of added timers")
             TimerNotifierTest::setTimerNotifier(timer, timerNotifier);
             timer.setTimerType(timerType);
             timer.setInterval(intervalToSet);
+            const auto extraTimeoutDueToHighResolutionTimeBefore = std::chrono::duration_cast<std::chrono::milliseconds>(TimerNotifier::nsecsSinceEpoch() - TimerNotifierTest::highResolutionTime(timerNotifier));
             timer.start();
+            const auto extraTimeoutDueToHighResolutionTimeAfter = std::chrono::duration_cast<std::chrono::milliseconds>(TimerNotifier::nsecsSinceEpoch() - TimerNotifierTest::highResolutionTime(timerNotifier));
 
-            THEN("timer notifier does not adjust timeout")
+            THEN("low resolution time does not influence timeout adjustment")
             {
                 auto *pTimerPrivate = TimerNotifierTest::fetchTimerPrivate(&timer);
                 REQUIRE(pTimerPrivate->timeout() == intervalToSet);
-                REQUIRE(pTimerPrivate->extraTimeout().count() == 0);
+                REQUIRE(pTimerPrivate->extraTimeout().count() == 0
+                        || ((extraTimeoutDueToHighResolutionTimeBefore <= pTimerPrivate->extraTimeout()) 
+                             && (pTimerPrivate->extraTimeout() <= extraTimeoutDueToHighResolutionTimeAfter)));
             }
         }
 
@@ -425,7 +440,7 @@ SCENARIO("TimerNotifier ajdusts timeout of added timers")
             THEN("timer notifier adjusts timeout")
             {
                 const auto extraTimeout = TimerNotifierTest::fetchTimerPrivate(&timer)->extraTimeout();
-                REQUIRE(extraTimeout == extraTimeoutBefore || extraTimeout == extraTimeoutAfter);
+                REQUIRE(extraTimeoutBefore <= extraTimeout && extraTimeout <= extraTimeoutAfter);
             }
         }
 
@@ -449,7 +464,7 @@ SCENARIO("TimerNotifier ajdusts timeout of added timers")
             THEN("timer notifier adjusts timeout")
             {
                 const auto extraTimeout = TimerNotifierTest::fetchTimerPrivate(&timer)->extraTimeout();
-                REQUIRE(extraTimeout == extraTimeoutBefore || extraTimeout == extraTimeoutAfter);
+                REQUIRE(extraTimeoutBefore <= extraTimeout && extraTimeout <= extraTimeoutAfter);
             }
         }
     }
