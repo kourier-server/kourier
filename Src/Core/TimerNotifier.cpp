@@ -19,8 +19,11 @@
 #include "EpollEventNotifier.h"
 #include "UnixUtils.h"
 #include <bit>
+#include <chrono>
 #include <utility>
 #include <sys/eventfd.h>
+
+using namespace std::chrono_literals;
 
 
 namespace Kourier
@@ -29,7 +32,7 @@ namespace Kourier
 TimerNotifier::TimerNotifier()
     : EpollEventSource(EPOLLET | EPOLLIN, EpollEventNotifier::current()),
       m_eventFd(eventfd(0, EFD_NONBLOCK)),
-      m_lowResolutionTime(msSinceEpoch()),
+      m_lowResolutionTime(nsecsSinceEpoch()),
       m_pLowResolutionClockTicker(std::make_shared<ClockTicker>(std::chrono::milliseconds(64))),
       m_pHighResolutionClockTicker(std::make_shared<ClockTicker>(std::chrono::milliseconds(1)))
 {
@@ -50,7 +53,7 @@ TimerNotifier::TimerNotifier(std::shared_ptr<ClockTicker> pLowResolutionClockTic
                              std::shared_ptr<ClockTicker> pHighResolutionClockTicker)
     : EpollEventSource(EPOLLET | EPOLLIN, EpollEventNotifier::current()),
       m_eventFd(eventfd(0, EFD_NONBLOCK)),
-      m_lowResolutionTime(msSinceEpoch()),
+      m_lowResolutionTime(nsecsSinceEpoch()),
       m_pLowResolutionClockTicker(std::move(pLowResolutionClockTicker)),
       m_pHighResolutionClockTicker(std::move(pHighResolutionClockTicker))
 
@@ -93,15 +96,15 @@ void TimerNotifier::addTimer(TimerPrivate *pTimer)
             case Timer::TimerType::Precise: [[unlikely]]
                 if (pTimer->timeout() > std::chrono::milliseconds(64))
                 {
-                    const auto currentTime = msSinceEpoch();
-                    if (currentTime > m_lowResolutionTime) [[likely]]
-                        pTimer->setExtraTimeout(currentTime - m_lowResolutionTime);
+                    const auto currentTime = nsecsSinceEpoch();
+                    if (currentTime > m_lowResolutionTime)
+                        pTimer->setExtraTimeout(std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - m_lowResolutionTime));
                 }
                 else if (m_pHighResolutionClockTicker->isEnabled())
                 {
-                    const auto currentTime = msSinceEpoch();
-                    if (currentTime > m_highResolutionTime) [[likely]]
-                        pTimer->setExtraTimeout(currentTime - m_highResolutionTime);
+                    const auto currentTime = nsecsSinceEpoch();
+                    if (currentTime > m_highResolutionTime)
+                        pTimer->setExtraTimeout(std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - m_highResolutionTime));
                 }
                 break;
         }

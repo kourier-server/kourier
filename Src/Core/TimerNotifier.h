@@ -38,9 +38,9 @@ public:
     ~TimerNotifier() override;
     void addTimer(TimerPrivate *pTimer);
     void removeTimer(TimerPrivate *pTimer);
-    inline std::chrono::milliseconds lowResolutionTime() const {return m_lowResolutionTime;}
+    inline std::chrono::nanoseconds lowResolutionTime() const {return m_lowResolutionTime;}
     int64_t fileDescriptor() const override {return m_eventFd;}
-    inline static std::chrono::milliseconds msSinceEpoch() {return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch());}
+    inline static std::chrono::nanoseconds nsecsSinceEpoch() {return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch());}
 
 private:
     void addAdjustedTimer(TimerPrivate *pTimer);
@@ -49,7 +49,7 @@ private:
     inline void setHighResolutionClockTickerEnabled(bool enabled)
     {
         if (enabled && !m_pHighResolutionClockTicker->isEnabled())
-            m_highResolutionTime = msSinceEpoch();
+            m_highResolutionTime = nsecsSinceEpoch();
         m_pHighResolutionClockTicker->setEnabled(enabled);
     }
     inline void processExpiredTimers(TimerList &expiredTimers)
@@ -78,8 +78,8 @@ private:
 
 private:
     static constexpr uint64_t maxTimeout = 1ull << 42;
-    std::chrono::milliseconds m_lowResolutionTime = std::chrono::milliseconds(0);
-    std::chrono::milliseconds m_highResolutionTime = std::chrono::milliseconds(0);
+    std::chrono::nanoseconds m_lowResolutionTime = std::chrono::nanoseconds(0);
+    std::chrono::nanoseconds m_highResolutionTime = std::chrono::nanoseconds(0);
     uint64_t m_lowResolutionTickCounter = 0;
     TimerList m_timersToNotify;
     std::shared_ptr<ClockTicker> m_pLowResolutionClockTicker;

@@ -46,7 +46,7 @@ namespace Test::TimerNotifier
     public:
         inline static TimerPrivate *fetchTimerPrivate(Timer *pTimer) {return pTimer->d_ptr.get();}
         inline static void setTimerNotifier(Timer &timer, class TimerNotifier &timerNotifier) {timer.d_ptr->m_pTimerNotifier = &timerNotifier;}
-        inline static void setLowResolutionTime(class TimerNotifier &timerNotifer, std::chrono::milliseconds time) {timerNotifer.m_lowResolutionTime = time;}
+        inline static void setLowResolutionTime(class TimerNotifier &timerNotifer, std::chrono::nanoseconds time) {timerNotifer.m_lowResolutionTime = time;}
         inline static TimerWheel &timerWheel(class TimerNotifier &timerNotifier, size_t idx) {REQUIRE(idx < 7); return timerNotifier.m_timerWheels[idx];}
         inline static void increaseLowResolutionTickCounter(class TimerNotifier &timerNotifier, uint64_t tickCount) {timerNotifier.m_lowResolutionTickCounter += tickCount; timerNotifier.m_lowResolutionTime += std::chrono::milliseconds(tickCount << 6);}
         inline static TimerList &timersToNotify(class TimerNotifier &timerNotifier) {return timerNotifier.m_timersToNotify;}
@@ -63,7 +63,7 @@ SCENARIO("TimerNotifier starts low resolution time to time elapsed since epoch")
         std::shared_ptr<ClockTicker> pLowResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
         std::shared_ptr<ClockTicker> pHighResolutionClockTicker(new ClockTicker(std::chrono::milliseconds::max()));
         TimerNotifier timerNotifier(pLowResolutionClockTicker, pHighResolutionClockTicker);
-        const auto timeElapsedSinceEpoch = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch());
+        const auto timeElapsedSinceEpoch = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch());
 
         WHEN("current low resolution time is fetched for time wheels")
         {
@@ -71,7 +71,7 @@ SCENARIO("TimerNotifier starts low resolution time to time elapsed since epoch")
 
             THEN("timer wheel gives elapsed time since epoch")
             {
-                REQUIRE(std::abs((lowResolutionTime - timeElapsedSinceEpoch).count()) <= 1);
+                REQUIRE(std::abs((lowResolutionTime - timeElapsedSinceEpoch).count()) <= 1000000);
             }
         }
     }
@@ -350,9 +350,9 @@ SCENARIO("TimerNotifier ajdusts timeout of added timers")
                                           std::chrono::milliseconds(1),
                                           std::chrono::milliseconds(18),
                                           std::chrono::milliseconds(63));
-        const auto msSinceEpochToSet = timerNotifier.lowResolutionTime() - timeAgoInMs;
-        TimerNotifierTest::setLowResolutionTime(timerNotifier, msSinceEpochToSet);
-        REQUIRE(timerNotifier.lowResolutionTime() == msSinceEpochToSet);
+        const auto nsecsSinceEpochToSet = timerNotifier.lowResolutionTime() - std::chrono::duration_cast<std::chrono::nanoseconds>(timeAgoInMs);
+        TimerNotifierTest::setLowResolutionTime(timerNotifier, nsecsSinceEpochToSet);
+        REQUIRE(timerNotifier.lowResolutionTime() == nsecsSinceEpochToSet);
 
         WHEN("a timer with positive interval up to 64ms is started")
         {
@@ -403,7 +403,7 @@ SCENARIO("TimerNotifier ajdusts timeout of added timers")
             }
         }
 
-        WHEN("a timer with positive interval belonging to the set [65ms, 4096ms[ is added to timer notifier")
+        WHEN("a timer with positive interval belonging to the interval [65ms, 4096ms[ is added to timer notifier")
         {
             const auto intervalToSet = GENERATE(AS(std::chrono::milliseconds),
                                                 std::chrono::milliseconds(65),
@@ -418,25 +418,14 @@ SCENARIO("TimerNotifier ajdusts timeout of added timers")
             TimerNotifierTest::setTimerNotifier(timer, timerNotifier);
             timer.setTimerType(timerType);
             timer.setInterval(intervalToSet);
-            const auto msSinceEpochBeforeStarting = TimerNotifier::msSinceEpoch();
+            const auto extraTimeoutBefore = std::chrono::duration_cast<std::chrono::milliseconds>(TimerNotifier::nsecsSinceEpoch() - timerNotifier.lowResolutionTime());
             timer.start();
-            const auto msSinceEpochAfterStarting = TimerNotifier::msSinceEpoch();
+            const auto extraTimeoutAfter = std::chrono::duration_cast<std::chrono::milliseconds>(TimerNotifier::nsecsSinceEpoch() - timerNotifier.lowResolutionTime());
 
             THEN("timer notifier adjusts timeout")
             {
-                auto *pTimerPrivate = TimerNotifierTest::fetchTimerPrivate(&timer);
-                const auto timeout = pTimerPrivate->timeout() + pTimerPrivate->extraTimeout();
-                bool hasAdjustedTimeout = false;
-                for (auto i = msSinceEpochBeforeStarting; i <= msSinceEpochAfterStarting; ++i)
-                {
-                    const auto expectedAdjustedInterval = intervalToSet + (i - timerNotifier.lowResolutionTime());
-                    if (timeout == expectedAdjustedInterval)
-                    {
-                        hasAdjustedTimeout = true;
-                        break;
-                    }
-                }
-                REQUIRE(hasAdjustedTimeout);
+                const auto extraTimeout = TimerNotifierTest::fetchTimerPrivate(&timer)->extraTimeout();
+                REQUIRE(extraTimeout == extraTimeoutBefore || extraTimeout == extraTimeoutAfter);
             }
         }
 
@@ -453,25 +442,14 @@ SCENARIO("TimerNotifier ajdusts timeout of added timers")
             TimerNotifierTest::setTimerNotifier(timer, timerNotifier);
             timer.setTimerType(timerType);
             timer.setInterval(intervalToSet);
-            const auto msSinceEpochBeforeStarting = TimerNotifier::msSinceEpoch();
+            const auto extraTimeoutBefore = std::chrono::duration_cast<std::chrono::milliseconds>(TimerNotifier::nsecsSinceEpoch() - timerNotifier.lowResolutionTime());
             timer.start();
-            const auto msSinceEpochAfterStarting = TimerNotifier::msSinceEpoch();
+            const auto extraTimeoutAfter = std::chrono::duration_cast<std::chrono::milliseconds>(TimerNotifier::nsecsSinceEpoch() - timerNotifier.lowResolutionTime());
 
             THEN("timer notifier adjusts timeout")
             {
-                auto *pTimerPrivate = TimerNotifierTest::fetchTimerPrivate(&timer);
-                const auto timeout = pTimerPrivate->timeout() + pTimerPrivate->extraTimeout();
-                bool hasAdjustedTimeout = false;
-                for (auto i = msSinceEpochBeforeStarting; i <= msSinceEpochAfterStarting; ++i)
-                {
-                    const auto expectedAdjustedInterval = intervalToSet + (i - timerNotifier.lowResolutionTime());
-                    if (timeout == expectedAdjustedInterval)
-                    {
-                        hasAdjustedTimeout = true;
-                        break;
-                    }
-                }
-                REQUIRE(hasAdjustedTimeout);
+                const auto extraTimeout = TimerNotifierTest::fetchTimerPrivate(&timer)->extraTimeout();
+                REQUIRE(extraTimeout == extraTimeoutBefore || extraTimeout == extraTimeoutAfter);
             }
         }
     }

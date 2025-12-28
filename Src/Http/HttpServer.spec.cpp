@@ -1376,13 +1376,16 @@ SCENARIO("HttpServer calls handler with request containing all body data availab
     {
         HttpServer server;
         REQUIRE(server.setServerOption(HttpServer::ServerOption::WorkerCount, 1));
-        static const constinit std::string_view fullRequestBody("Hello World!");
+        static constexpr std::string_view fullRequestBody("Hello World!");
         static std::string requestBody;
+        requestBody.clear();
         static QSemaphore serverReceivedRequest;
         static constinit size_t pendingBodySize = 0;
+        pendingBodySize = 0;
         static QSemaphore brokerReceivedRemainingBodyData;
         static QSemaphore objectDeletedSemaphore;
         static std::string requestBodyReceivedThroughBroker;
+        requestBodyReceivedThroughBroker.clear();
         REQUIRE(server.addRoute(HttpRequest::Method::POST, "/data", [](const HttpRequest &request, HttpBroker &broker)
         {
             REQUIRE(request.method() == HttpRequest::Method::POST);
@@ -1463,7 +1466,7 @@ SCENARIO("HttpServer sends chunked body data through broker")
     {
         HttpServer server;
         REQUIRE(server.setServerOption(HttpServer::ServerOption::WorkerCount, 1));
-        static const constinit std::string_view fullRequestBody("Hello World!");
+        static constexpr std::string_view fullRequestBody("Hello World!");
         static QSemaphore serverReceivedRequest;
         static QSemaphore brokerReceivedRemainingBodyData;
         static QSemaphore objectDeletedSemaphore;
@@ -1675,9 +1678,10 @@ SCENARIO("HttpServer supports pipelined requests")
     GIVEN("a running server and a connected client")
     {
         HttpServer server;
+        static size_t counter{0};
+        counter = 0;
         REQUIRE(server.addRoute(HttpRequest::Method::GET, "/", [](const HttpRequest &request, HttpBroker &broker)
         {
-            static size_t counter{0};
             if (request.isComplete())
                 broker.writeResponse(std::string("Hello World ").append(std::to_string(++counter)));
             else

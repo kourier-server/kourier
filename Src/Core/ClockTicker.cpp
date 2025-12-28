@@ -18,6 +18,7 @@
 #include "ClockTicker.h"
 #include "UnixUtils.h"
 #include "EpollEventNotifier.h"
+#include <chrono>
 #include <sys/timerfd.h>
 
 
@@ -73,10 +74,12 @@ void ClockTicker::activateTicker()
     // Setting time
     struct itimerspec newValue{0,0,0,0};
     struct itimerspec oldValue{0,0,0,0};
-    newValue.it_value.tv_sec = m_resolution.count()/1000;
-    newValue.it_value.tv_nsec = (m_resolution.count()%1000)*1000000;
-    newValue.it_interval.tv_sec = m_resolution.count()/1000;
-    newValue.it_interval.tv_nsec = (m_resolution.count()%1000)*1000000;
+    using SecType = decltype(newValue.it_value.tv_sec);
+    using NSecType = decltype(newValue.it_value.tv_nsec);
+    newValue.it_value.tv_sec = m_resolution.count()/static_cast<SecType>(1000);
+    newValue.it_value.tv_nsec = (m_resolution.count()%static_cast<NSecType>(1000))*static_cast<NSecType>(1000000);
+    newValue.it_interval.tv_sec = m_resolution.count()/static_cast<SecType>(1000);
+    newValue.it_interval.tv_nsec = (m_resolution.count()%static_cast<NSecType>(1000))*static_cast<NSecType>(1000000);
     if (-1 == timerfd_settime(m_timerFd, 0, &newValue, &oldValue))
         qFatal("ClockTicker::activateTicker failed. Failed to set timer. Exiting.");
 }
