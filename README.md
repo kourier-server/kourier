@@ -8,9 +8,9 @@
 
 Kourier is open-source, written in modern C++, and is 100% HTTP syntax-compliant. Kourier outperforms significantly less-compliant servers in terms of performance and memory consumption.
 
-Below, you can see the results of reproducible, container-based benchmarks shown in detail at https://blog.kourier.io and created using open-source Docker images.
+Below, you can see the results of reproducible, container-based benchmarks shown in detail at https://kourier-server.github.io/blog and created using open-source Docker images.
 
-With Kourier, you can implement backend services at a fraction of your current infrastructure costs. Besides its ultra-fast and fully compliant HTTP server and parser, Kourier also exports many C++ classes it uses for TCP communication, TLS encryption, lightweight timers, and signal-slot communications that you can use as building blocks to implement high-performance networked systems. At https://docs.kourier.io, you can find detailed documentation about the Kourier server and all C++ classes it exports.
+With Kourier, you can implement backend services at a fraction of your current infrastructure costs. Besides its ultra-fast and fully compliant HTTP server and parser, Kourier also exports many C++ classes it uses for TCP communication, TLS encryption, lightweight timers, and signal-slot communications that you can use as building blocks to implement high-performance networked systems. At https://kourier-server.github.io/docs, you can find detailed documentation about the Kourier server and all C++ classes it exports.
 
 If high-performance network communication is part of your core business, Kourier can take it to the next level.
 
@@ -22,11 +22,11 @@ It is common to see high RPS for servers on benchmarks, but how many HTTP-compli
 
 | Server      | Lan     | HTTP Compliance Score |
 | -------     | :-----: | :------: |
-| [Kourier](https://blog.kourier.io/posts/kourier-vs-lithium-the-fully-compliant-server-is-also-the-fastest)     | C++     | 100.0% |
-| [Hyper](https://blog.kourier.io/posts/c-kourier-vs-rust-hyper-vs-go-http-http-compliance-benchmark)       | Rust    | 89.7% |
-| [net/http](https://blog.kourier.io/posts/c-kourier-vs-rust-hyper-vs-go-http-http-compliance-benchmark)    | Go      | 63.1% |
-| [QHttpServer](https://blog.kourier.io/posts/kourier-vs-qhttpserver) | C++     | 1.2% |
-| [Lithium](https://blog.kourier.io/posts/kourier-vs-lithium-the-fully-compliant-server-is-also-the-fastest)     | C++     | 0.0% |
+| [Kourier](https://kourier-server.github.io/blog/posts/kourier-vs-lithium-the-fully-compliant-server-is-also-the-fastest)     | C++     | 100.0% |
+| [Hyper](https://kourier-server.github.io/blog/posts/c-kourier-vs-rust-hyper-vs-go-http-http-compliance-benchmark)       | Rust    | 89.7% |
+| [net/http](https://kourier-server.github.io/blog/posts/c-kourier-vs-rust-hyper-vs-go-http-http-compliance-benchmark)    | Go      | 63.1% |
+| [QHttpServer](https://kourier-server.github.io/blog/posts/kourier-vs-qhttpserver) | C++     | 1.2% |
+| [Lithium](https://kourier-server.github.io/blog/posts/kourier-vs-lithium-the-fully-compliant-server-is-also-the-fastest)     | C++     | 0.0% |
 
 <br />
 
@@ -34,11 +34,11 @@ Many servers/frameworks deliberately take a lenient approach regarding the HTTP 
 
 | Framework   | CPU       | Lan     | RPS       |
 | :---------- | :-------: | :-----: | :-------: |
-| [Kourier](https://blog.kourier.io/posts/kourier-vs-lithium-the-fully-compliant-server-is-also-the-fastest)     | AMD EPYC  |   C++   | 33.0M     |
-| [Lithium](https://blog.kourier.io/posts/kourier-vs-lithium-the-fully-compliant-server-is-also-the-fastest)     | AMD EPYC  |   C++   | 32.5M     |
-| [Kourier](https://blog.kourier.io/posts/c-kourier-vs-rust-hyper-vs-go-http-performance-benchmark)     | AMD Ryzen |   C++   | 12.1M     |
-| [Hyper](https://blog.kourier.io/posts/c-kourier-vs-rust-hyper-vs-go-http-performance-benchmark)       | AMD Ryzen |   Rust  | 4.3M      |
-| [net/http](https://blog.kourier.io/posts/c-kourier-vs-rust-hyper-vs-go-http-performance-benchmark)    | AMD Ryzen |   Go    | 231K      |  
+| [Kourier](https://kourier-server.github.io/blog/posts/kourier-vs-lithium-the-fully-compliant-server-is-also-the-fastest)     | AMD EPYC  |   C++   | 33.0M     |
+| [Lithium](https://kourier-server.github.io/blog/posts/kourier-vs-lithium-the-fully-compliant-server-is-also-the-fastest)     | AMD EPYC  |   C++   | 32.5M     |
+| [Kourier](https://kourier-server.github.io/blog/posts/c-kourier-vs-rust-hyper-vs-go-http-performance-benchmark)     | AMD Ryzen |   C++   | 12.1M     |
+| [Hyper](https://kourier-server.github.io/blog/posts/c-kourier-vs-rust-hyper-vs-go-http-performance-benchmark)       | AMD Ryzen |   Rust  | 4.3M      |
+| [net/http](https://kourier-server.github.io/blog/posts/c-kourier-vs-rust-hyper-vs-go-http-performance-benchmark)    | AMD Ryzen |   Go    | 231K      |  
 
 <br />
 
@@ -46,9 +46,9 @@ An ultra-fast server enables a significant reduction of the computing resources 
 
 | Framework     | Lan | Max Used Memory (kB) |
 | ------------- | :-----: | :--------: |
-| [Kourier](https://blog.kourier.io/posts/c-kourier-vs-rust-hyper-vs-go-http-memory-consumption-benchmark)  | C++     | 1.2 GB   |
-| [Hyper](https://blog.kourier.io/posts/c-kourier-vs-rust-hyper-vs-go-http-memory-consumption-benchmark)  | Rust | 5.9 GB   |
-| [net/http](https://blog.kourier.io/posts/c-kourier-vs-rust-hyper-vs-go-http-memory-consumption-benchmark) | Go |  9.8 GB   |
+| [Kourier](https://kourier-server.github.io/blog/posts/c-kourier-vs-rust-hyper-vs-go-http-memory-consumption-benchmark)  | C++     | 1.2 GB   |
+| [Hyper](https://kourier-server.github.io/blog/posts/c-kourier-vs-rust-hyper-vs-go-http-memory-consumption-benchmark)  | Rust | 5.9 GB   |
+| [net/http](https://kourier-server.github.io/blog/posts/c-kourier-vs-rust-hyper-vs-go-http-memory-consumption-benchmark) | Go |  9.8 GB   |
 
 <br />
 
@@ -113,18 +113,18 @@ Kourier is developed with strict and demanding requirements, where all possible 
 
 Kourier is open-source. Thus, anyone can study, build, validate, and benchmark Kourier.
 
-You can contact me at glauco@kourier.io if your Business is incompatible with the AGPL and you want to license Kourier under alternative terms.
+You can [contact me](mailto:glaucopacheco@gmail.com) if your Business is incompatible with the AGPL and you want to license Kourier under alternative terms.
 
 <br />
 
 ## About Me
-I have zero social media usage. If your Business wants to license Kourier, [here](https://kourier.io/about.html) 
+I have zero social media usage. If your Business wants to license Kourier, [here](https://kourier-server.github.io/about.html) 
 you can learn more about me.
 
 <br />
 
 ## Documentation
-Kourier's documentation is available at https://docs.kourier.io.
+Kourier's documentation is available at https://kourier-server.github.io/docs.
 
 <br />
 
