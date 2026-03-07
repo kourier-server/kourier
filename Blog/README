@@ -1,0 +1,11 @@
+To test the blog run the following command:
+
+hugo server --disableFastRender --renderToMemory
+
+To test it on other devices on the locahost add the bind option, as shown below
+
+hugo server --disableFastRender --renderToMemory --bind=0.0.0.0
+
+To build all html pages into the local output folder, use the command below
+
+HUGO_ENV=production hugo --minify --destination=/tmp/output

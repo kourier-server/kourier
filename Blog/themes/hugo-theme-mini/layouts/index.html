@@ -1,0 +1,63 @@
+{{ define "main" }}
+{{ partial "profile.html" . }}
+
+<div id="list-page">
+    <div id="items">
+        {{ if site.Params.search }}
+        <div class="searchBar">
+        <span class="material-symbols-outlined searchBarSearchIcon">
+           search
+        </span>
+        <input id="searchBarTextId" class="form-control searchBarText" type="text"
+        aria-label="Case-insensitive search by title, tag, or publish date"
+        placeholder="Search by title, keyword or date ..."
+        oninput="searchPost(this.value)">
+        <span id="searchBarCancelBtn" class="material-symbols-outlined searchBarCancelIcon" onclick="clearSearchText()">
+           cancel
+        </span>
+        </div>
+        {{ end }}
+        {{ $pages := .Site.RegularPages }}
+        {{ $paginator := .Paginate ($pages) }}
+        {{ range $paginator.Pages }}
+            {{ $title := .Title }}
+            {{ $summary := .Summary }}
+            <section class="item">
+            <div>
+                <div class ="date">
+                    <time datetime="{{ .PublishDate }}">{{ i18n "publishDate" . }}</time>  
+                </div>
+                <div class="title"><a href='{{ .RelPermalink }}'>{{ $title }}</a></div>
+            </div>
+
+            {{ if ne .Site.Params.hiddenPostSummaryInHomePage true }}
+                <div class="summary">{{ $summary | plainify | htmlUnescape }}</div>
+            {{ end }}
+
+            </section>
+        {{ end }}
+
+        {{ if or ($paginator.HasPrev) ($paginator.HasNext) }}
+            <div class="pagination">
+            {{ if $paginator.HasPrev }}
+                <span class="prev">
+                    <a href="{{.Paginator.Prev.URL}}">
+                        <span class="arrow">←</span> {{ with .Site.Params.newerPosts }}{{ . }}{{ else }}{{ i18n "postsNewer" }}{{ end }}
+                    </a>
+                </span>
+            {{ end }}
+            
+            {{ if $paginator.HasNext }}
+                <span class="next">
+                    <a href="{{.Paginator.Next.URL}}">
+                        {{ with .Site.Params.olderPosts }}{{ . }}{{ else }}{{ i18n "postsOlder" }}{{ end }} <span class="arrow">→</span>
+                    </a>
+                </span>
+            {{ end }}
+            </div>
+        {{ end }}
+    </div>
+
+
+</div>
+{{ end }}

@@ -1,0 +1,16 @@
+{{- $blog := slice -}}
+
+{{- range where site.RegularPages "Type" "posts" -}}
+  {{- $item := dict "Title" .Title "RelPermalink" .RelPermalink "Tags" .Params.tags -}}
+
+  {{- $blog = $blog | append $item -}}
+{{- end -}}
+
+{{- $object := dict "blog" $blog -}}
+
+{{- if (eq site.Params.search_minify true) -}}
+  {{- $object | jsonify -}}
+{{- else -}}
+  {{- $jsonifyOptions := dict "indent" "  " -}}
+  {{- $object | jsonify $jsonifyOptions -}}
+{{- end -}}

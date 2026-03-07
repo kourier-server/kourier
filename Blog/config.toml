@@ -1,0 +1,94 @@
+baseURL = "https://kourier-server.github.io/blog/"
+languageCode = "en-us"
+title = "Kourier Blog"
+theme = "hugo-theme-mini"
+disableKinds = ["taxonomy", "term"]
+
+defaultContentLanguage = "en"
+hasCJKLanguage = true
+[permalinks]
+  posts = "/posts/:title/"
+    
+
+# Hugo Configure Markup
+# More info: https://gohugo.io/getting-started/configuration-markup#
+[markup]
+  defaultMarkdownHandler = 'goldmark'
+  [highlight]
+    guessSyntax = true
+    style = "emacs"
+  [markup.highlight]
+    noClasses=false
+  [tableOfContents]
+    endLevel = 3
+    ordered = false
+    startLevel = 2
+  # needed to render raw HTML (e.g. <sub>, <sup>, <kbd>, <mark>)
+  [goldmark]
+    [renderer]
+      unsafe = true
+  [markup.goldmark.renderer]
+     unsafe = true
+
+# Social links in footer, support github,twitter,stackoverflow,facebook
+#[social]
+#  home = "https://kourier-server.github.io"
+
+[outputs]
+  home = ["HTML", "RSS", "JSON"]
+    
+
+# Site parameters
+[params]
+  author = "Glauco Pacheco"
+  # Author biography
+  bio = ""
+  # Site Description, used in HTML meat
+  description = "Kourier Blog"
+  home = "Blog"
+  
+  links = [
+    {name = "Kourier", path = "https://kourier-server.github.io"},
+    {name = "Docs", path = "https://kourier-server.github.io/docs"},
+    {name = "GitHub", path = "https://github.com/kourier-server/kourier"}
+    ]
+  search = false
+  search_minify = false
+  customCSS = ["assets/css/blog.css"]
+
+
+  ###########################################
+  # Optional Configuration
+  ###########################################
+
+  # To enable RSS, you could set `enableRSS: true`, default is `true`
+  enableRSS = false
+  # To enable comments, you may need to set `disqusShortname`
+  enableComments = false
+  # To enable comments, you may need to set `googleAnalytics`
+  enableGoogleAnalytics = false
+  # To enable table of content, you could set `showToc: true`, default is `false`
+  showToc = false
+  # To hidden powerBy message in the page footer, you could set: `showPowerBy: false`, default is `true`
+  showPowerBy = false
+  # To enable math typesetting , you could set `math: true`, default is `false`
+  math = false
+  # To hidden post summary in home page, you could set `hiddenPostSummaryInHomePage: true`, default is `false`
+  hiddenPostSummaryInHomePage = false
+  # Website copy write, default: '© Copyright 2021 ❤️ {params.author}'
+
+  # Extra links in navigation
+  #[links]
+    ## e.g.
+    # - name: Project
+    #   path: /project
+
+  # You can put your custom css and js to `static` directory, or use remote css and js files which start with `http://` or `https://`
+  #customCSS
+    ## e.g.
+    # - css/custom.css # local css in `static/css/custom.css`
+    # - https://example.com/custom.css # remote css
+  #customJS:
+    ## e.g.
+    # - js/custom.js # local js in `static/js/custom.js`
+    # - https://example.com/custom.js # remote js

@@ -1,0 +1,41 @@
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">    
+<meta name="viewport" content="width=device-width,minimum-scale=1">
+<meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{if .IsPage}}{{ .Summary }}{{ else }}{{ with .Site.Params.description }}{{ . }}{{ end }}{{ end }}{{ end }}">
+{{ hugo.Generator }}
+{{/* NOTE: For Production make sure you add `HUGO_ENV="production"` before your build command */}}
+{{ if eq (getenv "HUGO_ENV") "production" | or (eq .Site.Params.env "production")  }}
+  <META NAME="ROBOTS" CONTENT="INDEX, FOLLOW">
+{{ else }}
+  <META NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW">
+{{ end }}
+
+<link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Barlow+Condensed:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700|Ubuntu+Mono:ital,wght@0,400;0,700;1,400;1,700|Ubuntu+Condensed|Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0|Source+Code+Pro:ital,wght@0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900|Open+Sans:ital,wght@0,300..800;1,300..800|Oswald:wght@200..700|Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900|Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display" />
+<script defer language="javascript" type="text/javascript"  src="{{ "/js/searchpost.js" | urlize | relURL }}"></script>
+
+
+
+{{ range .Site.Params.customCSS }}
+  {{ if ( or ( hasPrefix . "http://" ) ( hasPrefix . "https://" ) ) }}
+    <!-- remote css -->
+    <link rel="stylesheet" href="{{ . }}">
+  {{ else }}
+    <!-- local css -->
+    <link rel="stylesheet" href="{{ $.Site.BaseURL }}{{ . }}">
+  {{ end }}
+{{ end }}
+
+{{ if .Site.Params.enableGoogleAnalytics }} 
+    {{ template "_internal/google_analytics.html" . }}
+{{ end }}
+
+{{ if or .Params.math .Site.Params.math }}
+  {{ partial "math.html" . }}
+{{ end }}
+
+{{ if .OutputFormats.Get "RSS" }}
+  {{ with .OutputFormats.Get "RSS" }}
+    <link href="{{ .RelPermalink }}" rel="alternate" type="application/rss+xml" title="{{ $.Site.Title }}" />
+    <link href="{{ .RelPermalink }}" rel="feed" type="application/rss+xml" title="{{ $.Site.Title }}" />
+  {{ end }}
+{{ end }}

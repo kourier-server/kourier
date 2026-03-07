@@ -1,6 +1,8 @@
 # Created by https://www.toptal.com/developers/gitignore/api/cmake,c,c++,qt,qml,qtcreator,visualstudiocode,visualstudio,clion+all,doxygen,git
 # Edit at https://www.toptal.com/developers/gitignore?templates=cmake,c,c++,qt,qml,qtcreator,visualstudiocode,visualstudio,clion+all,doxygen,git
 
+**/.hugo_build.lock
+
 ### C ###
 # Prerequisites
 *.d
