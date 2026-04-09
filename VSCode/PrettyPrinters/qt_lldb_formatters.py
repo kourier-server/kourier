@@ -1,7 +1,195 @@
+import datetime
+
 import lldb
 
-# Add std::string_view QByteArrayView QStringView QLatin1Char QLatin1String QLatin1StringView QUtf8StringView
-# QTime QDate QDateTime QJsonValue QJsonObject QJsonDocument
+class QDateProvider:
+    @staticmethod
+    def provide_summary(valobj, internal_dict, options=None):
+        valobj.SetPreferSyntheticValue(False)
+        julianDay = valobj.GetChildMemberWithName("jd").GetValueAsSigned()
+        if julianDay < 0:
+            return ''
+        # Below, I use the algorithm shown at https://en.wikipedia.org/wiki/Julian_day
+        # section 'Julian or Gregorian calendar from Julian day number'
+        y = 4716
+        v = 3
+        j = 1401
+        u = 5
+        m = 2
+        s = 153
+        n = 12
+        w = 2
+        r = 4
+        B = 274277
+        p = 1461
+        C = -38
+        f = julianDay + j + (((4 * julianDay + B) // 146097) * 3) // 4 + C
+        e = r * f + v
+        g = (e % p) // r
+        h = u * g + w
+        D = (h % s) // u + 1
+        M = ((h // s + m) % n) + 1
+        Y = (e // p) - y + (n + m - M) // n
+        return datetime.date(Y, M, D).strftime("%d-%b-%Y")
+
+class QTimeProvider:
+    @staticmethod
+    def provide_summary(valobj, internal_dict, options=None):
+        valobj.SetPreferSyntheticValue(False)
+        millisecondsSinceMidnight = valobj.GetChildMemberWithName("mds").GetValueAsSigned()
+        if millisecondsSinceMidnight < 0:
+            return ''
+        hours = millisecondsSinceMidnight // 3600000
+        remainder = millisecondsSinceMidnight % 3600000
+        minutes = remainder // 60000
+        remainder = remainder % 60000
+        seconds = remainder // 1000
+        milliseconds = remainder % 1000
+        return str(hours) + 'h:' + str(minutes) + 'm:' + str(seconds) + 's:' + str(milliseconds) + 'ms'
+
+class QUtf8StringViewProvider:
+    def __init__(self, valueObject, internal_dict):
+        self.valueObject = valueObject
+        self.update()
+
+    def update(self):
+        self.size = self.valueObject.GetChildMemberWithName("m_size").GetValueAsSigned()
+        if self.size > 0:
+            self.data = self.valueObject.GetChildMemberWithName("m_data")
+            if self.data.GetValueAsUnsigned() == 0:
+                self.data = None
+                self.size = 0
+        else:
+            self.data = None
+        return True
+
+    def num_children(self):
+        return self.size
+
+    def get_child_at_index(self, index):
+        if 0 <= index and index < self.num_children():
+            element_type = self.data.GetType().GetPointeeType()
+            element_size = element_type.GetByteSize()
+            offset = index * element_size
+            child_address = self.data.GetValueAsUnsigned() + offset
+            return self.valueObject.CreateValueFromAddress(f"[{index}]", child_address, element_type)
+        else:
+            return None
+
+    def has_children(self):
+        return self.num_children() > 0
+    
+    @staticmethod
+    def provide_summary(valobj, internal_dict, options=None):
+        valobj.SetPreferSyntheticValue(False)
+        pointer = valobj.GetChildMemberWithName("m_data").GetValueAsUnsigned()
+        length = valobj.GetChildMemberWithName("m_size").GetValueAsSigned()
+        if pointer == 0:
+            return ''
+        if length == 0:
+            return '""'
+        error = lldb.SBError()
+        string_data = valobj.process.ReadMemory(pointer, length, error)
+        if error.Success():
+            return string_data
+        else:
+            return ''
+
+class QLatin1StringViewProvider:
+    def __init__(self, valueObject, internal_dict):
+        self.valueObject = valueObject
+        self.update()
+
+    def update(self):
+        self.size = self.valueObject.GetChildMemberWithName("m_size").GetValueAsSigned()
+        if self.size > 0:
+            self.data = self.valueObject.GetChildMemberWithName("m_data")
+            if self.data.GetValueAsUnsigned() == 0:
+                self.data = None
+                self.size = 0
+        else:
+            self.data = None
+        return True
+
+    def num_children(self):
+        return self.size
+
+    def get_child_at_index(self, index):
+        if 0 <= index and index < self.num_children():
+            element_type = self.data.GetType().GetPointeeType()
+            element_size = element_type.GetByteSize()
+            offset = index * element_size
+            child_address = self.data.GetValueAsUnsigned() + offset
+            return self.valueObject.CreateValueFromAddress(f"[{index}]", child_address, element_type)
+        else:
+            return None
+
+    def has_children(self):
+        return self.num_children() > 0
+    
+    @staticmethod
+    def provide_summary(valobj, internal_dict, options=None):
+        valobj.SetPreferSyntheticValue(False)
+        pointer = valobj.GetChildMemberWithName("m_data").GetValueAsUnsigned()
+        length = valobj.GetChildMemberWithName("m_size").GetValueAsSigned()
+        if pointer == 0:
+            return ''
+        if length == 0:
+            return '""'
+        error = lldb.SBError()
+        string_data = valobj.process.ReadMemory(pointer, length, error)
+        if error.Success():
+            return string_data.decode("latin1").encode("utf-8")
+        else:
+            return ''
+
+class QByteArrayViewProvider:
+    def __init__(self, valueObject, internal_dict):
+        self.valueObject = valueObject
+        self.update()
+
+    def update(self):
+        self.size = self.valueObject.GetChildMemberWithName("m_size").GetValueAsSigned()
+        if self.size > 0:
+            self.data = self.valueObject.GetChildMemberWithName("m_data")
+            if self.data.GetValueAsUnsigned() == 0:
+                self.data = None
+                self.size = 0
+        else:
+            self.data = None
+        return True
+
+    def num_children(self):
+        return self.size
+
+    def get_child_at_index(self, index):
+        if 0 <= index and index < self.num_children():
+            element_type = self.data.GetType().GetPointeeType()
+            element_size = element_type.GetByteSize()
+            offset = index * element_size
+            child_address = self.data.GetValueAsUnsigned() + offset
+            return self.valueObject.CreateValueFromAddress(f"[{index}]", child_address, element_type)
+        else:
+            return None
+
+    def has_children(self):
+        return self.num_children() > 0
+    
+    @staticmethod
+    def provide_summary(valobj, internal_dict, options=None):
+        valobj.SetPreferSyntheticValue(False)
+        pointer = valobj.GetChildMemberWithName("m_data").GetValueAsUnsigned()
+        length = valobj.GetChildMemberWithName("m_size").GetValueAsSigned()
+        if pointer == 0:
+            return ''
+        if length == 0:
+            return '""'
+        error = lldb.SBError()
+        string_data = valobj.process.ReadMemory(pointer, length, error)
+        if error.Success():
+            return string_data
+        else:
+            return ''
 
 class QByteArrayProvider:
     def __init__(self, valueObject, internal_dict):
@@ -48,6 +236,54 @@ class QByteArrayProvider:
         else:
             return ''
     
+class QStringViewProvider:
+    def __init__(self, valueObject, internal_dict):
+        self.valueObject = valueObject
+        self.update()
+
+    def update(self):
+        self.size = self.valueObject.GetChildMemberWithName("m_size").GetValueAsSigned()
+        if self.size > 0:
+            self.data = self.valueObject.GetChildMemberWithName("m_data")
+            if self.data.GetValueAsUnsigned() == 0:
+                self.data = None
+                self.size = 0
+        else:
+            self.data = None
+            self.size = 0
+        return True
+
+    def num_children(self):
+        return self.size
+
+    def get_child_at_index(self, index):
+        if 0 <= index and index < self.num_children():
+            element_type = self.data.GetType().GetPointeeType()
+            element_size = element_type.GetByteSize()
+            offset = index * element_size
+            child_address = self.data.GetValueAsUnsigned() + offset
+            return self.valueObject.CreateValueFromAddress(f"[{index}]", child_address, element_type)
+        else:
+            return None
+
+    def has_children(self):
+        return self.num_children() > 0
+    
+    @staticmethod
+    def provide_summary(valobj, internal_dict, options=None):
+        valobj.SetPreferSyntheticValue(False)
+        pointer = valobj.GetChildMemberWithName("m_data").GetValueAsUnsigned()
+        length = 2*valobj.GetChildMemberWithName("m_size").GetValueAsSigned()
+        if pointer == 0:
+            return ''
+        if length == 0:
+            return '""'
+        error = lldb.SBError()
+        string_data = valobj.process.ReadMemory(pointer, length, error)
+        if error.Success():
+            return string_data.decode("utf-16").encode("utf-8")
+        else:
+            return ''
 
 class QStringProvider:
     def __init__(self, valueObject, internal_dict):
@@ -443,8 +679,22 @@ class QUrlProvider:
 
 
 def __lldb_init_module(debugger, dict):
+    debugger.HandleCommand('type summary add QDate -F qt_lldb_formatters.QDateProvider.provide_summary')
+    debugger.HandleCommand('type summary add QTime -F qt_lldb_formatters.QTimeProvider.provide_summary')
+    debugger.HandleCommand('type summary add QUtf8StringView -F qt_lldb_formatters.QUtf8StringViewProvider.provide_summary')
+    debugger.HandleCommand('type synthetic add QUtf8StringView --python-class qt_lldb_formatters.QUtf8StringViewProvider')
+    debugger.HandleCommand('type summary add -x "QBasicUtf8StringView<" -F qt_lldb_formatters.QUtf8StringViewProvider.provide_summary')
+    debugger.HandleCommand('type synthetic add -x "QBasicUtf8StringView<" --python-class qt_lldb_formatters.QUtf8StringViewProvider')
+    debugger.HandleCommand('type summary add QLatin1String -F qt_lldb_formatters.QLatin1StringViewProvider.provide_summary')
+    debugger.HandleCommand('type synthetic add QLatin1String --python-class qt_lldb_formatters.QLatin1StringViewProvider')
+    debugger.HandleCommand('type summary add QLatin1StringView -F qt_lldb_formatters.QLatin1StringViewProvider.provide_summary')
+    debugger.HandleCommand('type synthetic add QLatin1StringView --python-class qt_lldb_formatters.QLatin1StringViewProvider')
+    debugger.HandleCommand('type summary add QByteArrayView -F qt_lldb_formatters.QByteArrayViewProvider.provide_summary')
+    debugger.HandleCommand('type synthetic add QByteArrayView --python-class qt_lldb_formatters.QByteArrayViewProvider')
     debugger.HandleCommand('type summary add QByteArray -F qt_lldb_formatters.QByteArrayProvider.provide_summary')
     debugger.HandleCommand('type synthetic add QByteArray --python-class qt_lldb_formatters.QByteArrayProvider')
+    debugger.HandleCommand('type summary add QStringView -F qt_lldb_formatters.QStringViewProvider.provide_summary')
+    debugger.HandleCommand('type synthetic add QStringView --python-class qt_lldb_formatters.QStringViewProvider')
     debugger.HandleCommand('type summary add QString -F qt_lldb_formatters.QStringProvider.provide_summary')
     debugger.HandleCommand('type synthetic add QString --python-class qt_lldb_formatters.QStringProvider')
     debugger.HandleCommand('type summary add -x "QList<" -F qt_lldb_formatters.QSequentialContainerProvider.provide_summary')

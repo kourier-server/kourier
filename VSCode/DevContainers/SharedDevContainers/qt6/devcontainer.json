@@ -1,0 +1,22 @@
+{
+    "name": "Qt6",
+    "image": "vscode-dev-container:qt6",
+    "workspaceMount": "source=VSCodeCppProjectsDevContainerVolume,target=/workspace,type=volume",
+    "workspaceFolder": "/workspace",
+    "runArgs": [ "--cap-add=SYS_PTRACE"],
+    "customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-vscode.cpptools",
+				"ms-vscode.cmake-tools",
+				"ms-vscode.cpp-devtools",
+				"ms-vscode.cpptools-extension-pack",
+				"ms-vscode.cpptools-themes",
+				"llvm-vs-code-extensions.vscode-clangd",
+				"llvm-vs-code-extensions.lldb-dap",
+				"theqtcompany.qt"
+			]
+		}
+	},
+	"remoteUser": "vscode"
+}
