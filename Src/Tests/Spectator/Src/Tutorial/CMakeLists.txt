@@ -2,9 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 cmake_minimum_required(VERSION 3.19 FATAL_ERROR)
-
-# Set project options
-project(Spectator)
+project(SpectatorTutorial)
 enable_language(CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -26,8 +24,6 @@ find_package(Qt6 REQUIRED COMPONENTS Core)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
-set(CMAKE_C_VISIBILITY_PRESET hidden)
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 # Set compiler options
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
@@ -43,20 +39,25 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GN
         add_link_options(-ftls-model=initial-exec)
     endif()
 endif()
-find_package(Git REQUIRED)
-if(Git_FOUND)
-  execute_process(
-    COMMAND ${GIT_EXECUTABLE} --no-pager log -n 1 HEAD --pretty=format:'%h-%ct'
-    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-    OUTPUT_VARIABLE CONFIGURATION_VERSION_STRING_RAW
-    RESULT_VARIABLE result
-    ERROR_QUIET
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if(NOT result EQUAL 0)
-    message(FATAL_ERROR "Failed to fetch Git short hash and UNIX timestamp.")
-  endif()
-  string(REPLACE "'" "" CONFIGURATION_VERSION_STRING "${CONFIGURATION_VERSION_STRING_RAW}")
-  message(STATUS "Configuration version: ${CONFIGURATION_VERSION_STRING}")
-endif()
-
-add_subdirectory(Src)
+qt_add_executable(SpectatorTutorialApp)
+target_sources(SpectatorTutorialApp PRIVATE
+    main.cpp
+    ScenarioThatEntersEventLoop.cpp
+    ScenarioWithGenerator.cpp)
+if (DEFINED Spectator_DIR OR DEFINED ENV{Spectator_DIR})
+  find_package(Spectator)
+else ()
+  include(FetchContent)
+  FetchContent_Declare(
+    Spectator
+    GIT_REPOSITORY https://github.com/GlaucoPacheco/Spectator.git
+    GIT_TAG        8535939ab3ad1ffb6f055c7b8a92ca917395a2af)
+  FetchContent_MakeAvailable(Spectator)
+endif ()
+find_package(Qt6 COMPONENTS Core Concurrent Network REQUIRED)
+target_link_libraries(SpectatorTutorialApp
+    PRIVATE
+    Kourier::Spectator
+    Qt::Core
+    Qt::Concurrent
+    Qt::Network)
