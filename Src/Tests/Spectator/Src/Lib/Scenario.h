@@ -29,7 +29,7 @@ public:
     virtual ~Scenario();
     void REQUIRE(bool expr, const std::source_location location = std::source_location::current());
     void INFO(QString message);
-    void FAIL(QString message, const std::source_location location = std::source_location::current());
+    [[noreturn]] void FAIL(QString message, const std::source_location location = std::source_location::current());
     static bool TRY_ACQUIRE(QSemaphore &semaphore, int resourceCount, QDeadlineTimer deadlineTimer);
     inline static bool TRY_ACQUIRE(QSemaphore &semaphore, QDeadlineTimer deadlineTimer)
     {
@@ -76,7 +76,7 @@ class SpectatorScenarioFinal : public SpectatorScenarioImpl<ptr> {};
         ~SpectatorScenarioImpl() override = default; \
         inline void REQUIRE(bool expr, const std::source_location location = std::source_location::current()) {::Spectator::Scenario::REQUIRE(expr, location);} \
         inline void INFO(QString message) {::Spectator::Scenario::INFO(message);} \
-        inline void FAIL(QString message, const std::source_location location = std::source_location::current()) {::Spectator::Scenario::FAIL(message, location);} \
+        [[noreturn]] inline void FAIL(QString message, const std::source_location location = std::source_location::current()) {::Spectator::Scenario::FAIL(message, location);} \
         inline bool TRY_ACQUIRE(QSemaphore &semaphore, int resourceCount, QDeadlineTimer deadlineTimer) {return ::Spectator::Scenario::TRY_ACQUIRE(semaphore, resourceCount, deadlineTimer);} \
         inline bool TRY_ACQUIRE(QSemaphore &semaphore, QDeadlineTimer deadlineTimer) {return ::Spectator::Scenario::TRY_ACQUIRE(semaphore, deadlineTimer);} \
         inline bool TRY_ACQUIRE(QSemaphore &semaphore, int timeoutInSecs) {return ::Spectator::Scenario::TRY_ACQUIRE(semaphore, timeoutInSecs);} \

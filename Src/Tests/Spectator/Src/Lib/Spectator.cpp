@@ -44,7 +44,7 @@ SPECTATOR_EXPORT void INFO(QString message)
         GlobalScopeData::recordInfoMessage(message);
 }
 
-SPECTATOR_EXPORT void FAIL(QString message, const std::source_location location)
+[[noreturn]] SPECTATOR_EXPORT void FAIL(QString message, const std::source_location location)
 {
     throw SpectatorException(message, QString::fromUtf8(location.file_name()), location.line());
 }

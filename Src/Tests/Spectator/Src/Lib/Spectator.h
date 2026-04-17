@@ -41,7 +41,7 @@ namespace Spectator
 {
     SPECTATOR_EXPORT void REQUIRE(bool expr, const std::source_location location = std::source_location::current());
     SPECTATOR_EXPORT void INFO(QString message);
-    SPECTATOR_EXPORT void FAIL(QString message, const std::source_location location = std::source_location::current());
+    [[noreturn]] SPECTATOR_EXPORT void FAIL(QString message, const std::source_location location = std::source_location::current());
     inline bool TRY_ACQUIRE(QSemaphore &semaphore, int resourceCount, QDeadlineTimer deadlineTimer)
     {
         return Scenario::TRY_ACQUIRE(semaphore, resourceCount, deadlineTimer);
