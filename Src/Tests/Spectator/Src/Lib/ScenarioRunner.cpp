@@ -142,17 +142,20 @@ void ScenarioRunner::runScenarioPath()
         catch (const SpectatorException &ex)
         {
             failureMessage = ex.message();
+            m_hasVisitedAllLeafNodes = true;
             break;
         }
         catch (const std::exception &ex)
         {
             failureMessage = QString().append(u"\nTest code has thrown an unhandled std::exception with message: "_s)
                                         .append(QString::fromUtf8(ex.what()));
+            m_hasVisitedAllLeafNodes = true;
             break;
         }
         catch (...)
         {
             failureMessage = QString().append(u"\nTest code has thrown an unhandled non-standard exception."_s);
+            m_hasVisitedAllLeafNodes = true;
             break;
         }
     } while (!hasConsumedAllGeneratorDataOnCurrentPath());
