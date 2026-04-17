@@ -19,7 +19,7 @@
 #include <QHostInfo>
 #include <QMutex>
 #include <atomic>
-#include <Spectator.h>
+#include <Spectator>
 
 using namespace Spectator;
 

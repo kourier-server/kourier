@@ -25,7 +25,7 @@
 #include <QDeadlineTimer>
 #include <chrono>
 #include <cmath>
-#include <Spectator.h>
+#include <Spectator>
 
 using Kourier::Timer;
 using Kourier::Object;

@@ -18,7 +18,7 @@
 #include "EpollObjectDeleter.h"
 #include "Object.h"
 #include <QCoreApplication>
-#include <Spectator.h>
+#include <Spectator>
 
 
 using Kourier::EpollObjectDeleter;

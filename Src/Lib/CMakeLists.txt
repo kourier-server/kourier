@@ -116,6 +116,9 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     )
     set_property(TARGET Lib PROPERTY OUTPUT_NAME Kourier)
     target_compile_definitions(Lib PRIVATE KOURIER_LIBRARY)
+    target_include_directories(Lib PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
     find_package(Qt6 COMPONENTS Core Concurrent Network REQUIRED)
     find_package(OpenSSL REQUIRED)
     target_link_libraries(Lib PUBLIC
@@ -128,7 +131,6 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         <QtConcurrent>
         <QtNetwork>)
     include(GNUInstallDirs)
-    target_include_directories(Lib PUBLIC "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
     install(TARGETS Lib
         EXPORT Kourier
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}

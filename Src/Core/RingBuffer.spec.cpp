@@ -16,7 +16,7 @@
 //
 
 #include "RingBuffer.h"
-#include <Spectator.h>
+#include <Spectator>
 #include <QRandomGenerator>
 #include <string_view>
 #include <cstring>

@@ -18,7 +18,7 @@
 #include "EpollEventSource.h"
 #include "UnixUtils.h"
 #include <QCoreApplication>
-#include <Spectator.h>
+#include <Spectator>
 #include <sys/eventfd.h>
 #include <memory.h>
 

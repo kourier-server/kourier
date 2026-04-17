@@ -16,7 +16,7 @@
 //
 
 #include "TlsSocket.h"
-#include <Spectator.h>
+#include <Spectator>
 #include "Core/TlsConfiguration.h"
 #include <Tests/Resources/TcpServer.h>
 #include <Tests/Resources/TlsServer.h>

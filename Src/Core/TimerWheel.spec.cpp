@@ -18,7 +18,7 @@
 #include "TimerWheel.h"
 #include "Core/TimerList.h"
 #include "TimerPrivate_epoll.h"
-#include <Spectator.h>
+#include <Spectator>
 #include <chrono>
 #include <vector>
 

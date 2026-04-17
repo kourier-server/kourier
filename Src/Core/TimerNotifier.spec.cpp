@@ -20,7 +20,7 @@
 #include "Core/TimerList.h"
 #include "Timer.h"
 #include "TimerPrivate_epoll.h"
-#include <Spectator.h>
+#include <Spectator>
 #include <QSemaphore>
 #include <QDeadlineTimer>
 #include <chrono>

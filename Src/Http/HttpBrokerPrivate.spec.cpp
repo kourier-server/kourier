@@ -18,7 +18,7 @@
 #include "HttpBrokerPrivate.h"
 #include "Http/HttpRequestParser.h"
 #include "../Core/IOChannel.h"
-#include <Spectator.h>
+#include <Spectator>
 #include <QDateTime>
 #include <list>
 #include <initializer_list>

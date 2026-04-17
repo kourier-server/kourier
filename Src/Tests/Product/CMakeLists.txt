@@ -1,61 +1,44 @@
-#
-# Copyright (C) 2024 Glauco Pacheco <glauco@kourier.io>
-# All rights reserved.
-#
-cmake_minimum_required(VERSION 3.19 FATAL_ERROR)
-cmake_policy(SET CMP0091 NEW)
-cmake_policy(SET CMP0083 NEW)
+# Copyright (C) 2026 Glauco Pacheco <glaucopacheco@gmail.com>
+# SPDX-License-Identifier: BSD-3-Clause
 
+cmake_minimum_required(VERSION 3.19 FATAL_ERROR)
 project(ProductTests)
 if (NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(FATAL_ERROR "ProductTests can only be built on Linux with AVX2 support.")
 endif()
-set(CMAKE_INSTALL_SO_NO_EXE False)
 enable_language(CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+include(CheckPIESupported)
+check_pie_supported()
 set (CMAKE_POSITION_INDEPENDENT_CODE True)
-# Disable RTTI
-string(REGEX REPLACE "-frtti" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
+include(CheckIPOSupported)
+check_ipo_supported(RESULT HAS_IPO)
+if (HAS_IPO AND (NOT (CMAKE_BUILD_TYPE STREQUAL "Debug")))
+    message("Enabling IPO.")
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION True)
+else()
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION False)
+endif()
+
 find_package(Qt6 REQUIRED COMPONENTS Core)
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
-#
-# Setting global compiler options
-#
+# Set compiler options
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O2")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELEASE} ${CMAKE_CXX_FLAGS_DEBUG}")
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set(CMAKE_C_FLAGS "${CFLAGS} ${CMAKE_C_FLAGS} -pipe -ftls-model=initial-exec -fvisibility=hidden -fstack-protector-strong -fstack-check -march=x86-64-v3 -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mavx -mavx2")
-    set(CMAKE_CXX_FLAGS "${CXXFLAGS} ${CMAKE_CXX_FLAGS} -pipe -ftls-model=initial-exec -fno-rtti -fvisibility=hidden -fvisibility-inlines-hidden -fstack-protector-strong -fstack-check -march=x86-64-v3 -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mavx -mavx2")
-    add_link_options(-pipe -ftls-model=initial-exec)
-    if (NOT (CMAKE_CXX_COMPILER_ID STREQUAL "Clang"))
-        add_link_options(LINKER:-z,noexecstack,-z,relro,-z,now)
-        add_link_options(-Wl,--enable-new-dtags -Wl,--demangle)
-    endif ()
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION False)
-        add_compile_options(-fno-omit-frame-pointer)
-        if (ENABLE_SANITIZERS)
-            message("Building a sanitizer-intrumented build")
-            add_compile_definitions(SANITIZED_BUILD)
-            add_compile_options(-fsanitize=address,undefined,leak)
-            add_link_options(-fsanitize=address,undefined,leak --param=max-vartrack-size=0)
-        endif()
-    else()
-        message("Enabling IPO.")
-        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION False)
-        add_compile_options(-O2 -flto -pipe -fomit-frame-pointer)
-        add_link_options(-O2 -flto)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pipe")
+    add_link_options(-pipe)
+    if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" AND (NOT (CMAKE_BUILD_TYPE STREQUAL "Debug")))
+        message("Enabling -ftls-model=initial-exec -march=x86-64-v3 -mavx2.")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ftls-model=initial-exec -march=x86-64-v3 -mavx2")
+        add_link_options(-ftls-model=initial-exec)
     endif()
-    set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O2")
-    set(CMAKE_C_FLAGS_RELEASE "-DNDEBUG -O2")
-endif()
-
-if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-    set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install-root")
 endif()
 add_subdirectory(EmitterLibrary)
 add_subdirectory(ReceiverLibrary)
@@ -67,7 +50,26 @@ target_sources(ProductTests PRIVATE
     ../Resources/TlsTestCertificates.h)
 find_package(Qt6 COMPONENTS Core Concurrent Network REQUIRED)
 find_package(OpenSSL REQUIRED)
-find_package(Kourier REQUIRED)
+if (DEFINED Spectator_DIR OR DEFINED ENV{Spectator_DIR})
+  find_package(Spectator)
+else ()
+  include(FetchContent)
+  FetchContent_Declare(
+    Spectator
+    GIT_REPOSITORY https://github.com/GlaucoPacheco/Spectator.git
+    GIT_TAG        8535939ab3ad1ffb6f055c7b8a92ca917395a2af)
+  FetchContent_MakeAvailable(Spectator)
+endif ()
+if (DEFINED Kourier_DIR OR DEFINED ENV{Kourier_DIR})
+  find_package(Kourier)
+else ()
+  include(FetchContent)
+  FetchContent_Declare(
+    Spectator
+    GIT_REPOSITORY https://github.com/kourier-server/kourier.git
+    GIT_TAG        8535939ab3ad1ffb6f055c7b8a92ca917395a2af)
+  FetchContent_MakeAvailable(Kourier)
+endif ()
 target_link_libraries(ProductTests PUBLIC
     EmitterLib
     ReceiverLib

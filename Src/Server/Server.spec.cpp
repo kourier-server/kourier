@@ -21,7 +21,7 @@
 #include <QCoreApplication>
 #include <QThread>
 #include <set>
-#include <Spectator.h>
+#include <Spectator>
 
 using Kourier::ExecutionState;
 using Kourier::Server;

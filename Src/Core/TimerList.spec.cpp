@@ -16,7 +16,7 @@
 //
 
 #include "TimerList.h"
-#include <Spectator.h>
+#include <Spectator>
 #include <list>
 #include <set>
 

@@ -17,7 +17,7 @@
 
 #include "EpollReadyEventSourceRegistrar.h"
 #include <QCoreApplication>
-#include <Spectator.h>
+#include <Spectator>
 #include <utility>
 #include <set>
 #include <vector>

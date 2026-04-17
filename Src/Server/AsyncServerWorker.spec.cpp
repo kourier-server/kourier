@@ -18,7 +18,7 @@
 #include "AsyncServerWorker.h"
 #include <QCoreApplication>
 #include <QSemaphore>
-#include <Spectator.h>
+#include <Spectator>
 
 using Kourier::ExecutionState;
 using Kourier::ServerWorker;

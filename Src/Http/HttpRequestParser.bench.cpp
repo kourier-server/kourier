@@ -17,7 +17,7 @@
 
 #include "HttpRequestParser.h"
 #include "../Core/IOChannel.h"
-#include <Spectator.h>
+#include <Spectator>
 #include <memory>
 #include <string>
 #include <string_view>

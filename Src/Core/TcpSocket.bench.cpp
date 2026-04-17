@@ -35,7 +35,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/mman.h>
-#include <Spectator.h>
+#include <Spectator>
 
 using Kourier::TcpServer;
 using Kourier::TcpSocket;

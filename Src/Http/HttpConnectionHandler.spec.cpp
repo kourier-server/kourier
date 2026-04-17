@@ -21,7 +21,7 @@
 #include "HttpBroker.h"
 #include "HttpRequestLimits.h"
 #include "../Core/TcpSocket.h"
-#include <Spectator.h>
+#include <Spectator>
 #include <QSemaphore>
 #include <QElapsedTimer>
 #include <chrono>

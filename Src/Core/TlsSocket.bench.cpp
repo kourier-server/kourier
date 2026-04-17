@@ -40,7 +40,7 @@
 #include <cstdint>
 #include <fstream>
 #include <unistd.h>
-#include <Spectator.h>
+#include <Spectator>
 
 using Kourier::TlsServer;
 using Kourier::TcpSocket;

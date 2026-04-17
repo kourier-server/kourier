@@ -20,7 +20,7 @@
 #include <QCoreApplication>
 #include <QSemaphore>
 #include <csignal>
-#include <Spectator.h>
+#include <Spectator>
 
 
 SCENARIO("UnixSignalListener listens to UNIX signals")

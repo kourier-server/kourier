@@ -17,7 +17,7 @@
 
 #include "ConnectionHandlerRepository.h"
 #include "ConnectionHandler.h"
-#include <Spectator.h>
+#include <Spectator>
 #include <set>
 #include <memory>
 

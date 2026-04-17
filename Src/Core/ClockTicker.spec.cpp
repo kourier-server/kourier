@@ -16,7 +16,7 @@
 //
 
 #include "ClockTicker.h"
-#include <Spectator.h>
+#include <Spectator>
 #include <QSemaphore>
 #include <chrono>
 #include <cmath>

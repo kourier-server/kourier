@@ -21,7 +21,7 @@
 #include "../Core/TcpSocket.h"
 #include "../Core/TlsSocket.h"
 #include <Tests/Resources/TlsTestCertificates.h>
-#include <Spectator.h>
+#include <Spectator>
 #include <QProcess>
 #include <QTemporaryFile>
 #include <QThread>

@@ -22,7 +22,7 @@
 #include "../Core/TlsSocket.h"
 #include <Tests/Resources/TlsTestCertificates.h>
 #include <Tests/Resources/TestHostNamesFetcher.h>
-#include <Spectator.h>
+#include <Spectator>
 #include <QProcess>
 #include <QTemporaryFile>
 #include <QThread>

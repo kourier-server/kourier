@@ -19,7 +19,7 @@
 #include "HttpRequestParser.h"
 #include "HttpBroker.h"
 #include "HttpBrokerPrivate.h"
-#include <Spectator.h>
+#include <Spectator>
 #include <vector>
 #include <utility>
 

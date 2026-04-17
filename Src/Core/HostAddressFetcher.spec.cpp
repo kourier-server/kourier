@@ -18,7 +18,7 @@
 #include "HostAddressFetcher.h"
 #include "Object.h"
 #include <Tests/Resources/TestHostNamesFetcher.h>
-#include <Spectator.h>
+#include <Spectator>
 #include <QThread>
 #include <QCoreApplication>
 

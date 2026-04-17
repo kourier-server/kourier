@@ -17,7 +17,7 @@
 
 #include "IOChannel.h"
 #include <QRandomGenerator64>
-#include <Spectator.h>
+#include <Spectator>
 
 
 using Kourier::RingBuffer;

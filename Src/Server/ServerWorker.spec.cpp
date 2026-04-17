@@ -20,7 +20,7 @@
 #include "ConnectionHandler.h"
 #include "ConnectionHandlerFactory.h"
 #include "ConnectionHandlerRepository.h"
-#include <Spectator.h>
+#include <Spectator>
 #include <set>
 #include <sys/socket.h>
 

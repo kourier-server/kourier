@@ -17,7 +17,7 @@
 
 #include "HttpChunkMetadataParser.h"
 #include "../Core/IOChannel.h"
-#include <Spectator.h>
+#include <Spectator>
 
 
 using Kourier::HttpChunkMetadataParser;

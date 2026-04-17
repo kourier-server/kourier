@@ -19,8 +19,10 @@
 #include "EmitterLibrary/Emitter.h"
 #include "ReceiverLibrary/Receiver.h"
 #include "../Resources/TlsTestCertificates.h"
-#include "../Spectator/Spectator.h"
+#include <Spectator>
 #include <QSemaphore>
+#include <QDeadlineTimer>
+#include <chrono>
 
 
 using Kourier::Object;
@@ -34,6 +36,7 @@ using Kourier::ErrorHandler;
 using Kourier::HttpServer;
 using Kourier::Signal;
 using Kourier::TestResources::TlsTestCertificates;
+using namespace std::chrono_literals;
 
 
 namespace Spec::Product
@@ -114,20 +117,20 @@ SCENARIO("Kourier library supports signal-slot connections accross shared librar
 
 SCENARIO("Kourier library supports timers")
 {
-    GIVEN("a timer set to timeout in 1 second")
+    GIVEN("a timer set to timeout in 10ms")
     {
         Timer timer;
-        timer.setInterval(1000);
+        timer.setInterval(10ms);
         QSemaphore timeoutSemaphore;
         Object::connect(&timer, &Timer::timeout, [&](){timeoutSemaphore.release();});
 
         WHEN("timer is started")
         {
-            timer.start(1000);
+            timer.start(10ms);
 
-            THEN("timer expire in 1 second")
+            THEN("timer expire in 10ms")
             {
-                REQUIRE(TRY_ACQUIRE(timeoutSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(timeoutSemaphore, QDeadlineTimer(15)));
             }
         }
     }

@@ -17,7 +17,7 @@
 
 #include "HttpServerOptions.h"
 #include "HttpFieldBlock.h"
-#include <Spectator.h>
+#include <Spectator>
 #include <QThread>
 #include <utility>
 

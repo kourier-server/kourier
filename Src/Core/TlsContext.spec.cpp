@@ -18,7 +18,7 @@
 #include "TlsContext.h"
 #include "TlsConfiguration.h"
 #include <Tests/Resources/TlsTestCertificates.h>
-#include <Spectator.h>
+#include <Spectator>
 #include <string>
 #include <set>
 

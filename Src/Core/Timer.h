@@ -18,6 +18,7 @@
 #ifndef KOURIER_TIMER_H
 #define KOURIER_TIMER_H
 
+#include "SDK.h"
 #include "Object.h"
 #include <chrono>
 #include <memory>

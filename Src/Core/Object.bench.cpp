@@ -23,7 +23,7 @@
 #include <QStringList>
 #include <QByteArray>
 #include <QString>
-#include <Spectator.h>
+#include <Spectator>
 
 using Kourier::Object;
 

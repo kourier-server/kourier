@@ -22,7 +22,7 @@
 #include <QTcpSocket>
 #include <QSemaphore>
 #include <vector>
-#include <Spectator.h>
+#include <Spectator>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
