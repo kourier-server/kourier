@@ -34,7 +34,6 @@ using Kourier::ErrorHandler;
 using Kourier::HttpServer;
 using Kourier::Signal;
 using Kourier::TestResources::TlsTestCertificates;
-using Spectator::SemaphoreAwaiter;
 
 
 namespace Spec::Product
@@ -128,7 +127,7 @@ SCENARIO("Kourier library supports timers")
 
             THEN("timer expire in 1 second")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(timeoutSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(timeoutSemaphore, 10));
             }
         }
     }
@@ -180,10 +179,10 @@ SCENARIO("Kourier library supports TcpServer, TlsServer and HttpServer and Error
         QObject::connect(&server, &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
         server.start(QHostAddress("127.0.0.1"), 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
 
         WHEN("a client tries to connect to server")
@@ -193,20 +192,20 @@ SCENARIO("Kourier library supports TcpServer, TlsServer and HttpServer and Error
             Object::connect(&clientSocket, &TcpSocket::connected, [&](){clientConnectedSemaphore.release();});
             QSemaphore clientDisconnectedSemaphore;
             Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
-            Object::connect(&clientSocket, &TcpSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+            Object::connect(&clientSocket, &TcpSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
             clientSocket.connect("127.0.0.1", server.serverPort());
 
             THEN("client establishes connection")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
                 REQUIRE(!clientDisconnectedSemaphore.tryAcquire());
                 while (server.connectionCount() != 1)
                 {
                     QCoreApplication::processEvents(QEventLoop::AllEvents | QEventLoop::WaitForMoreEvents, 1);
                 }
                 server.stop();
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStoppedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverStoppedSemaphore, 10));
             }
         }
     }
@@ -227,10 +226,10 @@ SCENARIO("Kourier library supports TcpServer, TlsServer and HttpServer and Error
         QObject::connect(&server, &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
         server.start(QHostAddress("127.10.20.50"), 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
 
         WHEN("a client tries to connect to server")
@@ -244,21 +243,21 @@ SCENARIO("Kourier library supports TcpServer, TlsServer and HttpServer and Error
             Object::connect(&clientSocket, &TlsSocket::encrypted, [&](){clientEncryptedSemaphore.release();});
             QSemaphore clientDisconnectedSemaphore;
             Object::connect(&clientSocket, &TlsSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
-            Object::connect(&clientSocket, &TlsSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+            Object::connect(&clientSocket, &TlsSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
             clientSocket.connect("test.onlocalhost.com", server.serverPort());
 
             THEN("client establishes encrypted connection")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientEncryptedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientEncryptedSemaphore, 10));
                 REQUIRE(!clientDisconnectedSemaphore.tryAcquire());
                 while (server.connectionCount() != 1)
                 {
                     QCoreApplication::processEvents(QEventLoop::AllEvents | QEventLoop::WaitForMoreEvents, 1);
                 }
                 server.stop();
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStoppedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverStoppedSemaphore, 10));
             }
         }
     }
@@ -274,19 +273,19 @@ SCENARIO("Kourier library supports TcpServer, TlsServer and HttpServer and Error
         QObject::connect(&server, &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
         server.start(QHostAddress("127.0.0.1"), 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
         TcpSocket clientSocket;
         QSemaphore clientConnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::connected, [&](){clientConnectedSemaphore.release();});
         QSemaphore clientDisconnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
-        Object::connect(&clientSocket, &TcpSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+        Object::connect(&clientSocket, &TcpSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         clientSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
         const std::string clientIp = std::string(clientSocket.localAddress());
         const auto clientPort = clientSocket.localPort();
 
@@ -296,14 +295,14 @@ SCENARIO("Kourier library supports TcpServer, TlsServer and HttpServer and Error
 
             THEN("server sends a 404 Not Found response, and closes the connection")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientDisconnectedSemaphore, 10));
                 REQUIRE(clientSocket.readAll().starts_with("HTTP/1.1 404 Not Found\r\n"));
                 while(pErrorHandler->reportedErrors().size() != 1)
                 {
                     QCoreApplication::processEvents(QEventLoop::AllEvents | QEventLoop::WaitForMoreEvents, 1);
                 }
                 server.stop();
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStoppedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverStoppedSemaphore, 10));
                 const auto reportedErrors = pErrorHandler->reportedErrors();
                 REQUIRE(reportedErrors.size() == 1);
                 REQUIRE(reportedErrors[0].error == HttpServer::ServerError::MalformedRequest);
