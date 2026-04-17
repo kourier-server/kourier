@@ -3,7 +3,7 @@
 # All rights reserved.
 #
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    qt_add_library(KourierServer STATIC
+    qt_add_library(KourierServer OBJECT
         AsyncServerWorker.h
         ConnectionHandler.cpp
         ConnectionHandler.h
@@ -23,6 +23,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         ServerWorker.cpp
         ServerWorker.h
         ServerWorkerFactory.h)
+    target_compile_definitions(KourierServer PUBLIC KOURIER_LIBRARY)
     find_package(Qt6 COMPONENTS Core Concurrent Network REQUIRED)
     target_link_libraries(KourierServer PRIVATE
         Qt::Core

@@ -2,7 +2,7 @@
 # Copyright (C) 2024 Glauco Pacheco <glauco@kourier.io>
 # All rights reserved.
 #
-qt_add_library(TestResources STATIC
+qt_add_library(TestResources OBJECT
     TcpServer.cpp
     TcpServer.h
     TestHostNamesFetcher.cpp

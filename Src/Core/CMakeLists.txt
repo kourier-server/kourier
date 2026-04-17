@@ -2,7 +2,7 @@
 # Copyright (C) 2024 Glauco Pacheco <glauco@kourier.io>
 # All rights reserved.
 #
-qt_add_library(KourierCore STATIC
+qt_add_library(KourierCore OBJECT
     AsyncQObject.h
     MetaTypeSystem.cpp
     MetaTypeSystem.h
@@ -78,6 +78,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
 else()
     target_sources(KourierCore PRIVATE)
 endif()
+target_compile_definitions(KourierCore PUBLIC KOURIER_LIBRARY)
 find_package(Qt6 COMPONENTS Core Concurrent Network REQUIRED)
 target_link_libraries(KourierCore PRIVATE
     Qt::Core

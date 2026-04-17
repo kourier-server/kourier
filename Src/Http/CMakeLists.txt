@@ -3,7 +3,7 @@
 # All rights reserved.
 #
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    qt_add_library(KourierHttpServer STATIC
+    qt_add_library(KourierHttpServer OBJECT
         ErrorHandler.h
         HttpBroker.cpp
         HttpBroker.h
@@ -36,6 +36,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         HttpServerWorker.h
         HttpServerWorkerFactory.cpp
         HttpServerWorkerFactory.h)
+    target_compile_definitions(KourierHttpServer PUBLIC KOURIER_LIBRARY)
     find_package(Qt6 COMPONENTS Core Concurrent Network REQUIRED)
     target_link_libraries(KourierHttpServer PRIVATE
         KourierServer
