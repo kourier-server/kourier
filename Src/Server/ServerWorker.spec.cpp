@@ -29,6 +29,7 @@ using Kourier::ConnectionListener;
 using Kourier::ConnectionHandler;
 using Kourier::ConnectionHandlerFactory;
 using Kourier::ConnectionHandlerRepository;
+using namespace Spectator;
 
 namespace Test::ServerWorker::Spec
 {
@@ -103,8 +104,8 @@ SCENARIO("ServerWorker makes ConnectionListener listen for incoming connections 
                                   std::make_shared<ConnectionHandlerRepository>());
         bool emittedStarted = false;
         QObject::connect(&serverWorker, &ServerWorker::started, [&emittedStarted](){emittedStarted = true;});
-        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){FAIL("This code is supposed to be unreachable.");});
-        QObject::connect(&serverWorker, &ServerWorker::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
 
         WHEN("ServerWorker is started with some data")
         {
@@ -135,8 +136,8 @@ SCENARIO("ServerWorker fails to start if ConnectionListener fails to listen for 
         ServerWorker serverWorker(pListener,
                                   std::make_shared<TestConnectionHandlerFactory>(),
                                   std::make_shared<ConnectionHandlerRepository>());
-        QObject::connect(&serverWorker, &ServerWorker::started, [](){FAIL("This code is supposed to be unreachable.");});
-        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::started, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         bool emittedFailed = false;
         std::string emittedErrorMessage;
         QObject::connect(&serverWorker, &ServerWorker::failed, [&emittedFailed, &emittedErrorMessage](std::string_view errorMessage){emittedFailed = true; emittedErrorMessage = errorMessage;});
@@ -173,8 +174,8 @@ SCENARIO("ServerWorker creates handler and adds it to repository whenever a new 
                                   pHandlerRepository);
         bool emittedStarted = false;
         QObject::connect(&serverWorker, &ServerWorker::started, [&emittedStarted](){emittedStarted = true;});
-        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){FAIL("This code is supposed to be unreachable.");});
-        QObject::connect(&serverWorker, &ServerWorker::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         QVariantMap variantMap;
         auto pCounter = std::make_shared<std::atomic_size_t>();
         variantMap["connectionCount"].setValue(pCounter);
@@ -220,7 +221,7 @@ SCENARIO("ServerWorker stops by deleting connection listener and stopping reposi
         QObject::connect(&serverWorker, &ServerWorker::started, [&emittedStarted](){emittedStarted = true;});
         bool emittedStopped = false;
         QObject::connect(&serverWorker, &ServerWorker::stopped, [&emittedStopped](){emittedStopped = true;});
-        QObject::connect(&serverWorker, &ServerWorker::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         QVariantMap variantMap;
         auto pCounter = std::make_shared<std::atomic_size_t>();
         variantMap["connectionCount"].setValue(pCounter);
@@ -263,8 +264,8 @@ SCENARIO("ServerWorker supports limiting max connections")
                                   pHandlerRepository);
         bool emittedStarted = false;
         QObject::connect(&serverWorker, &ServerWorker::started, [&emittedStarted](){emittedStarted = true;});
-        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){FAIL("This code is supposed to be unreachable.");});
-        QObject::connect(&serverWorker, &ServerWorker::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         QVariantMap variantMap;
         auto pCounter = std::make_shared<std::atomic_size_t>();
         variantMap["connectionCount"].setValue(pCounter);
@@ -344,8 +345,8 @@ SCENARIO("ServerWorker fails as expected")
         ServerWorker serverWorker(std::shared_ptr<TestConnectionListener>(),
                                   pHandlerFactory,
                                   pHandlerRepository);
-        QObject::connect(&serverWorker, &ServerWorker::started, [](){FAIL("This code is supposed to be unreachable.");});
-        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::started, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         bool emittedFailed = false;
         std::string emittedErrorMessage;
         QObject::connect(&serverWorker, &ServerWorker::failed, [&emittedFailed, &emittedErrorMessage](std::string_view errorMessage){emittedFailed = true; emittedErrorMessage = errorMessage;});
@@ -375,8 +376,8 @@ SCENARIO("ServerWorker fails as expected")
         ServerWorker serverWorker(pListener,
                                   std::shared_ptr<TestConnectionHandlerFactory>(),
                                   pHandlerRepository);
-        QObject::connect(&serverWorker, &ServerWorker::started, [](){FAIL("This code is supposed to be unreachable.");});
-        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::started, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         bool emittedFailed = false;
         std::string emittedErrorMessage;
         QObject::connect(&serverWorker, &ServerWorker::failed, [&emittedFailed, &emittedErrorMessage](std::string_view errorMessage){emittedFailed = true; emittedErrorMessage = errorMessage;});
@@ -406,8 +407,8 @@ SCENARIO("ServerWorker fails as expected")
         ServerWorker serverWorker(pListener,
                                   pHandlerFactory,
                                   std::shared_ptr<ConnectionHandlerRepository>());
-        QObject::connect(&serverWorker, &ServerWorker::started, [](){FAIL("This code is supposed to be unreachable.");});
-        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::started, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         bool emittedFailed = false;
         std::string emittedErrorMessage;
         QObject::connect(&serverWorker, &ServerWorker::failed, [&emittedFailed, &emittedErrorMessage](std::string_view errorMessage){emittedFailed = true; emittedErrorMessage = errorMessage;});
@@ -437,8 +438,8 @@ SCENARIO("ServerWorker fails as expected")
         ServerWorker serverWorker(pListener,
                                   pHandlerFactory,
                                   pHandlerRepository);
-        QObject::connect(&serverWorker, &ServerWorker::started, [](){FAIL("This code is supposed to be unreachable.");});
-        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::started, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         bool emittedFailed = false;
         std::string emittedErrorMessage;
         QObject::connect(&serverWorker, &ServerWorker::failed, [&emittedFailed, &emittedErrorMessage](std::string_view errorMessage){emittedFailed = true; emittedErrorMessage = errorMessage;});
@@ -465,8 +466,8 @@ SCENARIO("ServerWorker fails as expected")
         ServerWorker serverWorker(pListener,
                                   pHandlerFactory,
                                   pHandlerRepository);
-        QObject::connect(&serverWorker, &ServerWorker::started, [](){FAIL("This code is supposed to be unreachable.");});
-        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::started, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         bool emittedFailed = false;
         std::string emittedErrorMessage;
         QObject::connect(&serverWorker, &ServerWorker::failed, [&emittedFailed, &emittedErrorMessage](std::string_view errorMessage){emittedFailed = true; emittedErrorMessage = errorMessage;});
@@ -494,8 +495,8 @@ SCENARIO("ServerWorker fails as expected")
         ServerWorker serverWorker(pListener,
                                   pHandlerFactory,
                                   pHandlerRepository);
-        QObject::connect(&serverWorker, &ServerWorker::started, [](){FAIL("This code is supposed to be unreachable.");});
-        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::started, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         bool emittedFailed = false;
         std::string emittedErrorMessage;
         QObject::connect(&serverWorker, &ServerWorker::failed, [&emittedFailed, &emittedErrorMessage](std::string_view errorMessage){emittedFailed = true; emittedErrorMessage = errorMessage;});
@@ -524,8 +525,8 @@ SCENARIO("ServerWorker fails as expected")
         ServerWorker serverWorker(pListener,
                                   pHandlerFactory,
                                   pHandlerRepository);
-        QObject::connect(&serverWorker, &ServerWorker::started, [](){FAIL("This code is supposed to be unreachable.");});
-        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::started, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         bool emittedFailed = false;
         std::string emittedErrorMessage;
         QObject::connect(&serverWorker, &ServerWorker::failed, [&emittedFailed, &emittedErrorMessage](std::string_view errorMessage){emittedFailed = true; emittedErrorMessage = errorMessage;});
@@ -556,8 +557,8 @@ SCENARIO("ServerWorker fails as expected")
         ServerWorker serverWorker(pListener,
                                   pHandlerFactory,
                                   pHandlerRepository);
-        QObject::connect(&serverWorker, &ServerWorker::started, [](){FAIL("This code is supposed to be unreachable.");});
-        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::started, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&serverWorker, &ServerWorker::stopped, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         bool emittedFailed = false;
         std::string emittedErrorMessage;
         QObject::connect(&serverWorker, &ServerWorker::failed, [&emittedFailed, &emittedErrorMessage](std::string_view errorMessage){emittedFailed = true; emittedErrorMessage = errorMessage;});

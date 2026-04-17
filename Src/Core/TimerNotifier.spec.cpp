@@ -36,8 +36,8 @@ using Kourier::Timer;
 using Kourier::TimerPrivate;
 using Kourier::ClockTicker;
 using Kourier::Object;
-using Spectator::SemaphoreAwaiter;
 using namespace std::chrono_literals;
+using namespace Spectator;
 
 
 namespace Test::TimerNotifier
@@ -160,12 +160,12 @@ SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms
         WHEN("high resolution clock ticker ticks")
         {
             pHighResolutionClockTicker->setEnabled(true);
-            REQUIRE(pHighResolutionClockTicker->isEnabled())
+            REQUIRE(pHighResolutionClockTicker->isEnabled());
             pHighResolutionClockTicker->tick();
 
             THEN("timer notifier disables high resolution clock ticker")
             {
-                REQUIRE(!pHighResolutionClockTicker->isEnabled())
+                REQUIRE(!pHighResolutionClockTicker->isEnabled());
             }
         }
 
@@ -181,7 +181,7 @@ SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms
 
             THEN("timer notifier does not trigger timer nor disables high resolution clock ticker")
             {
-                REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, QDeadlineTimer(1)));
+                REQUIRE(!TRY_ACQUIRE(emittedTimeoutSemaphore, QDeadlineTimer(1)));
                 REQUIRE(pHighResolutionClockTicker->isEnabled());
 
                 AND_WHEN("high resolution clock ticker ticks more three times")
@@ -191,7 +191,7 @@ SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms
 
                     THEN("timer notifier does not trigger timer nor disables high resolution clock ticker")
                     {
-                        REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, QDeadlineTimer(1)));
+                        REQUIRE(!TRY_ACQUIRE(emittedTimeoutSemaphore, QDeadlineTimer(1)));
                         REQUIRE(pHighResolutionClockTicker->isEnabled());
 
                         AND_WHEN("high resolution clock ticker ticks one more time")
@@ -200,9 +200,9 @@ SCENARIO("TimerNotifier disables high resolution clock ticker if wheel with 64ms
 
                             THEN("timer notifier triggers timer and disables high resolution clock ticker")
                             {
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, 10));
+                                REQUIRE(TRY_ACQUIRE(emittedTimeoutSemaphore, 10));
                                 REQUIRE(!pHighResolutionClockTicker->isEnabled());
-                                REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, QDeadlineTimer(1)));
+                                REQUIRE(!TRY_ACQUIRE(emittedTimeoutSemaphore, QDeadlineTimer(1)));
                             }
                         }
                     }
@@ -260,7 +260,7 @@ SCENARIO("TimerNotifier times out timers having zero interval when control retur
                 TimerNotifierTest::setTimerNotifier(timer, timerNotifier);
                 Object::connect(&timer, &Timer::timeout, [&, pTimer = &timer]()
                 {
-                    REQUIRE(!timedOutTimers.contains(pTimer))
+                    REQUIRE(!timedOutTimers.contains(pTimer));
                     timedOutTimers.insert(pTimer);
                     timeoutSemaphore.release();
                 });
@@ -277,7 +277,7 @@ SCENARIO("TimerNotifier times out timers having zero interval when control retur
             THEN("time notifier triggers added timers when control returns to the event loop")
             {
                 REQUIRE(!timeoutSemaphore.tryAcquire());
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(timeoutSemaphore, timersWithZeroIntervalToAddToTimerNotifier, 10));
+                REQUIRE(TRY_ACQUIRE(timeoutSemaphore, timersWithZeroIntervalToAddToTimerNotifier, 10));
                 std::set<Timer*> expectedTimers;
                 for (auto &timer : timersWithZeroInterval)
                     expectedTimers.insert(&timer);
@@ -310,7 +310,7 @@ SCENARIO("TimerNotifier times out timers when their timeout reaches zero")
                 TimerNotifierTest::setTimerNotifier(timerInfo.second, timerNotifier);
                 Object::connect(&timerInfo.second, &Timer::timeout, [&, pTimer = &timerInfo.second]()
                 {
-                    REQUIRE(!timedOutTimers.contains(pTimer))
+                    REQUIRE(!timedOutTimers.contains(pTimer));
                     timedOutTimers.insert(pTimer);
                     timeoutSemaphore.release();
                 });
@@ -334,7 +334,7 @@ SCENARIO("TimerNotifier times out timers when their timeout reaches zero")
                     {
                         if (tickCounter == timerInfo.first)
                         {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(timeoutSemaphore, 10));
+                            REQUIRE(TRY_ACQUIRE(timeoutSemaphore, 10));
                         }
                     }
                 }
@@ -506,11 +506,11 @@ SCENARIO("TimerNotifier ticks all timer wheels having a resolution that is a mul
                         const auto wheelTickCount = TimerNotifierTest::timerWheel(timerNotifier, i).tickCount();
                         if (elapsedTime & (wheelResolution - 1))
                         {
-                            REQUIRE(currentWheelTickCount[i] == wheelTickCount)
+                            REQUIRE(currentWheelTickCount[i] == wheelTickCount);
                         }
                         else
                         {
-                            REQUIRE(++currentWheelTickCount[i] == wheelTickCount)
+                            REQUIRE(++currentWheelTickCount[i] == wheelTickCount);
                         }
                     }
                 }
@@ -650,7 +650,7 @@ SCENARIO("TimerNotifier moves timer on timer wheels until timer's timeout reache
                                     REQUIRE(TimerNotifierTest::timerWheel(timerNotifier, idx).timerCount() == 0);
                                 }
                                 REQUIRE(TimerNotifierTest::timersToNotify(timerNotifier).size() == 1);
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(emittedTimeoutSemaphore, QDeadlineTimer(1)));
+                                REQUIRE(TRY_ACQUIRE(emittedTimeoutSemaphore, QDeadlineTimer(1)));
                                 REQUIRE(TimerNotifierTest::timersToNotify(timerNotifier).size() == 0);
                             }
                             else

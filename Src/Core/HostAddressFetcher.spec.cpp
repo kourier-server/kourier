@@ -23,9 +23,9 @@
 #include <QCoreApplication>
 
 using Kourier::HostAddressFetcher;
-using Spectator::SemaphoreAwaiter;
 using Kourier::Object;
 using Kourier::TestResources::TestHostNamesFetcher;
+using namespace Spectator;
 
 static std::vector<std::string> fetchedAddresses;
 static std::list<void*> givenCallbackData;
@@ -55,7 +55,7 @@ SCENARIO("HostAddressFetcher fetches addresses for domains on hosts file")
 
             THEN("HostAddressFetcher informs the correct addresses")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(fetchedAddressesSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(fetchedAddressesSemaphore, 10));
                 REQUIRE(threadId == QThread::currentThreadId());
                 REQUIRE(givenCallbackData.size() == 1);
                 REQUIRE(*givenCallbackData.begin() == pStaticData);
@@ -103,7 +103,7 @@ SCENARIO("HostAddressFetcher supports deletions while calling callback")
 
             THEN("HostAddressFetcher informs the correct addresses to the first receiver only")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(fetchedAddressesSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(fetchedAddressesSemaphore, 10));
                 REQUIRE(0 == HostAddressFetcher::receiverCount(domain));
                 REQUIRE(threadId == QThread::currentThreadId());
                 REQUIRE(givenCallbackData.size() == 1);

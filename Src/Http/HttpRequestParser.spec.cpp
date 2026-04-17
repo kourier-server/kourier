@@ -733,7 +733,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         // pct-encoded    = "%" HEXDIG HEXDIG
         // sub-delims     = "!" / "$" / "&" / "'" / "(" / ")" / "*" / "+" / "," / ";" / "="
         constexpr static size_t invalidCharsCount = (256 - (26 + 26 + 10 + 17 + 2));
-        const static auto invalidChars = []() -> std::string
+        const static auto invalidChars = [this]() -> std::string
         {
             std::string temp;
             temp.reserve(256);
@@ -1112,7 +1112,7 @@ SCENARIO("HttpRequestParser parses http requests with only host header and no bo
         // pct-encoded    = "%" HEXDIG HEXDIG
         // sub-delims     = "!" / "$" / "&" / "'" / "(" / ")" / "*" / "+" / "," / ";" / "="
         constexpr static size_t invalidCharsCount = (256 - (26 + 26 + 10 + 17 + 2));
-        const static auto invalidChars = []() -> std::string
+        const static auto invalidChars = [this]() -> std::string
         {
             std::string temp;
             temp.reserve(256);
@@ -2152,7 +2152,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         //                  "+" / "-" / "." / "^" / "_" / "`" / "|" / "~" / ":"
         //                  DIGIT / ALPHA
         constexpr static size_t invalidCharsCount = (256 - (26 + 26 + 10 + 15 + 1));
-        const static auto invalidChars = []() -> std::string
+        const static auto invalidChars = [this]() -> std::string
         {
             std::string temp;
             temp.reserve(256);
@@ -2383,7 +2383,7 @@ SCENARIO("HttpRequestParser parses http requests with headers and no body")
         // field-vchar    = VCHAR / obs-text (RFC9110, section 5.5)
         // obs-text       = %x80-FF (RFC9110, section 5.5)
         constexpr static size_t invalidCharsCount = 31;
-        const static auto invalidChars = []() -> std::string
+        const static auto invalidChars = [this]() -> std::string
         {
             std::string temp;
             temp.reserve(256);
@@ -3578,8 +3578,8 @@ SCENARIO("HttpRequestParser parses requests with chunked bodies")
                     REQUIRE(httpRequest.hasHeader("Transfer-Encoding"));
                     REQUIRE(httpRequest.headerCount("Transfer-Encoding") == 1);
                     REQUIRE(httpRequest.header("Transfer-Encoding") == "chunked");
-                    REQUIRE(!httpRequest.isComplete())
-                    REQUIRE(httpRequest.chunked())
+                    REQUIRE(!httpRequest.isComplete());
+                    REQUIRE(httpRequest.chunked());
                     REQUIRE(httpRequest.requestBodySize() == 0);
                     REQUIRE(httpRequest.pendingBodySize() == 0);
                     REQUIRE(!httpRequest.hasBody());
@@ -3689,8 +3689,8 @@ SCENARIO("HttpRequestParser parses requests with chunked bodies")
                     REQUIRE(httpRequest.hasHeader("Transfer-Encoding"));
                     REQUIRE(httpRequest.headerCount("Transfer-Encoding") == 1);
                     REQUIRE(httpRequest.header("Transfer-Encoding") == "chunked");
-                    REQUIRE(!httpRequest.isComplete())
-                    REQUIRE(httpRequest.chunked())
+                    REQUIRE(!httpRequest.isComplete());
+                    REQUIRE(httpRequest.chunked());
                     REQUIRE(httpRequest.requestBodySize() == 0);
                     REQUIRE(httpRequest.pendingBodySize() == 0);
                     REQUIRE(!httpRequest.hasBody());

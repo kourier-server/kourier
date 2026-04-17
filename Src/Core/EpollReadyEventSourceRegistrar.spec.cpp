@@ -27,6 +27,7 @@ using Kourier::EpollReadyEventSourceRegistrar;
 using Kourier::EpollEventSource;
 using Kourier::EpollEventNotifier;
 using Kourier::Object;
+using namespace Spectator;
 
 namespace Test::EpollReadyEventSourceRegistrar
 {

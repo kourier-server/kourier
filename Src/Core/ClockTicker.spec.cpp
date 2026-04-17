@@ -23,7 +23,6 @@
 
 using Kourier::ClockTicker;
 using Kourier::Object;
-using Spectator::SemaphoreAwaiter;
 using namespace std::chrono_literals;
 
 
@@ -51,7 +50,7 @@ SCENARIO("ClockTicker ticks at specified resolution")
 
             THEN("clock ticker ticks at given resolution")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(tickSemaphore, tickTimes.size(), 10));
+                REQUIRE(TRY_ACQUIRE(tickSemaphore, tickTimes.size(), 10));
                 auto previousTime = startTime;
                 for (const auto &tickTime : tickTimes)
                 {

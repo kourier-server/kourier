@@ -113,7 +113,7 @@ SCENARIO("IOChannel supports data writing")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == 0);
         REQUIRE(ioChannel.dataAvailable() == 0);
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.writeBuffer().isEmpty());
         ioChannel.dataSinkTest().addCapacity(std::numeric_limits<size_t>::max()/2);
 
@@ -145,7 +145,7 @@ SCENARIO("IOChannel supports data writing")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == 0);
         REQUIRE(ioChannel.dataAvailable() == 0);
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.writeBuffer().isEmpty());
 
         WHEN("data is written to IOChannel")
@@ -198,7 +198,7 @@ SCENARIO("IOChannel supports data writing")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == 0);
         REQUIRE(ioChannel.dataAvailable() == 0);
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.writeBuffer().isEmpty());
 
         WHEN("data is written to IOChannel")
@@ -237,7 +237,7 @@ SCENARIO("IOChannel supports data writing")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == 0);
         REQUIRE(ioChannel.dataAvailable() == 0);
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.writeBuffer().isEmpty());
         const auto initialDataInWriteBuffer = GENERATE(AS(std::string_view), "aeiou", "1234", "a");
         REQUIRE(initialDataInWriteBuffer.size() == ioChannel.writeBuffer().write(initialDataInWriteBuffer.data(), initialDataInWriteBuffer.size()));
@@ -272,7 +272,7 @@ SCENARIO("IOChannel supports data writing")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == 0);
         REQUIRE(ioChannel.dataAvailable() == 0);
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.writeBuffer().isEmpty());
         const auto initialDataInWriteBuffer = GENERATE(AS(std::string_view), "aeiou", "1234", "a");
         REQUIRE(initialDataInWriteBuffer.size() == ioChannel.writeBuffer().write(initialDataInWriteBuffer.data(), initialDataInWriteBuffer.size()));
@@ -327,7 +327,7 @@ SCENARIO("IOChannel supports data writing")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == 0);
         REQUIRE(ioChannel.dataAvailable() == 0);
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.writeBuffer().isEmpty());
         const auto initialDataInWriteBuffer = GENERATE(AS(std::string_view), "aeiou", "1234", "a");
         REQUIRE(initialDataInWriteBuffer.size() == ioChannel.writeBuffer().write(initialDataInWriteBuffer.data(), initialDataInWriteBuffer.size()));
@@ -370,7 +370,7 @@ SCENARIO("IOChannel writes data to channel")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == 0);
         REQUIRE(ioChannel.dataAvailable() == 0);
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.writeBuffer().isEmpty());
         const auto initialDataInWriteBuffer = GENERATE(AS(std::string_view), "aeiou", "1234", "a");
         REQUIRE(initialDataInWriteBuffer.size() == ioChannel.writeBuffer().write(initialDataInWriteBuffer.data(), initialDataInWriteBuffer.size()));
@@ -378,7 +378,7 @@ SCENARIO("IOChannel writes data to channel")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == initialDataInWriteBuffer.size());
         REQUIRE(ioChannel.dataAvailable() == 0);
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.writeBuffer().peekAll() == initialDataInWriteBuffer);
         const auto extraCapacityInSink = GENERATE(AS(size_t), 0, 3, 18);
         ioChannel.dataSinkTest().addCapacity(initialDataInWriteBuffer.size() + extraCapacityInSink);
@@ -394,7 +394,7 @@ SCENARIO("IOChannel writes data to channel")
                 REQUIRE(ioChannel.isReadNotificationEnabled() == true);
                 REQUIRE(ioChannel.dataToWrite() == 0);
                 REQUIRE(ioChannel.dataAvailable() == 0);
-                REQUIRE(ioChannel.readBufferCapacity() == 0)
+                REQUIRE(ioChannel.readBufferCapacity() == 0);
                 REQUIRE(ioChannel.writeBuffer().isEmpty());
                 REQUIRE(ioChannel.dataSinkTest().data() == initialDataInWriteBuffer);
                 REQUIRE(ioChannel.isWriteNotificationEnabled() == false);
@@ -409,7 +409,7 @@ SCENARIO("IOChannel writes data to channel")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == 0);
         REQUIRE(ioChannel.dataAvailable() == 0);
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.writeBuffer().isEmpty());
         const auto initialDataInWriteBuffer = GENERATE(AS(std::string_view), "aeiou", "1234", "a");
         REQUIRE(initialDataInWriteBuffer.size() == ioChannel.writeBuffer().write(initialDataInWriteBuffer.data(), initialDataInWriteBuffer.size()));
@@ -417,7 +417,7 @@ SCENARIO("IOChannel writes data to channel")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == initialDataInWriteBuffer.size());
         REQUIRE(ioChannel.dataAvailable() == 0);
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.writeBuffer().peekAll() == initialDataInWriteBuffer);
 
         WHEN("IOChannel writes data to channel")
@@ -431,7 +431,7 @@ SCENARIO("IOChannel writes data to channel")
                 REQUIRE(ioChannel.isReadNotificationEnabled() == true);
                 REQUIRE(ioChannel.dataToWrite() == initialDataInWriteBuffer.size());
                 REQUIRE(ioChannel.dataAvailable() == 0);
-                REQUIRE(ioChannel.readBufferCapacity() == 0)
+                REQUIRE(ioChannel.readBufferCapacity() == 0);
                 REQUIRE(ioChannel.writeBuffer().peekAll() == initialDataInWriteBuffer);
                 REQUIRE(ioChannel.isWriteNotificationEnabled() == true);
             }
@@ -445,7 +445,7 @@ SCENARIO("IOChannel writes data to channel")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == 0);
         REQUIRE(ioChannel.dataAvailable() == 0);
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.writeBuffer().isEmpty());
         const auto initialDataInWriteBuffer = GENERATE(AS(std::string_view), "asdf qwer", "1234 5678 9", "Hello World");
         REQUIRE(initialDataInWriteBuffer.size() == ioChannel.writeBuffer().write(initialDataInWriteBuffer.data(), initialDataInWriteBuffer.size()));
@@ -453,7 +453,7 @@ SCENARIO("IOChannel writes data to channel")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == initialDataInWriteBuffer.size());
         REQUIRE(ioChannel.dataAvailable() == 0);
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.writeBuffer().peekAll() == initialDataInWriteBuffer);
         const auto lackingCapacityInSink = GENERATE(AS(size_t), 1, 4, 7);
         REQUIRE(initialDataInWriteBuffer.size() > lackingCapacityInSink);
@@ -476,7 +476,7 @@ SCENARIO("IOChannel writes data to channel")
                 REQUIRE(ioChannel.dataToWrite() == lackingCapacityInSink);
                 REQUIRE(ioChannel.writeBuffer().size() == lackingCapacityInSink);
                 REQUIRE(ioChannel.dataAvailable() == 0);
-                REQUIRE(ioChannel.readBufferCapacity() == 0)
+                REQUIRE(ioChannel.readBufferCapacity() == 0);
                 REQUIRE(!ioChannel.writeBuffer().isEmpty());
                 REQUIRE(ioChannel.writeBuffer().peekAll() == std::string_view(initialDataInWriteBuffer.data() + initialSinkCapacity, lackingCapacityInSink));
                 REQUIRE(ioChannel.isWriteNotificationEnabled() == true);
@@ -491,7 +491,7 @@ SCENARIO("IOChannel writes data to channel")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == 0);
         REQUIRE(ioChannel.dataAvailable() == 0);
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.writeBuffer().isEmpty());
         const auto sinkCapacity = GENERATE(AS(size_t), 1, 3, 18);
         ioChannel.dataSinkTest().addCapacity(sinkCapacity);
@@ -509,7 +509,7 @@ SCENARIO("IOChannel writes data to channel")
                 REQUIRE(ioChannel.isReadNotificationEnabled() == true);
                 REQUIRE(ioChannel.dataToWrite() == 0);
                 REQUIRE(ioChannel.dataAvailable() == 0);
-                REQUIRE(ioChannel.readBufferCapacity() == 0)
+                REQUIRE(ioChannel.readBufferCapacity() == 0);
                 REQUIRE(ioChannel.writeBuffer().isEmpty());
                 REQUIRE(ioChannel.isWriteNotificationEnabled() == false);
             }
@@ -523,7 +523,7 @@ SCENARIO("IOChannel writes data to channel")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == 0);
         REQUIRE(ioChannel.dataAvailable() == 0);
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.writeBuffer().isEmpty());
 
         WHEN("IOChannel writes data to channel")
@@ -539,7 +539,7 @@ SCENARIO("IOChannel writes data to channel")
                 REQUIRE(ioChannel.isReadNotificationEnabled() == true);
                 REQUIRE(ioChannel.dataToWrite() == 0);
                 REQUIRE(ioChannel.dataAvailable() == 0);
-                REQUIRE(ioChannel.readBufferCapacity() == 0)
+                REQUIRE(ioChannel.readBufferCapacity() == 0);
                 REQUIRE(ioChannel.writeBuffer().isEmpty());
                 REQUIRE(ioChannel.isWriteNotificationEnabled() == false);
             }
@@ -557,7 +557,7 @@ SCENARIO("IOChannel supports data reading")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == 0);
         REQUIRE(ioChannel.dataAvailable() == 0);
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.writeBuffer().isEmpty());
         REQUIRE(ioChannel.peekAll().empty());
         REQUIRE(ioChannel.readAll().empty());
@@ -576,7 +576,7 @@ SCENARIO("IOChannel supports data reading")
                 REQUIRE(ioChannel.isWriteNotificationEnabled() == true);
                 REQUIRE(ioChannel.dataToWrite() == 0);
                 REQUIRE(ioChannel.dataAvailable() == 0);
-                REQUIRE(ioChannel.readBufferCapacity() == 0)
+                REQUIRE(ioChannel.readBufferCapacity() == 0);
                 REQUIRE(ioChannel.writeBuffer().isEmpty());
                 REQUIRE(ioChannel.peekAll().empty());
                 REQUIRE(ioChannel.readAll().empty());
@@ -600,7 +600,7 @@ SCENARIO("IOChannel supports data reading")
                 REQUIRE(ioChannel.isReadNotificationEnabled() == true);
                 REQUIRE(ioChannel.dataToWrite() == 0);
                 REQUIRE(ioChannel.dataAvailable() == 0);
-                REQUIRE(ioChannel.readBufferCapacity() == 0)
+                REQUIRE(ioChannel.readBufferCapacity() == 0);
                 REQUIRE(ioChannel.writeBuffer().isEmpty());
                 REQUIRE(ioChannel.peekAll().empty());
                 REQUIRE(ioChannel.readAll().empty());
@@ -617,7 +617,7 @@ SCENARIO("IOChannel supports data reading")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == 0);
         REQUIRE(ioChannel.dataAvailable() == 0);
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.readBuffer().isEmpty());
         REQUIRE(ioChannel.writeBuffer().isEmpty());
         REQUIRE(ioChannel.peekAll().empty());
@@ -629,7 +629,7 @@ SCENARIO("IOChannel supports data reading")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == 0);
         REQUIRE(ioChannel.dataAvailable() == initialDataInReadBuffer.size());
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.readBuffer().peekAll() == initialDataInReadBuffer);
         REQUIRE(!ioChannel.readBuffer().isEmpty() && !ioChannel.readBuffer().isFull());
         const auto isReadNotificationEnabled = GENERATE(AS(bool), true, false);
@@ -646,7 +646,7 @@ SCENARIO("IOChannel supports data reading")
                 REQUIRE(ioChannel.isWriteNotificationEnabled() == true);
                 REQUIRE(ioChannel.dataToWrite() == 0);
                 REQUIRE(ioChannel.dataAvailable() == initialDataInReadBuffer.size());
-                REQUIRE(ioChannel.readBufferCapacity() == 0)
+                REQUIRE(ioChannel.readBufferCapacity() == 0);
                 REQUIRE(!ioChannel.readBuffer().isEmpty());
                 REQUIRE(!ioChannel.readBuffer().isFull());
                 REQUIRE(ioChannel.readBuffer().peekAll() == initialDataInReadBuffer);
@@ -671,7 +671,7 @@ SCENARIO("IOChannel supports data reading")
                 REQUIRE(ioChannel.isWriteNotificationEnabled() == true);
                 REQUIRE(ioChannel.dataToWrite() == 0);
                 REQUIRE(ioChannel.dataAvailable() == (initialDataInReadBuffer.size() - dataSize));
-                REQUIRE(ioChannel.readBufferCapacity() == 0)
+                REQUIRE(ioChannel.readBufferCapacity() == 0);
                 REQUIRE(!ioChannel.readBuffer().isEmpty());
                 REQUIRE(!ioChannel.readBuffer().isFull());
                 REQUIRE(ioChannel.readBuffer().peekAll() == std::string_view(initialDataInReadBuffer.data() + dataSize, initialDataInReadBuffer.size() - dataSize));
@@ -695,7 +695,7 @@ SCENARIO("IOChannel supports data reading")
                 REQUIRE(ioChannel.isWriteNotificationEnabled() == true);
                 REQUIRE(ioChannel.dataToWrite() == 0);
                 REQUIRE(ioChannel.dataAvailable() == 0);
-                REQUIRE(ioChannel.readBufferCapacity() == 0)
+                REQUIRE(ioChannel.readBufferCapacity() == 0);
                 REQUIRE(ioChannel.readBuffer().isEmpty());
                 REQUIRE(!ioChannel.readBuffer().isFull());
                 REQUIRE(ioChannel.readBuffer().peekAll().empty());
@@ -719,7 +719,7 @@ SCENARIO("IOChannel supports data reading")
                 REQUIRE(ioChannel.isWriteNotificationEnabled() == true);
                 REQUIRE(ioChannel.dataToWrite() == 0);
                 REQUIRE(ioChannel.dataAvailable() == 0);
-                REQUIRE(ioChannel.readBufferCapacity() == 0)
+                REQUIRE(ioChannel.readBufferCapacity() == 0);
                 REQUIRE(ioChannel.readBuffer().isEmpty());
                 REQUIRE(!ioChannel.readBuffer().isFull());
                 REQUIRE(ioChannel.readBuffer().peekAll().empty());
@@ -740,7 +740,7 @@ SCENARIO("IOChannel supports data reading")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == 0);
         REQUIRE(ioChannel.dataAvailable() == 0);
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.readBuffer().isEmpty());
         REQUIRE(ioChannel.writeBuffer().isEmpty());
         REQUIRE(ioChannel.peekAll().empty());
@@ -757,7 +757,7 @@ SCENARIO("IOChannel supports data reading")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == 0);
         REQUIRE(ioChannel.dataAvailable() == initialDataInReadBuffer.size());
-        REQUIRE(ioChannel.readBufferCapacity() == RingBuffer::defaultCapacity())
+        REQUIRE(ioChannel.readBufferCapacity() == RingBuffer::defaultCapacity());
         REQUIRE(ioChannel.readBuffer().peekAll() == initialDataInReadBuffer);
         REQUIRE(!ioChannel.readBuffer().isEmpty());
         const auto isReadNotificationEnabled = GENERATE(AS(bool), true, false);
@@ -891,7 +891,7 @@ SCENARIO("IOChannel reads data from channel")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == 0);
         REQUIRE(ioChannel.dataAvailable() == 0);
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.writeBuffer().isEmpty());
         REQUIRE(ioChannel.peekAll().empty());
         REQUIRE(ioChannel.readAll().empty());
@@ -910,7 +910,7 @@ SCENARIO("IOChannel reads data from channel")
                 REQUIRE(ioChannel.isWriteNotificationEnabled() == true);
                 REQUIRE(ioChannel.dataToWrite() == 0);
                 REQUIRE(ioChannel.dataAvailable() == 0);
-                REQUIRE(ioChannel.readBufferCapacity() == 0)
+                REQUIRE(ioChannel.readBufferCapacity() == 0);
                 REQUIRE(ioChannel.writeBuffer().isEmpty());
                 REQUIRE(ioChannel.peekAll().empty());
                 REQUIRE(ioChannel.readAll().empty());
@@ -941,7 +941,7 @@ SCENARIO("IOChannel reads data from channel")
                 REQUIRE(ioChannel.isWriteNotificationEnabled() == true);
                 REQUIRE(ioChannel.dataToWrite() == 0);
                 REQUIRE(ioChannel.dataAvailable() == initialDataInSource.size());
-                REQUIRE(ioChannel.readBufferCapacity() == 0)
+                REQUIRE(ioChannel.readBufferCapacity() == 0);
                 REQUIRE(ioChannel.writeBuffer().isEmpty());
                 REQUIRE(ioChannel.peekAll() == initialDataInSource);
                 REQUIRE(!ioChannel.readBuffer().isEmpty());
@@ -978,7 +978,7 @@ SCENARIO("IOChannel reads data from channel")
                 REQUIRE(ioChannel.isWriteNotificationEnabled() == true);
                 REQUIRE(ioChannel.dataToWrite() == 0);
                 REQUIRE(ioChannel.dataAvailable() == initialDataInSource.size());
-                REQUIRE(ioChannel.readBufferCapacity() == RingBuffer::defaultCapacity())
+                REQUIRE(ioChannel.readBufferCapacity() == RingBuffer::defaultCapacity());
                 REQUIRE(ioChannel.writeBuffer().isEmpty());
                 REQUIRE(ioChannel.peekAll() == initialDataInSource);
                 REQUIRE(!ioChannel.readBuffer().isEmpty());
@@ -1016,7 +1016,7 @@ SCENARIO("IOChannel reads data from channel")
                 REQUIRE(ioChannel.isWriteNotificationEnabled() == true);
                 REQUIRE(ioChannel.dataToWrite() == 0);
                 REQUIRE(ioChannel.dataAvailable() == ioChannel.readBufferCapacity());
-                REQUIRE(ioChannel.readBufferCapacity() == RingBuffer::defaultCapacity())
+                REQUIRE(ioChannel.readBufferCapacity() == RingBuffer::defaultCapacity());
                 REQUIRE(ioChannel.writeBuffer().isEmpty());
                 REQUIRE(ioChannel.peekAll() == std::string_view(initialDataInSource.data(), ioChannel.readBufferCapacity()));
                 REQUIRE(!ioChannel.readBuffer().isEmpty());
@@ -1034,7 +1034,7 @@ SCENARIO("IOChannel reads data from channel")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == 0);
         REQUIRE(ioChannel.dataAvailable() == 0);
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.readBuffer().isEmpty());
         REQUIRE(ioChannel.writeBuffer().isEmpty());
         REQUIRE(ioChannel.peekAll().empty());
@@ -1046,7 +1046,7 @@ SCENARIO("IOChannel reads data from channel")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == 0);
         REQUIRE(ioChannel.dataAvailable() == initialDataInReadBuffer.size());
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.readBuffer().peekAll() == initialDataInReadBuffer);
         REQUIRE(!ioChannel.readBuffer().isEmpty() && !ioChannel.readBuffer().isFull());
         const auto isReadNotificationEnabled = GENERATE(AS(bool), true, false);
@@ -1063,7 +1063,7 @@ SCENARIO("IOChannel reads data from channel")
                 REQUIRE(ioChannel.isWriteNotificationEnabled() == true);
                 REQUIRE(ioChannel.dataToWrite() == 0);
                 REQUIRE(ioChannel.dataAvailable() == initialDataInReadBuffer.size());
-                REQUIRE(ioChannel.readBufferCapacity() == 0)
+                REQUIRE(ioChannel.readBufferCapacity() == 0);
                 REQUIRE(ioChannel.writeBuffer().isEmpty());
                 REQUIRE(ioChannel.peekAll() == initialDataInReadBuffer);
                 REQUIRE(!ioChannel.readBuffer().isEmpty());
@@ -1096,7 +1096,7 @@ SCENARIO("IOChannel reads data from channel")
                 REQUIRE(ioChannel.isWriteNotificationEnabled() == true);
                 REQUIRE(ioChannel.dataToWrite() == 0);
                 REQUIRE(ioChannel.dataAvailable() == (initialDataInReadBuffer.size() + initialDataInSource.size()));
-                REQUIRE(ioChannel.readBufferCapacity() == 0)
+                REQUIRE(ioChannel.readBufferCapacity() == 0);
                 REQUIRE(ioChannel.writeBuffer().isEmpty());
                 REQUIRE(ioChannel.peekAll() == (std::string(initialDataInReadBuffer) + initialDataInSource));
                 REQUIRE(!ioChannel.readBuffer().isEmpty());
@@ -1135,7 +1135,7 @@ SCENARIO("IOChannel reads data from channel")
                 REQUIRE(ioChannel.dataToWrite() == 0);
                 REQUIRE(ioChannel.dataAvailable() == (initialDataInReadBuffer.size() + initialDataInSource.size()));
                 REQUIRE(ioChannel.dataAvailable() == RingBuffer::defaultCapacity());
-                REQUIRE(ioChannel.readBufferCapacity() == RingBuffer::defaultCapacity())
+                REQUIRE(ioChannel.readBufferCapacity() == RingBuffer::defaultCapacity());
                 REQUIRE(ioChannel.writeBuffer().isEmpty());
                 REQUIRE(ioChannel.peekAll() == (std::string(initialDataInReadBuffer) + initialDataInSource));
                 REQUIRE(!ioChannel.readBuffer().isEmpty());
@@ -1174,7 +1174,7 @@ SCENARIO("IOChannel reads data from channel")
                 REQUIRE(ioChannel.isWriteNotificationEnabled() == true);
                 REQUIRE(ioChannel.dataToWrite() == 0);
                 REQUIRE(ioChannel.dataAvailable() == ioChannel.readBufferCapacity());
-                REQUIRE(ioChannel.readBufferCapacity() == RingBuffer::defaultCapacity())
+                REQUIRE(ioChannel.readBufferCapacity() == RingBuffer::defaultCapacity());
                 REQUIRE(ioChannel.writeBuffer().isEmpty());
                 REQUIRE(ioChannel.peekAll() == (std::string(initialDataInReadBuffer) + std::string(initialDataInSource.data(), initialDataInSource.size() - extraDataSizeInSource)));
                 REQUIRE(!ioChannel.readBuffer().isEmpty());
@@ -1192,7 +1192,7 @@ SCENARIO("IOChannel reads data from channel")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == 0);
         REQUIRE(ioChannel.dataAvailable() == 0);
-        REQUIRE(ioChannel.readBufferCapacity() == 0)
+        REQUIRE(ioChannel.readBufferCapacity() == 0);
         REQUIRE(ioChannel.readBuffer().isEmpty());
         REQUIRE(ioChannel.writeBuffer().isEmpty());
         REQUIRE(ioChannel.peekAll().empty());
@@ -1209,7 +1209,7 @@ SCENARIO("IOChannel reads data from channel")
         REQUIRE(ioChannel.isReadNotificationEnabled() == true);
         REQUIRE(ioChannel.dataToWrite() == 0);
         REQUIRE(ioChannel.dataAvailable() == initialDataInReadBuffer.size());
-        REQUIRE(ioChannel.readBufferCapacity() == RingBuffer::defaultCapacity())
+        REQUIRE(ioChannel.readBufferCapacity() == RingBuffer::defaultCapacity());
         REQUIRE(ioChannel.readBuffer().peekAll() == initialDataInReadBuffer);
         REQUIRE(!ioChannel.readBuffer().isEmpty());
         const auto isReadNotificationEnabled = GENERATE(AS(bool), true, false);

@@ -27,6 +27,7 @@ using Kourier::TlsContext;
 using Kourier::TlsConfiguration;
 using Kourier::TestResources::TlsTestCertificateInfo;
 using Kourier::TestResources::TlsTestCertificates;
+using namespace Spectator;
 
 struct SslCtxConfiguration
 {
@@ -186,7 +187,7 @@ SCENARIO("TlsContext is setup according to given CA certificates tls configurati
         tlsConfiguration.setPeerVerifyMode(peerVerifyMode);
         if (useSystemCertificates)
         {
-            static const auto defaultCaCerts = []() -> std::set<std::string>
+            static const auto defaultCaCerts = [this]() -> std::set<std::string>
             {
                 auto *pCtx = SSL_CTX_new(TLS_method());
                 REQUIRE(pCtx != nullptr);

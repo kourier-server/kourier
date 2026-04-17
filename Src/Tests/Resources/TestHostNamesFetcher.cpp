@@ -19,8 +19,9 @@
 #include <QHostInfo>
 #include <QMutex>
 #include <atomic>
-#include "../Spectator/Spectator.h"
+#include <Spectator.h>
 
+using namespace Spectator;
 
 namespace Kourier::TestResources
 {

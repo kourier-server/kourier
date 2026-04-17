@@ -59,21 +59,21 @@ private:
 #define GENERATE(TypeHolder, ...) \
     [this]() -> const GET_TYPE TypeHolder & { \
         const static GET_TYPE TypeHolder data[] = {__VA_ARGS__}; \
-        static_assert(sizeof(data)/sizeof(GET_TYPE TypeHolder) > 0); \
+        assert(sizeof(data)/sizeof(GET_TYPE TypeHolder) > 0); \
         const static ::Spectator::Generator generator(sizeof(data)/sizeof(GET_TYPE TypeHolder), _SPECTATOR_TO_UTF_16_STRING_LITERAL(__FILE__), __LINE__); \
         /* The explicit cast below on the this pointer is permitted per C++20 Standard 11.9.2 (4.4) */ \
         return generator.currentValue<GET_TYPE TypeHolder>(data, (::Spectator::Scenario*)this); \
     }()
 #define GENERATE_RANGE(TypeHolder, MIN_VAL, MAX_VAL) \
     [this]() -> GET_TYPE TypeHolder { \
-        static_assert(std::numeric_limits<GET_TYPE TypeHolder>::is_integer && MAX_VAL > MIN_VAL); \
+        assert(std::numeric_limits<GET_TYPE TypeHolder>::is_integer && MAX_VAL > MIN_VAL); \
         static ::Spectator::Generator generator(MAX_VAL - MIN_VAL + 1, _SPECTATOR_TO_UTF_16_STRING_LITERAL(__FILE__), __LINE__); \
         /* The explicit cast below on the this pointer is permitted per C++20 Standard 11.9.2 (4.4) */ \
         return generator.currentRangeValue<GET_TYPE TypeHolder>(MIN_VAL, MAX_VAL, 1, (::Spectator::Scenario*)this); \
     }()
 #define GENERATE_RANGE_WITH_STEP(TypeHolder, MIN_VAL, MAX_VAL, STEP_VAL) \
     [this]() -> GET_TYPE TypeHolder { \
-        static_assert(std::numeric_limits<GET_TYPE TypeHolder>::is_integer && MAX_VAL > MIN_VAL && STEP_VAL > 0); \
+        assert(std::numeric_limits<GET_TYPE TypeHolder>::is_integer && MAX_VAL > MIN_VAL && STEP_VAL > 0); \
         static ::Spectator::Generator generator((MAX_VAL - MIN_VAL)/STEP_VAL + 1, _SPECTATOR_TO_UTF_16_STRING_LITERAL(__FILE__), __LINE__); \
         /* The explicit cast below on the this pointer is permitted per C++20 Standard 11.9.2 (4.4) */ \
         return generator.currentRangeValue<GET_TYPE TypeHolder>(MIN_VAL, MAX_VAL, STEP_VAL, (::Spectator::Scenario*)this); \

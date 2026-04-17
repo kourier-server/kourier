@@ -202,7 +202,7 @@ SCENARIO("RingBuffer allows setting capacity after creation")
 
             THEN("buffer changes its capacity and adjust its availableFreeSize")
             {
-                REQUIRE(succeeded)
+                REQUIRE(succeeded);
                 REQUIRE(!ringBuffer.isEmpty());
                 REQUIRE(ringBuffer.size() == initialDataSize);
                 REQUIRE(ringBuffer.capacity() == newCapacity);
@@ -223,7 +223,7 @@ SCENARIO("RingBuffer allows setting capacity after creation")
 
             THEN("buffer changes its capacity keep its availableFreeSize")
             {
-                REQUIRE(succeeded)
+                REQUIRE(succeeded);
                 REQUIRE(!ringBuffer.isEmpty());
                 REQUIRE(ringBuffer.size() == initialDataSize);
                 REQUIRE(ringBuffer.capacity() == newCapacity);
@@ -303,7 +303,7 @@ SCENARIO("RingBuffer allows setting capacity after creation")
 
             THEN("buffer changes its capacity keep its availableFreeSize")
             {
-                REQUIRE(succeeded)
+                REQUIRE(succeeded);
                 REQUIRE(!ringBuffer.isEmpty());
                 REQUIRE(ringBuffer.size() == initialDataSize);
                 REQUIRE(ringBuffer.capacity() == newCapacity);
@@ -718,11 +718,11 @@ SCENARIO("RingBuffer enlarges buffer when writing data")
     GIVEN("a buffer constructed according to an initial data policy")
     {
         enum class InitialDataPolicy {Empty, Full, Start, End, Middle, Splitted};
-        auto bufferInitializer = [](InitialDataPolicy dataPolicy, RingBuffer &ringBuffer, std::string &data)
+        auto bufferInitializer = [this](InitialDataPolicy dataPolicy, RingBuffer &ringBuffer, std::string &data)
         {
             REQUIRE(ringBuffer.isEmpty());
             const auto currentCapacity = ringBuffer.availableFreeSize();
-            auto dataGenerator = [](size_t size) -> std::string
+            auto dataGenerator = [this](size_t size) -> std::string
             {
                 REQUIRE(size > 0);
                 std::string tmp(size, ' ');
@@ -1029,11 +1029,11 @@ SCENARIO("RingBuffer enlarges buffer when writing data from data source")
     GIVEN("a buffer constructed according to an initial data policy")
     {
         enum class InitialDataPolicy {Empty, Full, Start, End, Middle, Splitted};
-        auto bufferInitializer = [](InitialDataPolicy dataPolicy, RingBuffer &ringBuffer, std::string &data)
+        auto bufferInitializer = [this](InitialDataPolicy dataPolicy, RingBuffer &ringBuffer, std::string &data)
         {
             REQUIRE(ringBuffer.isEmpty());
             const auto currentCapacity = ringBuffer.availableFreeSize();
-            auto dataGenerator = [](size_t size) -> std::string
+            auto dataGenerator = [this](size_t size) -> std::string
             {
                 REQUIRE(size > 0);
                 std::string tmp(size, ' ');
@@ -1201,11 +1201,11 @@ SCENARIO("RingBuffer uses all available size/capacity of data source/sink")
     GIVEN("a buffer constructed according to an initial data policy")
     {
         enum class InitialDataPolicy {Empty, Full, Start, End, Middle, Splitted};
-        auto bufferInitializer = [](InitialDataPolicy dataPolicy, RingBuffer &ringBuffer, std::string &data)
+        auto bufferInitializer = [this](InitialDataPolicy dataPolicy, RingBuffer &ringBuffer, std::string &data)
         {
             REQUIRE(ringBuffer.isEmpty());
             const auto currentCapacity = ringBuffer.availableFreeSize();
-            auto dataGenerator = [](size_t size) -> std::string
+            auto dataGenerator = [this](size_t size) -> std::string
             {
                 REQUIRE(size > 0);
                 std::string tmp(size, ' ');

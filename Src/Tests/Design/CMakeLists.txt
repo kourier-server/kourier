@@ -4,6 +4,7 @@
 #
 qt_add_executable(DesignTests)
 target_sources(DesignTests PRIVATE
+    main.cpp
     ../../Core/HostAddressFetcher.spec.cpp
     ../../Core/IOChannel.spec.cpp
     ../../Core/Object.spec.cpp
@@ -42,13 +43,13 @@ endif()
 find_package(Qt6 COMPONENTS Core Concurrent Network REQUIRED)
 target_link_libraries(DesignTests
     PRIVATE
-    Spectator
+    Kourier::Spectator
     KourierCore
     TestResources
     Qt::Core
     Qt::Concurrent
     Qt::Network)
-target_include_directories(DesignTests PRIVATE ../Spectator ../..)
+target_include_directories(DesignTests PRIVATE ../..)
 target_precompile_headers(DesignTests PRIVATE
     <Spectator.h>
     <QtCore>

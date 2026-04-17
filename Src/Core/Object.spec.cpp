@@ -3308,7 +3308,7 @@ SCENARIO("Object calls connected methods")
                 AND_WHEN("connected signal is emitted")
                 {
                     const auto emittedValue = GENERATE(AS(int), -125, 0, 1, 3, 5, 12);
-                    WARN(QByteArray("emitted value: ").append(QByteArray::number(emittedValue)));
+                    INFO(QByteArray("emitted value: ").append(QByteArray::number(emittedValue)));
                     const int delta = 18;
                     emitter.twoIntsSignal(emittedValue, emittedValue + delta);
 
@@ -3332,7 +3332,7 @@ SCENARIO("Object calls connected methods")
                 AND_WHEN("connected signal is emitted")
                 {
                     const auto emittedValue = GENERATE(AS(int), -125, 0, 1, 3, 5, 12);
-                    WARN(QByteArray("emitted value: ").append(QByteArray::number(emittedValue)));
+                    INFO(QByteArray("emitted value: ").append(QByteArray::number(emittedValue)));
                     emitter.twoIntsSignal(emittedValue, emittedValue);
 
                     THEN("method on connected object is called")

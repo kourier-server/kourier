@@ -36,7 +36,6 @@ using Kourier::TcpServer;
 using Kourier::TcpSocket;
 using Kourier::Object;
 using Kourier::TestResources::TestHostNamesFetcher;
-using Spectator::SemaphoreAwaiter;
 
 
 namespace TcpSocketTests
@@ -123,8 +122,8 @@ SCENARIO("TcpSocket connects to server, sends a PING and gets a PONG as response
 
             THEN("client connects to server peer")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientPeerConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerConnectedSemaphore, 10));
 
                 AND_WHEN("client peer sends a PING message to the server peer")
                 {
@@ -132,10 +131,10 @@ SCENARIO("TcpSocket connects to server, sends a PING and gets a PONG as response
 
                     THEN("server peer responds with a PONG message and closes the connection")
                     {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerReceivedPingSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerReceivedPongSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerReceivedPingSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(clientPeerReceivedPongSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                     }
                 }
             }
@@ -190,7 +189,7 @@ SCENARIO("TcpSocket allows binding to an address/port prior to connecting to ser
             constexpr static auto fetchAvailablePort = [](QHostAddress address) -> uint16_t
             {
                 QTcpSocket socket;
-                REQUIRE(socket.bind(address));
+                Spectator::REQUIRE(socket.bind(address));
                 const auto availablePort = socket.localPort();
                 socket.abort();
                 return availablePort;
@@ -222,8 +221,8 @@ SCENARIO("TcpSocket allows binding to an address/port prior to connecting to ser
 
             THEN("server connects to client and client emits the connected signal")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientPeerConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerConnectedSemaphore, 10));
                 REQUIRE(clientPeer.localAddress() == bindAddress.toString().toStdString());
                 if (bindPort != 0)
                 {
@@ -236,10 +235,10 @@ SCENARIO("TcpSocket allows binding to an address/port prior to connecting to ser
 
                     THEN("server peer responds with a PONG message and closes the connection")
                     {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerReceivedPingSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerReceivedPongSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerReceivedPingSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(clientPeerReceivedPongSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                     }
                 }
             }
@@ -298,8 +297,8 @@ SCENARIO("TcpSocket allows OS-level socket options to be set")
                 }
             });
         pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(clientPeerConnectedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverPeerConnectedSemaphore, 10));
         const auto disableLowDelayOption = GENERATE(AS(bool), true, false);
         const auto setKeepAliveOption = GENERATE(AS(bool), true, false);
         const auto readBufferCapacity = GENERATE(AS(size_t), 0, 1024, 16384, 65536);
@@ -329,10 +328,10 @@ SCENARIO("TcpSocket allows OS-level socket options to be set")
 
             THEN("server peer responds with a PONG message and closes the connection")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerReceivedPingSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerReceivedPongSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerReceivedPingSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientPeerReceivedPongSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
             }
         }
     }
@@ -379,8 +378,8 @@ SCENARIO("Connected TcpSocket peers interact with each other")
                 clientPeerReceivedDataSemaphore.release();
             });
         pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(clientPeerConnectedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverPeerConnectedSemaphore, 10));
 
         WHEN("TcpSocket sends data to connected peer")
         {
@@ -399,7 +398,7 @@ SCENARIO("Connected TcpSocket peers interact with each other")
                 auto &connectedPeerReceivedDataSemaphore = isClientTheSendingPeer ? serverPeerReceivedDataSemaphore : clientPeerReceivedDataSemaphore;
                 while(dataToSend != receivedData)
                 {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(connectedPeerReceivedDataSemaphore, 1));
+                    REQUIRE(TRY_ACQUIRE(connectedPeerReceivedDataSemaphore, 1));
                 }
 
                 AND_WHEN("TcpSocket sends more data to connected peer")
@@ -412,7 +411,7 @@ SCENARIO("Connected TcpSocket peers interact with each other")
                     {
                         while(someMoreData != receivedData)
                         {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(connectedPeerReceivedDataSemaphore, 1));
+                            REQUIRE(TRY_ACQUIRE(connectedPeerReceivedDataSemaphore, 1));
                         }
 
                         AND_WHEN("TcpSocket disconnects from connected peer")
@@ -421,8 +420,8 @@ SCENARIO("Connected TcpSocket peers interact with each other")
 
                             THEN("both peers disconnect")
                             {
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                                REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                                REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                             }
                         }
                     }
@@ -448,13 +447,13 @@ SCENARIO("Connected TcpSocket peers interact with each other")
                 auto &connectedPeerReceivedDataSemaphore = isClientTheSendingPeer ? serverPeerReceivedDataSemaphore : clientPeerReceivedDataSemaphore;
                 while(dataToSend != receivedData)
                 {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(connectedPeerReceivedDataSemaphore, 1));
+                    REQUIRE(TRY_ACQUIRE(connectedPeerReceivedDataSemaphore, 1));
                 }
 
                 AND_THEN("both peers disconnect without emitting any errors")
                 {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                     REQUIRE(pSendingPeer->errorMessage().empty());
                     REQUIRE(pReceivingPeer->errorMessage().empty());
 
@@ -464,7 +463,7 @@ SCENARIO("Connected TcpSocket peers interact with each other")
 
                         THEN("neither peer emit any error")
                         {
-                            REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(clientPeerFailedSemaphore, QDeadlineTimer(1)));
+                            REQUIRE(!TRY_ACQUIRE(clientPeerFailedSemaphore, QDeadlineTimer(1)));
                             REQUIRE(!serverPeerFailedSemaphore.tryAcquire());
                         }
                     }
@@ -475,7 +474,7 @@ SCENARIO("Connected TcpSocket peers interact with each other")
 
                         THEN("neither peer emit any error")
                         {
-                            REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(clientPeerFailedSemaphore, QDeadlineTimer(1)));
+                            REQUIRE(!TRY_ACQUIRE(clientPeerFailedSemaphore, QDeadlineTimer(1)));
                             REQUIRE(!serverPeerFailedSemaphore.tryAcquire());
                         }
                     }
@@ -498,7 +497,7 @@ SCENARIO("Connected TcpSocket peers interact with each other")
             THEN("connected peer disconnects without peers emitting any errors")
             {
                 auto &connectedPeerDisconnectedSemaphore = isClientTheSendingPeer ? serverPeerDisconnectedSemaphore : clientPeerDisconnectedSemaphore;
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(connectedPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(connectedPeerDisconnectedSemaphore, 10));
                 REQUIRE(pSendingPeer->errorMessage().empty());
                 REQUIRE(pReceivingPeer->errorMessage().empty());
             }
@@ -519,7 +518,7 @@ SCENARIO("Connected TcpSocket peers interact with each other")
             THEN("connected peer disconnects without emitting any errors")
             {
                 auto &connectedPeerDisconnectedSemaphore = isClientTheSendingPeer ? serverPeerDisconnectedSemaphore : clientPeerDisconnectedSemaphore;
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(connectedPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(connectedPeerDisconnectedSemaphore, 10));
                 REQUIRE(pReceivingPeer->errorMessage().empty());
             }
         }
@@ -533,8 +532,8 @@ SCENARIO("Connected TcpSocket peers interact with each other")
 
             THEN("both peers disconnect")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                 REQUIRE(pTcpSocket->errorMessage().empty());
                 REQUIRE(pConnectedPeer->errorMessage().empty());
 
@@ -546,7 +545,7 @@ SCENARIO("Connected TcpSocket peers interact with each other")
 
                     THEN("neither peer emit any error")
                     {
-                        REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(connectedPeerFailedSemaphore, QDeadlineTimer(1)));
+                        REQUIRE(!TRY_ACQUIRE(connectedPeerFailedSemaphore, QDeadlineTimer(1)));
                         REQUIRE(!tcpSocketFailedSemaphore.tryAcquire());
                     }
                 }
@@ -563,7 +562,7 @@ SCENARIO("Connected TcpSocket peers interact with each other")
             THEN("connected peer disconnect")
             {
                 auto &connectedPeerDisconnectedSemaphore = isTcpSocketTheClient ? serverPeerDisconnectedSemaphore : clientPeerDisconnectedSemaphore;
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(connectedPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(connectedPeerDisconnectedSemaphore, 10));
                 REQUIRE(pTcpSocket->errorMessage().empty());
                 REQUIRE(pConnectedPeer->errorMessage().empty());
 
@@ -575,7 +574,7 @@ SCENARIO("Connected TcpSocket peers interact with each other")
 
                     THEN("neither peer emit any error")
                     {
-                        REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(connectedPeerFailedSemaphore, QDeadlineTimer(1)));
+                        REQUIRE(!TRY_ACQUIRE(connectedPeerFailedSemaphore, QDeadlineTimer(1)));
                         REQUIRE(!tcpSocketFailedSemaphore.tryAcquire());
                     }
                 }
@@ -592,8 +591,8 @@ SCENARIO("Connected TcpSocket peers interact with each other")
 
             THEN("both peers disconnect")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                 REQUIRE(pTcpSocket->errorMessage().empty());
                 REQUIRE(pConnectedPeer->errorMessage().empty());
 
@@ -605,7 +604,7 @@ SCENARIO("Connected TcpSocket peers interact with each other")
 
                     THEN("neither peer emit any error")
                     {
-                        REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(connectedPeerFailedSemaphore, QDeadlineTimer(1)));
+                        REQUIRE(!TRY_ACQUIRE(connectedPeerFailedSemaphore, QDeadlineTimer(1)));
                         REQUIRE(!tcpSocketFailedSemaphore.tryAcquire());
                     }
                 }
@@ -633,7 +632,7 @@ SCENARIO("Connected TcpSocket peers interact with each other")
 
                     THEN("neither peer emit any error")
                     {
-                        REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(connectedPeerFailedSemaphore, QDeadlineTimer(1)));
+                        REQUIRE(!TRY_ACQUIRE(connectedPeerFailedSemaphore, QDeadlineTimer(1)));
                         REQUIRE(!tcpSocketFailedSemaphore.tryAcquire());
                     }
                 }
@@ -650,10 +649,10 @@ SCENARIO("Connected TcpSocket peers interact with each other")
             THEN("connected peer disconnects without errors")
             {
                 auto &connectedPeerDisconnectedSemaphore = isTcpSocketTheClient ? serverPeerDisconnectedSemaphore : clientPeerDisconnectedSemaphore;
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(connectedPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(connectedPeerDisconnectedSemaphore, 10));
                 auto &tcpSocketFailedSemaphore = isTcpSocketTheClient ? clientPeerFailedSemaphore : serverPeerFailedSemaphore;
                 auto &connectedPeerFailedSemaphore = isTcpSocketTheClient ? serverPeerFailedSemaphore : clientPeerFailedSemaphore;
-                REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(connectedPeerFailedSemaphore, QDeadlineTimer(1)));
+                REQUIRE(!TRY_ACQUIRE(connectedPeerFailedSemaphore, QDeadlineTimer(1)));
                 REQUIRE(!tcpSocketFailedSemaphore.tryAcquire());
                 REQUIRE(pConnectedPeer->errorMessage().empty());
             }
@@ -676,7 +675,7 @@ SCENARIO("TcpSocket fails as expected")
 
             THEN("connection fails")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(socketFailedSemaphore, 10));
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
                 REQUIRE(socket.errorMessage().starts_with(std::string("Failed to connect to ").append(hostName).append(" at")));
             }
@@ -706,7 +705,7 @@ SCENARIO("TcpSocket fails as expected")
 
             THEN("connection fails")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(socketFailedSemaphore, 10));
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
                 const auto expectedErrorMessage = connectByName ? std::string("Failed to connect to ").append(hostName).append(" at [::1]:") : std::string("Failed to connect to [::1]:");
                 REQUIRE(socket.errorMessage().starts_with(expectedErrorMessage));
@@ -728,7 +727,7 @@ SCENARIO("TcpSocket fails as expected")
 
             THEN("connection fails")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(socketFailedSemaphore, 10));
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
                 REQUIRE(socket.errorMessage() == "Failed to bind socket to [::1]:443. POSIX error EACCES(13): Permission denied.");
                 REQUIRE(connectionCount == 0);
@@ -741,7 +740,7 @@ SCENARIO("TcpSocket fails as expected")
             QSemaphore previouslyConnectedSocketSemaphore;
             Object::connect(&previouslyConnectedSocket, &TcpSocket::connected, [&](){previouslyConnectedSocketSemaphore.release();});
             previouslyConnectedSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
-            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(previouslyConnectedSocketSemaphore, 10));
+            REQUIRE(TRY_ACQUIRE(previouslyConnectedSocketSemaphore, 10));
             TcpSocket socket;
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
@@ -754,7 +753,7 @@ SCENARIO("TcpSocket fails as expected")
 
             THEN("connection fails")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(socketFailedSemaphore, 10));
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
                 REQUIRE(socket.errorMessage() == std::string("Failed to bind socket to [::1]:").append(std::to_string(previouslyConnectedSocket.localPort())).append(". POSIX error EADDRINUSE(98): Address already in use."));
                 REQUIRE(connectionCount == 1);
@@ -786,7 +785,7 @@ SCENARIO("TcpSocket fails as expected")
 
             THEN("connection fails")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(socketFailedSemaphore, 10));
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
                 const auto expectedErrorMessage = connectByName ? std::string("Failed to connect to ").append(hostName).append(" at ").append(hostAddress.toString().toStdString()).append(":") : std::string("Failed to connect to ").append(hostAddress.toString().toStdString()).append(":");
                 REQUIRE(socket.errorMessage().starts_with(expectedErrorMessage));
@@ -808,7 +807,7 @@ SCENARIO("TcpSocket fails as expected")
 
             THEN("connection fails")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(socketFailedSemaphore, 10));
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
                 REQUIRE(socket.errorMessage() == "Failed to bind socket to 127.0.0.1:443. POSIX error EACCES(13): Permission denied.");
                 REQUIRE(connectionCount == 0);
@@ -821,7 +820,7 @@ SCENARIO("TcpSocket fails as expected")
             QSemaphore previouslyConnectedSocketSemaphore;
             Object::connect(&previouslyConnectedSocket, &TcpSocket::connected, [&](){previouslyConnectedSocketSemaphore.release();});
             previouslyConnectedSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
-            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(previouslyConnectedSocketSemaphore, 10));
+            REQUIRE(TRY_ACQUIRE(previouslyConnectedSocketSemaphore, 10));
             TcpSocket socket;
             QSemaphore socketFailedSemaphore;
             Object::connect(&socket, &TcpSocket::error, [&](){socketFailedSemaphore.release();});
@@ -834,7 +833,7 @@ SCENARIO("TcpSocket fails as expected")
 
             THEN("connection fails")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(socketFailedSemaphore, 10));
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
                 REQUIRE(socket.errorMessage() == std::string("Failed to bind socket to 127.0.0.1:").append(std::to_string(previouslyConnectedSocket.localPort())).append(". POSIX error EADDRINUSE(98): Address already in use."));
                 REQUIRE(connectionCount == 1);
@@ -894,7 +893,7 @@ SCENARIO("TcpSocket fails as expected")
         QTcpServer server;
         static constexpr int backlogSize = 128;
         server.setListenBacklogSize(backlogSize);
-        QObject::connect(&server, &QTcpServer::newConnection, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &QTcpServer::newConnection, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         auto hostAddress("127.10.20.82");
         REQUIRE(server.listen(QHostAddress(hostAddress)));
         REQUIRE(server.listenBacklogSize() == backlogSize);
@@ -910,7 +909,7 @@ SCENARIO("TcpSocket fails as expected")
             Object::connect(pSocket.get(), &TcpSocket::connected, [&connectedSemaphore](){connectedSemaphore.release();});
             Object::connect(pSocket.get(), &TcpSocket::error, [&errorSemaphore](){errorSemaphore.release();});
             pSocket->connect(server.serverAddress().toString().toStdString(), server.serverPort());
-            isServerAcceptingConnections = SemaphoreAwaiter::signalSlotAwareWait(connectedSemaphore, QDeadlineTimer(10));
+            isServerAcceptingConnections = TRY_ACQUIRE(connectedSemaphore, QDeadlineTimer(10));
         }
         while (isServerAcceptingConnections);
         sockets.front()->abort();
@@ -925,7 +924,7 @@ SCENARIO("TcpSocket fails as expected")
 
             THEN("TcpSocket times out while trying to connect to server")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketFailedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(socketFailedSemaphore, 10));
                 REQUIRE(socket.state() == TcpSocket::State::Unconnected);
                 std::string expectedErrorMessage("Failed to connect to ");
                 expectedErrorMessage.append(hostAddress);
@@ -983,7 +982,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
         std::unique_ptr<TcpSocket> pClientPeer(new TcpSocket);
         Object::connect(pClientPeer.get(), &TcpSocket::connected, [&]()
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerConnectedSemaphore, 10));
                 clientPeerConnectedSemaphore.release();
             });
         Object::connect(pClientPeer.get(), &TcpSocket::disconnected, [&](){clientPeerDisconnectedSemaphore.release();});
@@ -996,10 +995,10 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
             THEN("peers connect and then disconnect")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientPeerConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                 REQUIRE(pClientPeer->state() == TcpSocket::State::Unconnected);
             }
         }
@@ -1011,9 +1010,9 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
             THEN("peers connect and then server peer disconnects")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientPeerConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                 REQUIRE(pClientPeer->state() == TcpSocket::State::Unconnected);
             }
         }
@@ -1025,9 +1024,9 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
             THEN("peers connect, client peer aborts connection and server peer disconnects")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientPeerConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
             }
         }
         
@@ -1046,14 +1045,14 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
             THEN("peers connect, client peer aborts and peer disconnects and then both client peer connects to another server peer")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientPeerConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientPeerConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerConnectedSemaphore, 10));
                 pClientPeer->disconnectFromPeer();
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
             }
         }
 
@@ -1076,10 +1075,10 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
             THEN("peers connect, client peer aborts and server peer disconnects and then client peer fails to connect to the non-existent server")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerFailedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientPeerConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientPeerFailedSemaphore, 10));
                 REQUIRE(pClientPeer->errorMessage().starts_with("Failed to connect to 127.1.2.3:"));
             }
         }
@@ -1087,8 +1086,8 @@ SCENARIO("TcpSocket allows connected slots to take any action")
         WHEN("client peer connects to server")
         {
             pClientPeer->connect(server.serverAddress().toString().toStdString(), server.serverPort());
-            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+            REQUIRE(TRY_ACQUIRE(clientPeerConnectedSemaphore, 10));
+            REQUIRE(TRY_ACQUIRE(serverPeerConnectedSemaphore, 10));
 
             THEN("connected peers can start exchanging data")
             {
@@ -1099,8 +1098,8 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
                     THEN("peers disconnect")
                     {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                     }
                 }
 
@@ -1111,7 +1110,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
                     THEN("client peer aborts and server peer disconnects")
                     {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                         REQUIRE(pClientPeer->state() == TcpSocket::State::Unconnected);
                     }
                 }
@@ -1124,7 +1123,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
                     THEN("client peer is destroyed and server peer disconnects")
                     {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                     }
                 }
 
@@ -1140,12 +1139,12 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
                     THEN("client peer aborts connection and disconnects server peer before reconnecting to another server peer")
                     {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(clientPeerConnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerConnectedSemaphore, 10));
                         pClientPeer->disconnectFromPeer();
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                     }
                 }
 
@@ -1163,8 +1162,8 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
                     THEN("peers disconnect")
                     {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                     }
                 }
 
@@ -1182,8 +1181,8 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
                     THEN("peers disconnect")
                     {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                     }
                 }
 
@@ -1201,7 +1200,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
                     THEN("client peer aborts the connection, disconnecting the server peer")
                     {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                         REQUIRE(pClientPeer->state() == TcpSocket::State::Unconnected);
                     }
                 }
@@ -1220,7 +1219,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
                     THEN("client peer aborts the connection, disconnecting the server peer")
                     {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                         REQUIRE(pClientPeer->state() == TcpSocket::State::Unconnected);
                     }
                 }
@@ -1242,7 +1241,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
                     THEN("client peer aborts the connection during destruction, disconnecting the server peer")
                     {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                     }
                 }
 
@@ -1260,7 +1259,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
                     THEN("client peer aborts the connection during destruction, disconnecting the server peer")
                     {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                     }
                 }
 
@@ -1280,12 +1279,12 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
                     THEN("client peer aborts the connection disconnecting the server peer and reconnects to another server peer")
                     {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(clientPeerConnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerConnectedSemaphore, 10));
                         pClientPeer->disconnectFromPeer();
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                     }
                 }
 
@@ -1305,12 +1304,12 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
                     THEN("client peer aborts the connection disconnecting the server peer and reconnects to another server peer")
                     {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(clientPeerConnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerConnectedSemaphore, 10));
                         pClientPeer->disconnectFromPeer();
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                     }
                 }
             }
@@ -1327,9 +1326,9 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
                 THEN("peers disconnect")
                 {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedFromPeerSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(socketDisconnectedFromPeerSemaphore, 10));
                 }
             }
 
@@ -1345,9 +1344,9 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
                 THEN("peers disconnect")
                 {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedFromPeerSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(socketDisconnectedFromPeerSemaphore, 10));
                 }
             }
 
@@ -1363,9 +1362,9 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
                 THEN("peers disconnect")
                 {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedFromPeerSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(socketDisconnectedFromPeerSemaphore, 10));
                 }
             }
 
@@ -1385,13 +1384,13 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
                 THEN("peers disconnect and client peer reconnects to another server peer")
                 {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketDisconnectedFromPeerSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(socketDisconnectedFromPeerSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(clientPeerConnectedSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(serverPeerConnectedSemaphore, 10));
                     pClientPeer->disconnectFromPeer();
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                 }
             }
         }
@@ -1414,7 +1413,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
             THEN("client peer handles error")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(socketHandledErrorSemaphore, 10));
             }
         }
 
@@ -1436,7 +1435,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
             THEN("client peer handles error")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(socketHandledErrorSemaphore, 10));
             }
         }
 
@@ -1458,7 +1457,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
             THEN("client peer handles error")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(socketHandledErrorSemaphore, 10));
             }
         }
 
@@ -1481,13 +1480,13 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
             THEN("client peer handles error, aborts and connects to server peer")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(socketHandledErrorSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientPeerConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerConnectedSemaphore, 10));
                 REQUIRE(pClientPeer->errorMessage().empty());
                 pClientPeer->disconnectFromPeer();
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
             }
         }
 
@@ -1506,7 +1505,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
             THEN("client peer handles error")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(socketHandledErrorSemaphore, 10));
             }
         }
 
@@ -1524,7 +1523,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
             THEN("client peer handles error")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(socketHandledErrorSemaphore, 10));
             }
         }
 
@@ -1542,7 +1541,7 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
             THEN("client peer handles error")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(socketHandledErrorSemaphore, 10));
             }
         }
 
@@ -1561,12 +1560,12 @@ SCENARIO("TcpSocket allows connected slots to take any action")
 
             THEN("client peer handles error and aborts before connecting to server peer")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(socketHandledErrorSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(socketHandledErrorSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientPeerConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerConnectedSemaphore, 10));
                 pClientPeer->disconnectFromPeer();
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
             }
         }
     }
@@ -1604,10 +1603,10 @@ SCENARIO("TcpSockets can be reused")
                 for (auto i = 0; i < 3; ++i)
                 {
                     clientPeer.connect(server.serverAddress().toString().toStdString(), server.serverPort());
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerConnectedSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerConnectedSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientPeerDisconnectedSemaphore, 10));
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverPeerDisconnectedSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(clientPeerConnectedSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(serverPeerConnectedSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(clientPeerDisconnectedSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(serverPeerDisconnectedSemaphore, 10));
                 }
             }
         }

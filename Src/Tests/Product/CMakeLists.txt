@@ -61,17 +61,17 @@ add_subdirectory(EmitterLibrary)
 add_subdirectory(ReceiverLibrary)
 qt_add_executable(ProductTests)
 target_sources(ProductTests PRIVATE
+    main.cpp
     Product.spec.cpp
     ../Resources/TlsTestCertificates.cpp
-    ../Resources/TlsTestCertificates.h
-    ../Spectator/Spectator.cpp
-    ../Spectator/Spectator.h)
+    ../Resources/TlsTestCertificates.h)
 find_package(Qt6 COMPONENTS Core Concurrent Network REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(Kourier REQUIRED)
 target_link_libraries(ProductTests PUBLIC
     EmitterLib
     ReceiverLib
+    Kourier::Spectator
     Qt::Core
     Qt::Concurrent
     Qt::Network

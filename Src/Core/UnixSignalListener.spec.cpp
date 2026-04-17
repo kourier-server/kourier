@@ -22,8 +22,6 @@
 #include <csignal>
 #include <Spectator.h>
 
-using Spectator::SemaphoreAwaiter;
-
 
 SCENARIO("UnixSignalListener listens to UNIX signals")
 {
@@ -42,7 +40,7 @@ SCENARIO("UnixSignalListener listens to UNIX signals")
         pid_t testAppPid = testApp.processId();
         while(true)
         {
-            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(testAppReceivedStandardOutputDataSemaphore, 60));
+            REQUIRE(TRY_ACQUIRE(testAppReceivedStandardOutputDataSemaphore, 60));
             QString standardOutput = QString(testApp.readAllStandardOutput());
             if (standardOutput.contains("App is ready."))
                 break;
@@ -62,7 +60,7 @@ SCENARIO("UnixSignalListener listens to UNIX signals")
                 QString stdOutput;
                 while (true)
                 {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(testAppReceivedStandardOutputDataSemaphore, 60));
+                    REQUIRE(TRY_ACQUIRE(testAppReceivedStandardOutputDataSemaphore, 60));
                     stdOutput.append(testApp.readAllStandardOutput());
                     if (6 == stdOutput.count("Received UNIX signal"))
                         break;

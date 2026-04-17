@@ -44,8 +44,8 @@ using Kourier::HttpServer;
 using Kourier::ErrorHandler;
 using Kourier::TcpSocket;
 using Kourier::Object;
-using Spectator::SemaphoreAwaiter;
 using namespace std::chrono_literals;
+using namespace Spectator;
 
 static std::pair<TcpSocket*, TcpSocket*> createConnectedSocketPair()
 {
@@ -133,7 +133,7 @@ SCENARIO("HttpConnectionHandler calls handler mapped to request path")
 
             THEN("request handler function mapped to path gets called")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
                 REQUIRE(calledRoute == requestTarget);
                 for (auto i = 0; i < 5; ++i)
                 {
@@ -160,7 +160,7 @@ SCENARIO("HttpConnectionHandler sends pending request data through broker")
         static thread_local QSemaphore requestSemaphore;
         REQUIRE(pHttpRequestRouter->addRoute(HttpRequest::Method::POST, "/data", [](const HttpRequest &request, HttpBroker &broker)
         {
-            REQUIRE(!request.isComplete());
+            Spectator::REQUIRE(!request.isComplete());
             body = request.body();
             broker.setQObject(new QObject);
             QObject::connect(&broker, &HttpBroker::receivedBodyData, [&](std::string_view bodyPart, bool isLastPart)
@@ -184,7 +184,7 @@ SCENARIO("HttpConnectionHandler sends pending request data through broker")
 
             THEN("request handler function mapped to path gets called")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
                 QCoreApplication::processEvents();
                 REQUIRE(!handlerSemaphore.tryAcquire());
                 REQUIRE(!bodySemaphore.tryAcquire());
@@ -204,7 +204,7 @@ SCENARIO("HttpConnectionHandler sends pending request data through broker")
 
                     THEN("remaining request data is sent through broker")
                     {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(requestSemaphore, 1));
+                        REQUIRE(TRY_ACQUIRE(requestSemaphore, 1));
                         REQUIRE(bodySemaphore.tryAcquire());
                         QCoreApplication::processEvents();
                         REQUIRE(!handlerSemaphore.tryAcquire());
@@ -225,7 +225,7 @@ SCENARIO("HttpConnectionHandler sends pending request data through broker")
                         {
                             ++counter;
                             clientSocket->write(&ch, 1);
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(bodySemaphore, 1));
+                            REQUIRE(TRY_ACQUIRE(bodySemaphore, 1));
                             QCoreApplication::processEvents();
                             REQUIRE(!handlerSemaphore.tryAcquire());
                             REQUIRE(!bodySemaphore.tryAcquire());
@@ -253,7 +253,7 @@ SCENARIO("HttpConnectionHandler processes next request after response for curren
         static thread_local HttpBroker *pBroker = nullptr;
         static constexpr auto pHandlerFcn = [](const HttpRequest &request, HttpBroker &broker)
         {
-            REQUIRE(request.isComplete());
+            Spectator::REQUIRE(request.isComplete());
             path = request.targetPath();
             pBroker = &broker;
             broker.setQObject(new QObject);
@@ -271,12 +271,12 @@ SCENARIO("HttpConnectionHandler processes next request after response for curren
 
             THEN("handler for second request is called after code handling the first request writes a full response")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
                 QCoreApplication::processEvents();
                 REQUIRE(!handlerSemaphore.tryAcquire());
                 REQUIRE(path == "/path1");
                 pBroker->writeResponse();
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
                 QCoreApplication::processEvents();
                 REQUIRE(!handlerSemaphore.tryAcquire());
                 REQUIRE(path == "/path2");
@@ -336,7 +336,7 @@ SCENARIO("HttpConnectionHandler allows request handling code to respond before r
 
             THEN("handler mapped to request path is called")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
 
                 AND_WHEN("request handling code finishes writing response")
                 {
@@ -355,7 +355,7 @@ SCENARIO("HttpConnectionHandler allows request handling code to respond before r
 
                     THEN("HttpConnectionHandler awaits for client to send rest of request")
                     {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(responseSemaphore, 1));
+                        REQUIRE(TRY_ACQUIRE(responseSemaphore, 1));
 
                         AND_WHEN("client sends rest of the first request and metadata for second request")
                         {
@@ -363,7 +363,7 @@ SCENARIO("HttpConnectionHandler allows request handling code to respond before r
 
                             THEN("HttpConnectionHandler calls handler mapped to second request path")
                             {
-                                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
+                                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
                             }
                         }
                     }
@@ -422,7 +422,7 @@ SCENARIO("HttpConnectionHandler processes all requests in buffer without the nee
 
             THEN("all requests are processed without the need for control to return to the event loop")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
                 REQUIRE(handlerSemaphore.tryAcquire(5));
                 REQUIRE(bodySemaphore.tryAcquire(3));
                 REQUIRE(handlerData.size() == 6);
@@ -459,10 +459,10 @@ SCENARIO("HttpConnectionHandler sends 100-continue before calling handler when r
 
             THEN("client receives a 100-continue response before response written by handler")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
                 QCoreApplication::processEvents();
                 REQUIRE(!handlerSemaphore.tryAcquire());
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(responseSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(responseSemaphore, 1));
                 REQUIRE(response.starts_with("HTTP/1.1 100 Continue\r\n\r\n"));
             }
         }
@@ -473,10 +473,10 @@ SCENARIO("HttpConnectionHandler sends 100-continue before calling handler when r
 
             THEN("client does not receive a 100-continue response")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
                 QCoreApplication::processEvents();
                 REQUIRE(!handlerSemaphore.tryAcquire());
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(responseSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(responseSemaphore, 1));
                 REQUIRE(response.starts_with("HTTP/1.1 200 OK\r\n"));
             }
         }
@@ -503,7 +503,7 @@ SCENARIO("HttpConnectionHandler supports server-wide options requests")
 
             THEN("request handler function mapped to server-wide options gets called")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
                 QCoreApplication::processEvents();
                 REQUIRE(!handlerSemaphore.tryAcquire());
             }
@@ -543,12 +543,12 @@ SCENARIO("HttpConnectionHandler allows request handling code to close http conne
 
             THEN("client receives a 200-ok response before connection gets closed")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
                 QCoreApplication::processEvents();
                 REQUIRE(!handlerSemaphore.tryAcquire());
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(responseSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(responseSemaphore, 1));
                 REQUIRE(response.starts_with("HTTP/1.1 200 OK\r\n"));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(disconnectedSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(disconnectedSemaphore, 1));
             }
         }
     }
@@ -590,13 +590,13 @@ SCENARIO("HttpConnectionHandler closes connection if handler function does not s
 
             THEN("HttpConnectionHandler closes connection after handler finishes without fully responding or setting a QObject")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(disconnectedSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(disconnectedSemaphore, 1));
                 QCoreApplication::processEvents();
                 REQUIRE(!handlerSemaphore.tryAcquire());
                 REQUIRE(!disconnectedSemaphore.tryAcquire());
                 REQUIRE(clientSocket->readAll().empty());
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(finishedSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(finishedSemaphore, 1));
             }
         }
 
@@ -608,13 +608,13 @@ SCENARIO("HttpConnectionHandler closes connection if handler function does not s
 
             THEN("HttpConnectionHandler closes connection after handler finishes without fully responding or setting a QObject")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(disconnectedSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(disconnectedSemaphore, 1));
                 QCoreApplication::processEvents();
                 REQUIRE(!handlerSemaphore.tryAcquire());
                 REQUIRE(!disconnectedSemaphore.tryAcquire());
                 REQUIRE(clientSocket->readAll().starts_with("HTTP/1.1 200 OK\r\n"));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(finishedSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(finishedSemaphore, 1));
             }
         }
     }
@@ -634,7 +634,7 @@ SCENARIO("HttpConnectionHandler allows request handling code to know how much da
         static thread_local size_t dataToBeSentToPeer = 0;
         static constexpr auto pHandlerFcn = [](const HttpRequest &request, HttpBroker &broker)
         {
-            REQUIRE(broker.bytesToSend() == 0);
+            Spectator::REQUIRE(broker.bytesToSend() == 0);
             broker.writeResponse();
             dataToBeSentToPeer = broker.bytesToSend();
             handlerSemaphore.release();
@@ -650,12 +650,12 @@ SCENARIO("HttpConnectionHandler allows request handling code to know how much da
 
             THEN("handler is called and data to be sent to peer is stored")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
                 REQUIRE(dataToBeSentToPeer > 0);
 
                 AND_WHEN("client receives response")
                 {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(responseSemaphore, 1));
+                    REQUIRE(TRY_ACQUIRE(responseSemaphore, 1));
 
                     THEN("received response size equals data to be sent to peer")
                     {
@@ -683,7 +683,7 @@ SCENARIO("HttpConnectionHandler informs request handling code whenever data is s
         static thread_local size_t dataSentToPeer = 0;
         static constexpr auto pHandlerFcn = [](const HttpRequest &request, HttpBroker &broker)
         {
-            REQUIRE(broker.bytesToSend() == 0);
+            Spectator::REQUIRE(broker.bytesToSend() == 0);
             QObject::connect(&broker, &HttpBroker::sentData, [&](size_t count)
             {
                 dataSentToPeer += count;
@@ -705,12 +705,12 @@ SCENARIO("HttpConnectionHandler informs request handling code whenever data is s
 
             THEN("handler is called and data to be sent to peer is stored")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
                 REQUIRE(dataToBeSentToPeer > 0);
 
                 AND_THEN("broker emits sentData until there is no more data to be sent to peer")
                 {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(sentDataToPeerSemaphore, 1));
+                    REQUIRE(TRY_ACQUIRE(sentDataToPeerSemaphore, 1));
 
                     AND_THEN("data sent to peer equals data to be sent to peer")
                     {
@@ -759,7 +759,7 @@ SCENARIO("HttpConnectionHandler informs if received body data is the last one")
 
             THEN("handler gets called")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
 
                 AND_WHEN("client writes part of body")
                 {
@@ -770,7 +770,7 @@ SCENARIO("HttpConnectionHandler informs if received body data is the last one")
                         {
                             REQUIRE(!isLastPart);
                             clientSocket->write(bodyPart);
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(bodySemaphore, 1));
+                            REQUIRE(TRY_ACQUIRE(bodySemaphore, 1));
                             REQUIRE(receivedBodyData == bodyPart);
                         }
                         REQUIRE(isLastPart);
@@ -785,7 +785,7 @@ SCENARIO("HttpConnectionHandler informs if received body data is the last one")
 
             THEN("handler gets called")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
 
                 AND_WHEN("client writes part of body")
                 {
@@ -799,7 +799,7 @@ SCENARIO("HttpConnectionHandler informs if received body data is the last one")
                         {
                             REQUIRE(!isLastPart);
                             clientSocket->write(chunkAndBodyPart.first);
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(bodySemaphore, 1));
+                            REQUIRE(TRY_ACQUIRE(bodySemaphore, 1));
                             REQUIRE(receivedBodyData == chunkAndBodyPart.second);
                         }
                         REQUIRE(isLastPart);
@@ -831,7 +831,7 @@ SCENARIO("HttpConnectionHandler informs if received body data is the last one")
 
             THEN("handler gets called and broker emits received data for every chunk in request")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
                 REQUIRE(bodySemaphore.tryAcquire(4));
                 const std::vector<std::pair<std::string, bool>> expectedEmittedData{{"Hello ", false},
                                                                                     {"Incredible ", false},
@@ -880,7 +880,7 @@ SCENARIO("HttpConnectionHandler informs if last chunk in chunked request contain
 
             THEN("handler gets called")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
 
                 AND_WHEN("client writes part of body")
                 {
@@ -890,7 +890,7 @@ SCENARIO("HttpConnectionHandler informs if last chunk in chunked request contain
                         for (auto bodyPart : bodyParts)
                         {
                             clientSocket->write(bodyPart);
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(bodySemaphore, 1));
+                            REQUIRE(TRY_ACQUIRE(bodySemaphore, 1));
                         }
                         const std::vector<std::pair<bool, bool>> expectedEmittedData{{false, false}, {false, false}, {true, false}};
                         REQUIRE(emittedIsLastPartHasTrailersData == expectedEmittedData);
@@ -908,7 +908,7 @@ SCENARIO("HttpConnectionHandler informs if last chunk in chunked request contain
 
             THEN("handler gets called")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
 
                 AND_WHEN("client writes chunks and maybe trailers")
                 {
@@ -924,7 +924,7 @@ SCENARIO("HttpConnectionHandler informs if last chunk in chunked request contain
                         for (auto chunk : chunks)
                         {
                             clientSocket->write(chunk);
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(bodySemaphore, 1));
+                            REQUIRE(TRY_ACQUIRE(bodySemaphore, 1));
                         }
                         clientSocket->write("0\r\n");
                         for (auto [name, value] : trailers)
@@ -935,7 +935,7 @@ SCENARIO("HttpConnectionHandler informs if last chunk in chunked request contain
                             clientSocket->write("\r\n");
                         }
                         clientSocket->write("\r\n");
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(bodySemaphore, 1));
+                        REQUIRE(TRY_ACQUIRE(bodySemaphore, 1));
                         QCoreApplication::processEvents();
                         REQUIRE(!bodySemaphore.tryAcquire());
                         const std::vector<std::pair<bool, bool>> expectedEmittedData{{false, false}, {false, false}, {false, false}, {true, !trailers.empty()}};
@@ -975,7 +975,7 @@ SCENARIO("HttpConnectionHandler informs if last chunk in chunked request contain
 
             THEN("handler gets called")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
 
                 AND_THEN("broker emits received data whenever client writes a chunk and informs if given part is the last one as well as if request has trailers")
                 {
@@ -1021,7 +1021,7 @@ SCENARIO("HttpRequest knows client IP/port")
 
             THEN("handler is called and request gives correct client IP/Port")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(handlerSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(handlerSemaphore, 1));
                 QCoreApplication::processEvents();
                 REQUIRE(!handlerSemaphore.tryAcquire());
                 REQUIRE(clientSocket->localAddress() == clientIp);
@@ -1096,7 +1096,7 @@ SCENARIO("HttpRequestHandler calls error handler on error")
             clientSocket->write("GET /hello HTTP/1.1\r\nHost: host\r\n\r\n");
             do
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(receivedResponseSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(receivedResponseSemaphore, 1));
             } while (!receivedResponses.ends_with("Hello World!"));
             receivedResponses.clear();
         }
@@ -1106,7 +1106,7 @@ SCENARIO("HttpRequestHandler calls error handler on error")
             QElapsedTimer elapsedTimer;
             elapsedTimer.start();
             receivedResponses.clear();
-            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(receivedResponseSemaphore, QDeadlineTimer(idleTimeoutInMSecs.count() + 2)));
+            REQUIRE(TRY_ACQUIRE(receivedResponseSemaphore, QDeadlineTimer(idleTimeoutInMSecs.count() + 2)));
             const auto elapsedTime = elapsedTimer.elapsed();
 
             THEN("server sends to client a response with a 408 Request Timeout status code before "
@@ -1114,7 +1114,7 @@ SCENARIO("HttpRequestHandler calls error handler on error")
             {
                 REQUIRE(std::abs(idleTimeoutInMSecs.count() - elapsedTime) <= 1);
                 REQUIRE(receivedResponses.starts_with("HTTP/1.1 408 Request Timeout\r\n"));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(disconnectedSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(disconnectedSemaphore, 1));
                 REQUIRE(pErrorHandler->hasHandled());
                 REQUIRE(pErrorHandler->error() == HttpServer::ServerError::RequestTimeout);
                 REQUIRE(pErrorHandler->clientIp() == clientIp);
@@ -1128,7 +1128,7 @@ SCENARIO("HttpRequestHandler calls error handler on error")
             QElapsedTimer elapsedTimer;
             elapsedTimer.start();
             receivedResponses.clear();
-            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(receivedResponseSemaphore, QDeadlineTimer(idleTimeoutInMSecs.count() + 2)));
+            REQUIRE(TRY_ACQUIRE(receivedResponseSemaphore, QDeadlineTimer(idleTimeoutInMSecs.count() + 2)));
             const auto elapsedTime = elapsedTimer.elapsed();
 
             THEN("server sends to client a response with a 408 Request Timeout status code before "
@@ -1136,7 +1136,7 @@ SCENARIO("HttpRequestHandler calls error handler on error")
             {
                 REQUIRE(std::abs(requestTimeoutInMSecs.count() - elapsedTime) <= 1);
                 REQUIRE(receivedResponses.starts_with("HTTP/1.1 408 Request Timeout\r\n"));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(disconnectedSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(disconnectedSemaphore, 1));
                 REQUIRE(pErrorHandler->hasHandled());
                 REQUIRE(pErrorHandler->error() == HttpServer::ServerError::RequestTimeout);
                 REQUIRE(pErrorHandler->clientIp() == clientIp);
@@ -1151,9 +1151,9 @@ SCENARIO("HttpRequestHandler calls error handler on error")
             THEN("server sends to client a response with a 400 Bad Request status code before "
                  "closing the connection, and calls error handler with client IP and MalformedRequest error code")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(receivedResponseSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(receivedResponseSemaphore, 1));
                 REQUIRE(receivedResponses.starts_with("HTTP/1.1 400 Bad Request\r\n"));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(disconnectedSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(disconnectedSemaphore, 1));
                 REQUIRE(pErrorHandler->hasHandled());
                 REQUIRE(pErrorHandler->error() == HttpServer::ServerError::MalformedRequest);
                 REQUIRE(pErrorHandler->clientIp() == clientIp);
@@ -1168,9 +1168,9 @@ SCENARIO("HttpRequestHandler calls error handler on error")
             THEN("server sends to client a response with a 404 Not Found status code before "
                  "closing the connection, and calls error handler with client IP and MalformedRequest error code")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(receivedResponseSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(receivedResponseSemaphore, 1));
                 REQUIRE(receivedResponses.starts_with("HTTP/1.1 404 Not Found\r\n"));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(disconnectedSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(disconnectedSemaphore, 1));
                 REQUIRE(pErrorHandler->hasHandled());
                 REQUIRE(pErrorHandler->error() == HttpServer::ServerError::MalformedRequest);
                 REQUIRE(pErrorHandler->clientIp() == clientIp);
@@ -1185,9 +1185,9 @@ SCENARIO("HttpRequestHandler calls error handler on error")
             THEN("server sends to client a response with a 400 Bad Request status code before "
                  "closing the connection, and calls error handler with client IP and TooBigRequest error code")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(receivedResponseSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(receivedResponseSemaphore, 1));
                 REQUIRE(receivedResponses.starts_with("HTTP/1.1 400 Bad Request\r\n"));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(disconnectedSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(disconnectedSemaphore, 1));
                 REQUIRE(pErrorHandler->hasHandled());
                 REQUIRE(pErrorHandler->error() == HttpServer::ServerError::TooBigRequest);
                 REQUIRE(pErrorHandler->clientIp() == clientIp);
@@ -1202,9 +1202,9 @@ SCENARIO("HttpRequestHandler calls error handler on error")
             THEN("server sends to client a response with a 400 Bad Request status code before "
                  "closing the connection, and calls error handler with client IP and MalformedRequest error code")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(receivedResponseSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(receivedResponseSemaphore, 1));
                 REQUIRE(receivedResponses.starts_with("HTTP/1.1 400 Bad Request\r\n"));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(disconnectedSemaphore, 1));
+                REQUIRE(TRY_ACQUIRE(disconnectedSemaphore, 1));
                 REQUIRE(pErrorHandler->hasHandled());
                 REQUIRE(pErrorHandler->error() == HttpServer::ServerError::MalformedRequest);
                 REQUIRE(pErrorHandler->clientIp() == clientIp);

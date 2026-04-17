@@ -129,7 +129,7 @@ SCENARIO("ConnectionHandlerRepository emits stopped after all handlers stop")
 
                 AND_WHEN("last handler emits finished")
                 {
-                    REQUIRE(!TestTcpConnectionHandler::createdHandlers().empty())
+                    REQUIRE(!TestTcpConnectionHandler::createdHandlers().empty());
                     auto createdHandlers = TestTcpConnectionHandler::createdHandlers();
                     auto it = createdHandlers.cbegin();
                     auto *pLastHandlerToEmitFinished = *it;

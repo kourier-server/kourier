@@ -23,8 +23,7 @@
 using Kourier::ExecutionState;
 using Kourier::ServerWorker;
 using Kourier::AsyncServerWorker;
-using Spectator::SemaphoreAwaiter;
-
+using namespace Spectator;
 
 namespace Tests::AsyncServerWorker::Spec
 {
@@ -90,7 +89,7 @@ public:
         while (m_startCalledSemaphore.tryAcquire(1));
         while (m_stopCalledSemaphore.tryAcquire(1));
     }
-    static bool waitForCreation() {return SemaphoreAwaiter::signalSlotAwareWait(m_createdSemaphore, 1);}
+    static bool waitForCreation() {return TRY_ACQUIRE(m_createdSemaphore, 1);}
 
 private:
     void doStart(QVariant data) override
@@ -215,8 +214,8 @@ SCENARIO("AsyncServerWorker emits started after async worker starts")
         AsyncServerWorker<TestAsyncServerWorker> worker;
         bool emittedStarted = false;
         QObject::connect(&worker, &ServerWorker::started, [&emittedStarted](){emittedStarted = true;});
-        QObject::connect(&worker, &ServerWorker::stopped, [](){FAIL("This code is supposed to be unreachable");});
-        QObject::connect(&worker, &ServerWorker::failed, [](){FAIL("This code is supposed to be unreachable");});
+        QObject::connect(&worker, &ServerWorker::stopped, [](){Spectator::FAIL("This code is supposed to be unreachable");});
+        QObject::connect(&worker, &ServerWorker::failed, [](){Spectator::FAIL("This code is supposed to be unreachable");});
 
         WHEN("worker is started")
         {
@@ -254,7 +253,7 @@ SCENARIO("AsyncServerWorker emits stopped after async worker stops")
         QObject::connect(&worker, &ServerWorker::started, [&emittedStarted](){emittedStarted = true;});
         bool emittedStopped = false;
         QObject::connect(&worker, &ServerWorker::stopped, [&emittedStopped](){emittedStopped = true;});
-        QObject::connect(&worker, &ServerWorker::failed, [](){FAIL("This code is supposed to be unreachable");});
+        QObject::connect(&worker, &ServerWorker::failed, [](){Spectator::FAIL("This code is supposed to be unreachable");});
         REQUIRE(worker.state() == ExecutionState::Stopped);
         const auto data = GENERATE(AS(QVariant), QVariant(int(145)), QVariant(QByteArray("Some data to use while starting...")));
         worker.start(data);
@@ -299,8 +298,8 @@ SCENARIO("AsyncServerWorker emits failed if async server worker fails")
         REQUIRE(TestAsyncServerWorker::instance() == nullptr);
         TestAsyncServerWorker::clear();
         AsyncServerWorker<TestAsyncServerWorker> worker;
-        QObject::connect(&worker, &ServerWorker::started, [](){FAIL("This code is supposed to be unreachable");});
-        QObject::connect(&worker, &ServerWorker::stopped, [](){FAIL("This code is supposed to be unreachable");});
+        QObject::connect(&worker, &ServerWorker::started, [](){Spectator::FAIL("This code is supposed to be unreachable");});
+        QObject::connect(&worker, &ServerWorker::stopped, [](){Spectator::FAIL("This code is supposed to be unreachable");});
         bool emittedFailed = false;
         std::string emittedErrorMessage;
         QObject::connect(&worker, &ServerWorker::failed, [&emittedFailed, &emittedErrorMessage](std::string_view errorMessage)

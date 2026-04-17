@@ -34,7 +34,6 @@ using Kourier::DataSink;
 using Kourier::HttpRequestParser;
 using Kourier::HttpRequestLimits;
 using Kourier::Object;
-using Spectator::SemaphoreAwaiter;
 
 namespace Test::HttpBrokerPrivate
 {
@@ -314,7 +313,7 @@ SCENARIO("HttpBrokerPrivate knows how to finish writing a chunked response")
                     {
                         if (pObject)
                         {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(destroyedQObjectSemaphore, 1));
+                            REQUIRE(TRY_ACQUIRE(destroyedQObjectSemaphore, 1));
                         }
                     }
                 }

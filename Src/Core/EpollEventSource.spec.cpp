@@ -25,6 +25,7 @@
 using Kourier::EpollEventSource;
 using Kourier::EpollEventNotifier;
 using Kourier::UnixUtils;
+using namespace Spectator;
 
 
 class EpollEventSourceTest : public EpollEventSource

@@ -49,7 +49,7 @@ using Kourier::TlsConfiguration;
 using TlsVersion = Kourier::TlsConfiguration::TlsVersion;
 using Kourier::TestResources::TlsTestCertificates;
 using Kourier::TestResources::TestHostNamesFetcher;
-using Spectator::SemaphoreAwaiter;
+using namespace Spectator;
 
 
 SCENARIO("HttpServer sets default values for its options")
@@ -95,7 +95,7 @@ SCENARIO("HttpServer emits started after all workers start")
         HttpServer server;
         QSemaphore serverEmittedStartedSemaphore;
         QObject::connect(&server, &HttpServer::started, [&](){serverEmittedStartedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
 
         WHEN("server is started")
         {
@@ -104,7 +104,7 @@ SCENARIO("HttpServer emits started after all workers start")
 
             THEN("server emits started after all its workers start")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverEmittedStartedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverEmittedStartedSemaphore, 10));
                 REQUIRE(server.isRunning());
             }
         }
@@ -122,19 +122,19 @@ SCENARIO("HttpServer closes all connections gracefully before emitting stopped")
         QObject::connect(&server, &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
         server.start(QHostAddress::LocalHost, 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
         TcpSocket clientSocket;
         QSemaphore clientConnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::connected, [&](){clientConnectedSemaphore.release();});
         QSemaphore clientDisconnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
-        Object::connect(&clientSocket, &TcpSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+        Object::connect(&clientSocket, &TcpSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         clientSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
         REQUIRE(!clientDisconnectedSemaphore.tryAcquire());
         while (server.connectionCount() != 1)
         {
@@ -147,8 +147,8 @@ SCENARIO("HttpServer closes all connections gracefully before emitting stopped")
 
             THEN("server closes all connections gracefully before emitting stopped")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStoppedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverStoppedSemaphore, 10));
                 REQUIRE(server.connectionCount() == 0);
             }
         }
@@ -166,19 +166,19 @@ SCENARIO("HttpServer can be deleted with established connections")
         QObject::connect(pServer.get(), &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(pServer.get(), &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(pServer.get(), &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(pServer.get(), &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!pServer->isRunning());
         pServer->start(QHostAddress::LocalHost, 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(pServer->isRunning());
         TcpSocket clientSocket;
         QSemaphore clientConnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::connected, [&](){clientConnectedSemaphore.release();});
         QSemaphore clientDisconnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
-        Object::connect(&clientSocket, &TcpSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+        Object::connect(&clientSocket, &TcpSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         clientSocket.connect(pServer->serverAddress().toString().toStdString(), pServer->serverPort());
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
         REQUIRE(!clientDisconnectedSemaphore.tryAcquire());
         while (pServer->connectionCount() != 1)
         {
@@ -191,7 +191,7 @@ SCENARIO("HttpServer can be deleted with established connections")
 
             THEN("server aborts all connections")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientDisconnectedSemaphore, 10));
             }
         }
     }
@@ -210,10 +210,10 @@ SCENARIO("HttpServer allows limiting max connection count")
         QObject::connect(&server, &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
         server.start(QHostAddress::LocalHost, 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
 
         WHEN("clients up to max connection limit try to connect to server")
@@ -225,7 +225,7 @@ SCENARIO("HttpServer allows limiting max connection count")
             {
                 Object::connect(&client, &TcpSocket::connected, [&](){clientConnectedSemaphore.release();});
                 Object::connect(&client, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
-                Object::connect(&client, &TcpSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+                Object::connect(&client, &TcpSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
                 client.connect(server.serverAddress().toString().toStdString(), server.serverPort());
             }
 
@@ -233,7 +233,7 @@ SCENARIO("HttpServer allows limiting max connection count")
             {
                 for (auto i = 0; i < maxConnectionCount; ++i)
                 {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
                 }
                 REQUIRE(!clientDisconnectedSemaphore.tryAcquire());
                 while (server.connectionCount() != maxConnectionCount)
@@ -248,13 +248,13 @@ SCENARIO("HttpServer allows limiting max connection count")
                     QSemaphore oneMoreClientDisconnectedSemaphore;
                     Object::connect(&oneMoreClient, &TcpSocket::connected, [&](){oneMoreClientConnectedSemaphore.release();});
                     Object::connect(&oneMoreClient, &TcpSocket::disconnected, [&](){oneMoreClientDisconnectedSemaphore.release();});
-                    Object::connect(&oneMoreClient, &TcpSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+                    Object::connect(&oneMoreClient, &TcpSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
                     oneMoreClient.connect(server.serverAddress().toString().toStdString(), server.serverPort());
 
                     THEN("server disconnects client after client connects to server")
                     {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(oneMoreClientConnectedSemaphore, 10));
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(oneMoreClientDisconnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(oneMoreClientConnectedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(oneMoreClientDisconnectedSemaphore, 10));
                         while (server.connectionCount() != maxConnectionCount)
                         {
                             QCoreApplication::processEvents(QEventLoop::AllEvents | QEventLoop::WaitForMoreEvents, 1);
@@ -499,10 +499,10 @@ SCENARIO("HttpServer does not accept TLS 1.2 clients if it is configured to acce
         QObject::connect(&server, &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
         server.start(serverAddress, 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
 
         WHEN("a client that only accetps TLS 1.2 tries to connect to server")
@@ -513,7 +513,7 @@ SCENARIO("HttpServer does not accept TLS 1.2 clients if it is configured to acce
             TlsSocket clientSocket(clientTlsConfiguration);
             QSemaphore clientConnectedSemaphore;
             Object::connect(&clientSocket, &TcpSocket::connected, [&](){clientConnectedSemaphore.release();});
-            Object::connect(&clientSocket, &TlsSocket::encrypted, [](){FAIL("This code is supposed to be unreachable.");});
+            Object::connect(&clientSocket, &TlsSocket::encrypted, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
             QSemaphore clientDisconnectedSemaphore;
             Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
             QSemaphore clientFailedSemaphore;
@@ -522,8 +522,8 @@ SCENARIO("HttpServer does not accept TLS 1.2 clients if it is configured to acce
 
             THEN("client establishes TCP connection before server closes it after receiving client's TLS hello message")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientDisconnectedSemaphore, 10));
                 REQUIRE(!clientFailedSemaphore.tryAcquire());
                 while (server.connectionCount() != 0)
                 {
@@ -547,13 +547,13 @@ SCENARIO("HttpServer does not accept TLS 1.2 clients if it is configured to acce
             Object::connect(&clientSocket, &TlsSocket::encrypted, [&](){clientEncryptedSemaphore.release();});
             QSemaphore clientDisconnectedSemaphore;
             Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
-            Object::connect(&clientSocket, &TlsSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+            Object::connect(&clientSocket, &TlsSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
             clientSocket.connect(hostName, server.serverPort());
 
             THEN("client establishes encrypted connection")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientEncryptedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientEncryptedSemaphore, 10));
                 REQUIRE(!clientDisconnectedSemaphore.tryAcquire());
                 while (server.connectionCount() != 1)
                 {
@@ -587,10 +587,10 @@ SCENARIO("HttpServer does not accept TLS 1.3 clients if it is configured to acce
         QObject::connect(&server, &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
         server.start(serverAddress, 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
 
         WHEN("a client that only accetps TLS 1.3 tries to connect to server")
@@ -601,7 +601,7 @@ SCENARIO("HttpServer does not accept TLS 1.3 clients if it is configured to acce
             TlsSocket clientSocket(clientTlsConfiguration);
             QSemaphore clientConnectedSemaphore;
             Object::connect(&clientSocket, &TcpSocket::connected, [&](){clientConnectedSemaphore.release();});
-            Object::connect(&clientSocket, &TlsSocket::encrypted, [](){FAIL("This code is supposed to be unreachable.");});
+            Object::connect(&clientSocket, &TlsSocket::encrypted, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
             QSemaphore clientDisconnectedSemaphore;
             Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
             QSemaphore clientFailedSemaphore;
@@ -610,8 +610,8 @@ SCENARIO("HttpServer does not accept TLS 1.3 clients if it is configured to acce
 
             THEN("client establishes tcp connection before server closes it after receiving the client hello tls message")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientDisconnectedSemaphore, 10));
                 REQUIRE(!clientFailedSemaphore.tryAcquire());
                 while (server.connectionCount() != 0)
                 {
@@ -635,13 +635,13 @@ SCENARIO("HttpServer does not accept TLS 1.3 clients if it is configured to acce
             Object::connect(&clientSocket, &TlsSocket::encrypted, [&](){clientEncryptedSemaphore.release();});
             QSemaphore clientDisconnectedSemaphore;
             Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
-            Object::connect(&clientSocket, &TlsSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+            Object::connect(&clientSocket, &TlsSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
             clientSocket.connect(hostName, server.serverPort());
 
             THEN("client establishes encrypted connection")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientEncryptedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientEncryptedSemaphore, 10));
                 REQUIRE(!clientDisconnectedSemaphore.tryAcquire());
                 while (server.connectionCount() != 1)
                 {
@@ -664,10 +664,10 @@ SCENARIO("HttpServer adds date and time headers")
         QObject::connect(&server, &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
         server.start(QHostAddress("127.0.0.1"), 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
 
         WHEN("client sends a get request")
@@ -684,7 +684,7 @@ SCENARIO("HttpServer adds date and time headers")
 
             THEN("server adds content lenght, date and server headers to response")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(networkReplySemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(networkReplySemaphore, 10));
                 REQUIRE(pReply->hasRawHeader("Content-Length"));
                 REQUIRE(pReply->hasRawHeader("Date"));
                 REQUIRE(pReply->hasRawHeader("Server"));
@@ -708,10 +708,10 @@ SCENARIO("HttpServer processes requests on most specific route")
         QObject::connect(&server, &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
         server.start(QHostAddress("127.0.0.1"), 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
 
         WHEN("client sends a get request")
@@ -739,7 +739,7 @@ SCENARIO("HttpServer processes requests on most specific route")
 
             THEN("server runs expected handler")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(networkReplySemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(networkReplySemaphore, 10));
                 REQUIRE(pReply->readAll() == targetPathAndExpectedRoute.second);
             }
         }
@@ -802,19 +802,19 @@ SCENARIO("HttpServer sends HTTP status 408 Request Timeout response, closes conn
         QObject::connect(&server, &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
         server.start(QHostAddress("127.0.0.1"), 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
         TcpSocket clientSocket;
         QSemaphore clientConnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::connected, [&](){clientConnectedSemaphore.release();});
         QSemaphore clientDisconnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
-        Object::connect(&clientSocket, &TcpSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+        Object::connect(&clientSocket, &TcpSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         clientSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
         const std::string clientIp = std::string(clientSocket.localAddress());
         const auto clientPort = clientSocket.localPort();
         const auto sendPreviousRequest = GENERATE(AS(bool), true, false);
@@ -830,7 +830,7 @@ SCENARIO("HttpServer sends HTTP status 408 Request Timeout response, closes conn
                 }
             });
             clientSocket.write("GET / HTTP/1.1\r\nHost: host\r\n\r\n");
-            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(receivedFirstResponseSemaphore, 10));
+            REQUIRE(TRY_ACQUIRE(receivedFirstResponseSemaphore, 10));
         }
         else
         {
@@ -847,7 +847,7 @@ SCENARIO("HttpServer sends HTTP status 408 Request Timeout response, closes conn
 
             THEN("server writes a 408 Request Timeout response and closes connection")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientDisconnectedSemaphore, 10));
                 const auto elapsedTime = elapsedTimer.elapsed();
                 REQUIRE(std::abs(idleTimeoutInMSecs - elapsedTime) <= 5);
                 REQUIRE(clientSocket.readAll().starts_with("HTTP/1.1 408 Request Timeout\r\n"));
@@ -859,7 +859,7 @@ SCENARIO("HttpServer sends HTTP status 408 Request Timeout response, closes conn
                     }
                 }
                 server.stop();
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStoppedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverStoppedSemaphore, 10));
                 if (setHandler)
                 {
                     const auto reportedErrors = pErrorHandler->reportedErrors();
@@ -894,19 +894,19 @@ SCENARIO("HttpServer sends HTTP status 408 Request Timeout response, closes conn
         QObject::connect(&server, &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
         server.start(QHostAddress("127.0.0.1"), 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
         TcpSocket clientSocket;
         QSemaphore clientConnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::connected, [&](){clientConnectedSemaphore.release();});
         QSemaphore clientDisconnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
-        Object::connect(&clientSocket, &TcpSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+        Object::connect(&clientSocket, &TcpSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         clientSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
         const std::string clientIp = std::string(clientSocket.localAddress());
         const auto clientPort = clientSocket.localPort();
         const auto sendPreviousRequest = GENERATE(AS(bool), true, false);
@@ -922,7 +922,7 @@ SCENARIO("HttpServer sends HTTP status 408 Request Timeout response, closes conn
                 }
             });
             clientSocket.write("GET / HTTP/1.1\r\nHost: host\r\n\r\n");
-            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(receivedFirstResponseSemaphore, 10));
+            REQUIRE(TRY_ACQUIRE(receivedFirstResponseSemaphore, 10));
         }
         else
         {
@@ -940,7 +940,7 @@ SCENARIO("HttpServer sends HTTP status 408 Request Timeout response, closes conn
 
             THEN("server writes a 408 Request Timeout response and closes connection")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientDisconnectedSemaphore, 10));
                 const auto elapsedTime = elapsedTimer.elapsed();
                 REQUIRE(std::abs(requestTimeoutInMSecs - elapsedTime) <= 5);
                 REQUIRE(clientSocket.readAll().starts_with("HTTP/1.1 408 Request Timeout\r\n"));
@@ -952,7 +952,7 @@ SCENARIO("HttpServer sends HTTP status 408 Request Timeout response, closes conn
                     }
                 }
                 server.stop();
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStoppedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverStoppedSemaphore, 10));
                 if (setHandler)
                 {
                     const auto reportedErrors = pErrorHandler->reportedErrors();
@@ -985,19 +985,19 @@ SCENARIO("HttpServer sends HTTP status 400 Bad Request response, closes connecti
         QObject::connect(&server, &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
         server.start(QHostAddress("127.0.0.1"), 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
         TcpSocket clientSocket;
         QSemaphore clientConnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::connected, [&](){clientConnectedSemaphore.release();});
         QSemaphore clientDisconnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
-        Object::connect(&clientSocket, &TcpSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+        Object::connect(&clientSocket, &TcpSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         clientSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
         const std::string clientIp = std::string(clientSocket.localAddress());
         const auto clientPort = clientSocket.localPort();
         const auto sendPreviousRequest = GENERATE(AS(bool), true, false);
@@ -1013,7 +1013,7 @@ SCENARIO("HttpServer sends HTTP status 400 Bad Request response, closes connecti
                 }
             });
             clientSocket.write("GET / HTTP/1.1\r\nHost: host\r\n\r\n");
-            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(receivedFirstResponseSemaphore, 10));
+            REQUIRE(TRY_ACQUIRE(receivedFirstResponseSemaphore, 10));
         }
 
         WHEN("client sends a malformed request to server")
@@ -1022,7 +1022,7 @@ SCENARIO("HttpServer sends HTTP status 400 Bad Request response, closes connecti
 
             THEN("server writes a 400 Bad Request response and closes connection")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientDisconnectedSemaphore, 10));
                 REQUIRE(clientSocket.readAll().starts_with("HTTP/1.1 400 Bad Request\r\n"));
                 if (setHandler)
                 {
@@ -1032,7 +1032,7 @@ SCENARIO("HttpServer sends HTTP status 400 Bad Request response, closes connecti
                     }
                 }
                 server.stop();
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStoppedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverStoppedSemaphore, 10));
                 if (setHandler)
                 {
                     const auto reportedErrors = pErrorHandler->reportedErrors();
@@ -1059,19 +1059,19 @@ SCENARIO("HttpServer sends HTTP 500 Internal Server Error code response if handl
         QObject::connect(&server, &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
         server.start(QHostAddress("127.0.0.1"), 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
         TcpSocket clientSocket;
         QSemaphore clientConnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::connected, [&](){clientConnectedSemaphore.release();});
         QSemaphore clientDisconnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
-        Object::connect(&clientSocket, &TcpSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+        Object::connect(&clientSocket, &TcpSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         clientSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
         const auto sendPreviousRequest = GENERATE(AS(bool), true, false);
         if (sendPreviousRequest)
         {
@@ -1085,7 +1085,7 @@ SCENARIO("HttpServer sends HTTP 500 Internal Server Error code response if handl
                 }
             });
             clientSocket.write("GET / HTTP/1.1\r\nHost: host\r\n\r\n");
-            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(receivedFirstResponseSemaphore, 10));
+            REQUIRE(TRY_ACQUIRE(receivedFirstResponseSemaphore, 10));
         }
 
         WHEN("client sends a request to server and the handler throws an unhandled exception")
@@ -1094,10 +1094,10 @@ SCENARIO("HttpServer sends HTTP 500 Internal Server Error code response if handl
 
             THEN("server catches unhandled exception, sends a 500 Internal Server Error response, and closes the connection")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientDisconnectedSemaphore, 10));
                 REQUIRE(clientSocket.readAll().starts_with("HTTP/1.1 500 Internal Server Error\r\n"));
                 server.stop();
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStoppedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverStoppedSemaphore, 10));
             }
         }
     }
@@ -1122,19 +1122,19 @@ SCENARIO("HttpServer sends HTTP 404 Not Found code response, closes connection, 
         QObject::connect(&server, &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
         server.start(QHostAddress("127.0.0.1"), 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
         TcpSocket clientSocket;
         QSemaphore clientConnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::connected, [&](){clientConnectedSemaphore.release();});
         QSemaphore clientDisconnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
-        Object::connect(&clientSocket, &TcpSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+        Object::connect(&clientSocket, &TcpSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         clientSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
         const std::string clientIp = std::string(clientSocket.localAddress());
         const auto clientPort = clientSocket.localPort();
         const auto sendPreviousRequest = GENERATE(AS(bool), true, false);
@@ -1150,7 +1150,7 @@ SCENARIO("HttpServer sends HTTP 404 Not Found code response, closes connection, 
                 }
             });
             clientSocket.write("GET / HTTP/1.1\r\nHost: host\r\n\r\n");
-            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(receivedFirstResponseSemaphore, 10));
+            REQUIRE(TRY_ACQUIRE(receivedFirstResponseSemaphore, 10));
         }
 
         WHEN("client sends a request targeting an unmapped resource")
@@ -1159,7 +1159,7 @@ SCENARIO("HttpServer sends HTTP 404 Not Found code response, closes connection, 
 
             THEN("server sends a 404 Not Found response, and closes the connection")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientDisconnectedSemaphore, 10));
                 REQUIRE(clientSocket.readAll().starts_with("HTTP/1.1 404 Not Found\r\n"));
                 if (setHandler)
                 {
@@ -1169,7 +1169,7 @@ SCENARIO("HttpServer sends HTTP 404 Not Found code response, closes connection, 
                     }
                 }
                 server.stop();
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStoppedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverStoppedSemaphore, 10));
                 if (setHandler)
                 {
                     const auto reportedErrors = pErrorHandler->reportedErrors();
@@ -1222,10 +1222,10 @@ SCENARIO("HttpServer sends HTTP status 400 Bad Request response, closes connecti
         QObject::connect(&server, &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
         server.start(QHostAddress("127.0.0.1"), 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
         TcpSocket clientSocket;
         QSemaphore clientConnectedSemaphore;
@@ -1242,9 +1242,9 @@ SCENARIO("HttpServer sends HTTP status 400 Bad Request response, closes connecti
         });
         QSemaphore clientDisconnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
-        Object::connect(&clientSocket, &TcpSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+        Object::connect(&clientSocket, &TcpSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         clientSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
 
         WHEN("client sends request to server")
         {
@@ -1285,7 +1285,7 @@ SCENARIO("HttpServer sends HTTP status 400 Bad Request response, closes connecti
                         expectBadRequestResponse = false;
                         break;
                 }
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(receivedResponseSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(receivedResponseSemaphore, 10));
                 const std::string response{clientSocket.readAll()};
                 if (expectBadRequestResponse)
                 {
@@ -1352,7 +1352,7 @@ SCENARIO("HttpServer sends HTTP status 400 Bad Request response, closes connecti
                         expectBadRequestResponse = false;
                         break;
                 }
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(receivedResponseSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(receivedResponseSemaphore, 10));
                 const std::string response{clientSocket.readAll()};
                 if (expectBadRequestResponse)
                 {
@@ -1388,14 +1388,14 @@ SCENARIO("HttpServer calls handler with request containing all body data availab
         requestBodyReceivedThroughBroker.clear();
         REQUIRE(server.addRoute(HttpRequest::Method::POST, "/data", [](const HttpRequest &request, HttpBroker &broker)
         {
-            REQUIRE(request.method() == HttpRequest::Method::POST);
-            REQUIRE(!request.chunked());
-            REQUIRE(request.hasBody());
-            REQUIRE(!request.isComplete());
-            REQUIRE(request.targetQuery().empty());
-            REQUIRE(request.targetPath() == "/data");
-            REQUIRE(request.bodyType() == HttpRequest::BodyType::NotChunked);
-            REQUIRE(request.requestBodySize() == fullRequestBody.size());
+            Spectator::REQUIRE(request.method() == HttpRequest::Method::POST);
+            Spectator::REQUIRE(!request.chunked());
+            Spectator::REQUIRE(request.hasBody());
+            Spectator::REQUIRE(!request.isComplete());
+            Spectator::REQUIRE(request.targetQuery().empty());
+            Spectator::REQUIRE(request.targetPath() == "/data");
+            Spectator::REQUIRE(request.bodyType() == HttpRequest::BodyType::NotChunked);
+            Spectator::REQUIRE(request.requestBodySize() == fullRequestBody.size());
             pendingBodySize = request.pendingBodySize();
             requestBody.append(request.body());
             auto *pObject = new QObject;
@@ -1417,19 +1417,19 @@ SCENARIO("HttpServer calls handler with request containing all body data availab
         QObject::connect(&server, &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
         server.start(QHostAddress("127.0.0.1"), 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
         TcpSocket clientSocket;
         QSemaphore clientConnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::connected, [&](){clientConnectedSemaphore.release();});
         QSemaphore clientDisconnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
-        Object::connect(&clientSocket, &TcpSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+        Object::connect(&clientSocket, &TcpSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         clientSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
 
         WHEN("client sends a request with partial body data")
         {
@@ -1437,7 +1437,7 @@ SCENARIO("HttpServer calls handler with request containing all body data availab
 
             THEN("server calls handler with partial body data")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverReceivedRequest, 10));
+                REQUIRE(TRY_ACQUIRE(serverReceivedRequest, 10));
                 REQUIRE(requestBody == "Hello ");
                 REQUIRE(pendingBodySize == (fullRequestBody.size() - requestBody.size()));
 
@@ -1449,9 +1449,9 @@ SCENARIO("HttpServer calls handler with request containing all body data availab
 
                     THEN("server sends remaining data to handler through broker, which responds and server destroys set QObject")
                     {
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(brokerReceivedRemainingBodyData, 10));
+                        REQUIRE(TRY_ACQUIRE(brokerReceivedRemainingBodyData, 10));
                         REQUIRE((requestBody + requestBodyReceivedThroughBroker) == fullRequestBody);
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(objectDeletedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(objectDeletedSemaphore, 10));
                     }
                 }
             }
@@ -1478,13 +1478,13 @@ SCENARIO("HttpServer sends chunked body data through broker")
         static QSemaphore receivedTrailerSemaphore;
         REQUIRE(server.addRoute(HttpRequest::Method::POST, "/data", [](const HttpRequest &request, HttpBroker &broker)
         {
-            REQUIRE(request.method() == HttpRequest::Method::POST);
-            REQUIRE(request.chunked());
-            REQUIRE(!request.hasBody());
-            REQUIRE(!request.isComplete());
-            REQUIRE(request.targetQuery().empty());
-            REQUIRE(request.targetPath() == "/data");
-            REQUIRE(request.bodyType() == HttpRequest::BodyType::Chunked);
+            Spectator::REQUIRE(request.method() == HttpRequest::Method::POST);
+            Spectator::REQUIRE(request.chunked());
+            Spectator::REQUIRE(!request.hasBody());
+            Spectator::REQUIRE(!request.isComplete());
+            Spectator::REQUIRE(request.targetQuery().empty());
+            Spectator::REQUIRE(request.targetPath() == "/data");
+            Spectator::REQUIRE(request.bodyType() == HttpRequest::BodyType::Chunked);
             auto *pObject = new QObject;
             QObject::connect(pObject, &QObject::destroyed, [](){objectDeletedSemaphore.release();});
             broker.setQObject(pObject);
@@ -1493,15 +1493,15 @@ SCENARIO("HttpServer sends chunked body data through broker")
                 requestBodyReceivedThroughBroker.append(data);
                 if (isLastPart)
                 {
-                    REQUIRE(data.empty());
+                    Spectator::REQUIRE(data.empty());
                     if (hasToSendTrailer)
                     {
-                        REQUIRE(broker.hasTrailers());
-                        REQUIRE(broker.trailersCount() == 2);
-                        REQUIRE(broker.hasTrailer("name1"));
-                        REQUIRE(broker.trailer("name1") == "value1");
-                        REQUIRE(broker.hasTrailer("name2"));
-                        REQUIRE(broker.trailer("name2") == "value2");
+                        Spectator::REQUIRE(broker.hasTrailers());
+                        Spectator::REQUIRE(broker.trailersCount() == 2);
+                        Spectator::REQUIRE(broker.hasTrailer("name1"));
+                        Spectator::REQUIRE(broker.trailer("name1") == "value1");
+                        Spectator::REQUIRE(broker.hasTrailer("name2"));
+                        Spectator::REQUIRE(broker.trailer("name2") == "value2");
                         receivedTrailerSemaphore.release();
                     }
                     brokerReceivedRemainingBodyData.release();
@@ -1509,7 +1509,7 @@ SCENARIO("HttpServer sends chunked body data through broker")
                 }
                 else
                 {
-                    REQUIRE(!broker.hasTrailers());
+                    Spectator::REQUIRE(!broker.hasTrailers());
                 }
             });
             serverReceivedRequest.release();
@@ -1519,19 +1519,19 @@ SCENARIO("HttpServer sends chunked body data through broker")
         QObject::connect(&server, &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
         server.start(QHostAddress("127.0.0.1"), 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
         TcpSocket clientSocket;
         QSemaphore clientConnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::connected, [&](){clientConnectedSemaphore.release();});
         QSemaphore clientDisconnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
-        Object::connect(&clientSocket, &TcpSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+        Object::connect(&clientSocket, &TcpSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         clientSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
 
         WHEN("client sends a chunked request to server")
         {
@@ -1543,13 +1543,13 @@ SCENARIO("HttpServer sends chunked body data through broker")
 
             THEN("server calls handler without any body data and sends all body data through broker, which responds when it received the last part, making the server destroy the set QObject")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverReceivedRequest, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(brokerReceivedRemainingBodyData, 10));
+                REQUIRE(TRY_ACQUIRE(serverReceivedRequest, 10));
+                REQUIRE(TRY_ACQUIRE(brokerReceivedRemainingBodyData, 10));
                 REQUIRE(requestBodyReceivedThroughBroker == fullRequestBody);
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(objectDeletedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(objectDeletedSemaphore, 10));
                 if (hasToSendTrailer)
                 {
-                    REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(receivedTrailerSemaphore, 10));
+                    REQUIRE(TRY_ACQUIRE(receivedTrailerSemaphore, 10));
                 }
             }
         }
@@ -1568,19 +1568,19 @@ SCENARIO("HttpServer closes connection if handler function neither fully respond
         QObject::connect(&server, &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
         server.start(QHostAddress("127.0.0.1"), 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
         TcpSocket clientSocket;
         QSemaphore clientConnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::connected, [&](){clientConnectedSemaphore.release();});
         QSemaphore clientDisconnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
-        Object::connect(&clientSocket, &TcpSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+        Object::connect(&clientSocket, &TcpSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         clientSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
 
         WHEN("client sends a request to server")
         {
@@ -1588,10 +1588,10 @@ SCENARIO("HttpServer closes connection if handler function neither fully respond
 
             THEN("server closes connection")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientDisconnectedSemaphore, 10));
                 REQUIRE(clientSocket.readAll().empty());
                 server.stop();
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStoppedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverStoppedSemaphore, 10));
             }
         }
     }
@@ -1622,10 +1622,10 @@ SCENARIO("HttpServer allows handler to respond to a request before it is fully r
         QObject::connect(&server, &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
         server.start(QHostAddress("127.0.0.1"), 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
         TcpSocket clientSocket;
         QSemaphore clientConnectedSemaphore;
@@ -1641,9 +1641,9 @@ SCENARIO("HttpServer allows handler to respond to a request before it is fully r
         });
         QSemaphore clientDisconnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
-        Object::connect(&clientSocket, &TcpSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+        Object::connect(&clientSocket, &TcpSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         clientSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
 
         WHEN("client sends a request without body data to server")
         {
@@ -1651,7 +1651,7 @@ SCENARIO("HttpServer allows handler to respond to a request before it is fully r
 
             THEN("handler responds without receiving full request body")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(receivedResponseSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(receivedResponseSemaphore, 10));
 
                 AND_WHEN("client sends request body data")
                 {
@@ -1661,10 +1661,10 @@ SCENARIO("HttpServer allows handler to respond to a request before it is fully r
                     {
                         if (hasToSetQObject)
                         {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(deletedQObjectSemaphore, 10));
+                            REQUIRE(TRY_ACQUIRE(deletedQObjectSemaphore, 10));
                         }
                         server.stop();
-                        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStoppedSemaphore, 10));
+                        REQUIRE(TRY_ACQUIRE(serverStoppedSemaphore, 10));
                     }
                 }
             }
@@ -1699,10 +1699,10 @@ SCENARIO("HttpServer supports pipelined requests")
         QObject::connect(&server, &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
         server.start(QHostAddress("127.0.0.1"), 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
         TcpSocket clientSocket;
         QSemaphore clientConnectedSemaphore;
@@ -1718,9 +1718,9 @@ SCENARIO("HttpServer supports pipelined requests")
         });
         QSemaphore clientDisconnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
-        Object::connect(&clientSocket, &TcpSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+        Object::connect(&clientSocket, &TcpSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         clientSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
 
         WHEN("client sends three pipelined requests to server")
         {
@@ -1736,10 +1736,10 @@ SCENARIO("HttpServer supports pipelined requests")
 
             THEN("server processes sent pipelined requests")
             {
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(receivedResponseSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(receivedResponseSemaphore, 10));
                 server.stop();
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStoppedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverStoppedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientDisconnectedSemaphore, 10));
             }
         }
     }
@@ -1762,19 +1762,19 @@ SCENARIO("HttpServer does not timeout after a complete request is received")
         QObject::connect(&server, &HttpServer::started, [&](){serverStartedSemaphore.release();});
         QSemaphore serverStoppedSemaphore;
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
-        QObject::connect(&server, &HttpServer::failed, [](){FAIL("This code is supposed to be unreachable.");});
+        QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
         server.start(QHostAddress("127.0.0.1"), 0);
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStartedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
         TcpSocket clientSocket;
         QSemaphore clientConnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::connected, [&](){clientConnectedSemaphore.release();});
         QSemaphore clientDisconnectedSemaphore;
         Object::connect(&clientSocket, &TcpSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
-        Object::connect(&clientSocket, &TcpSocket::error, [](){FAIL("This code is supposed to be unreachable.");});
+        Object::connect(&clientSocket, &TcpSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         clientSocket.connect(server.serverAddress().toString().toStdString(), server.serverPort());
-        REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientConnectedSemaphore, 10));
+        REQUIRE(TRY_ACQUIRE(clientConnectedSemaphore, 10));
 
         WHEN("client sends a request to server")
         {
@@ -1782,10 +1782,10 @@ SCENARIO("HttpServer does not timeout after a complete request is received")
 
             THEN("server keeps awaiting for handler to respond without timing out")
             {
-                REQUIRE(!SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, QDeadlineTimer(15)));
+                REQUIRE(!TRY_ACQUIRE(clientDisconnectedSemaphore, QDeadlineTimer(15)));
                 server.stop();
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(serverStoppedSemaphore, 10));
-                REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(clientDisconnectedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(serverStoppedSemaphore, 10));
+                REQUIRE(TRY_ACQUIRE(clientDisconnectedSemaphore, 10));
             }
         }
     }

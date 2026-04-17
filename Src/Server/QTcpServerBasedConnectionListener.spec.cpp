@@ -30,7 +30,6 @@
 using Kourier::QTcpServerBasedConnectionListener;
 using Kourier::ConnectionListener;
 using Kourier::Object;
-using Spectator::SemaphoreAwaiter;
 
 
 SCENARIO("QTcpServerBasedConnectionListener listens for incoming connections")
@@ -65,7 +64,7 @@ SCENARIO("QTcpServerBasedConnectionListener listens for incoming connections")
                 {
                     QSemaphore emittedNewConnectionSemaphore;
                     QList<qintptr> socketDescriptors;
-                    Object::connect(&connectionListener, &ConnectionListener::newConnection, [&emittedNewConnectionSemaphore, &socketDescriptors](qintptr socketDescriptor)
+                    Object::connect(&connectionListener, &ConnectionListener::newConnection, [this, &emittedNewConnectionSemaphore, &socketDescriptors](qintptr socketDescriptor)
                     {
                         REQUIRE(!socketDescriptors.contains(socketDescriptor));
                         socketDescriptors.append(socketDescriptor);
@@ -80,7 +79,7 @@ SCENARIO("QTcpServerBasedConnectionListener listens for incoming connections")
                     {
                         for (auto i = 0; i < clientsToConnect; ++i)
                         {
-                            REQUIRE(SemaphoreAwaiter::signalSlotAwareWait(emittedNewConnectionSemaphore, 1));
+                            REQUIRE(TRY_ACQUIRE(emittedNewConnectionSemaphore, 1));
                         }
                     }
                 }

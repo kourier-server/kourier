@@ -27,7 +27,7 @@ using Kourier::ExecutionState;
 using Kourier::Server;
 using Kourier::ServerWorker;
 using Kourier::ServerWorkerFactory;
-
+using namespace Spectator;
 
 namespace Tests::Server::Spec
 {
@@ -229,8 +229,8 @@ SCENARIO("Server emits started after all workers start")
         Server server(std::shared_ptr<ServerWorkerFactory>(new TestServerWorkerFactory));
         bool emittedStarted = false;
         QObject::connect(&server, &Server::started, [&emittedStarted](){emittedStarted = true;});
-        QObject::connect(&server, &Server::stopped, [](){FAIL("This code is supposed to be unreachable");});
-        QObject::connect(&server, &Server::failed, [](){FAIL("This code is supposed to be unreachable");});
+        QObject::connect(&server, &Server::stopped, [](){Spectator::FAIL("This code is supposed to be unreachable");});
+        QObject::connect(&server, &Server::failed, [](){Spectator::FAIL("This code is supposed to be unreachable");});
         const auto workerCountToTry = GENERATE(AS(int), 0, 1, 3, 5);
         server.setWorkerCount(workerCountToTry);
 
@@ -277,7 +277,7 @@ SCENARIO("Server emits stopped after all workers stop")
         QObject::connect(&server, &Server::started, [&emittedStarted](){emittedStarted = true;});
         bool emittedStopped = false;
         QObject::connect(&server, &Server::stopped, [&emittedStopped](){emittedStopped = true;});
-        QObject::connect(&server, &Server::failed, [](){FAIL("This code is supposed to be unreachable");});
+        QObject::connect(&server, &Server::failed, [](){Spectator::FAIL("This code is supposed to be unreachable");});
         const auto workerCountToTry = GENERATE(AS(int), 0, 1, 3, 5);
         server.setWorkerCount(workerCountToTry);
         REQUIRE(server.state() == ExecutionState::Stopped);
