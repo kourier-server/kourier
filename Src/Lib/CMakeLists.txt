@@ -1,6 +1,6 @@
 #
-# Copyright (C) 2024 Glauco Pacheco <glauco@kourier.io>
-# All rights reserved.
+# Copyright (C) 2024 Glauco Pacheco <glaucopacheco@gmail.com>
+# SPDX-License-Identifier: BSD-3-Clause
 #
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     qt_add_library(Lib SHARED

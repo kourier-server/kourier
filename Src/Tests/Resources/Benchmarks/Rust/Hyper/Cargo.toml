@@ -3,7 +3,7 @@ name = "hyper-bench"
 version = "1.0.0"
 edition = "2024"
 authors = [
-    "Glauco Pacheco <glauco@kourier.io>"
+    "Glauco Pacheco <glaucopacheco@gmail.com>"
 ]
 
 [[bin]]

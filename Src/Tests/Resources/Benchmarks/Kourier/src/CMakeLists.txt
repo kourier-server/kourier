@@ -1,6 +1,6 @@
 #
-# Copyright (C) 2024 Glauco Pacheco <glauco@kourier.io>
-# All rights reserved.
+# Copyright (C) 2024 Glauco Pacheco <glaucopacheco@gmail.com>
+# SPDX-License-Identifier: BSD-3-Clause
 #
 cmake_minimum_required(VERSION 3.19 FATAL_ERROR)
 cmake_policy(SET CMP0091 NEW)

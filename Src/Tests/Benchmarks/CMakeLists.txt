@@ -1,6 +1,6 @@
 #
-# Copyright (C) 2025 Glauco Pacheco <glauco@kourier.io>
-# All rights reserved.
+# Copyright (C) 2025 Glauco Pacheco <glaucopacheco@gmail.com>
+# SPDX-License-Identifier: BSD-3-Clause
 #
 qt_add_executable(Benchmarks)
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")

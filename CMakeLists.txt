@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2024 Glauco Pacheco <glauco@kourier.io>
+# Copyright (C) 2024 Glauco Pacheco <glaucopacheco@gmail.com>
 # All rights reserved.
 #
 

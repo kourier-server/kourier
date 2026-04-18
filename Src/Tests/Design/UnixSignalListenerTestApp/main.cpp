@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2024 Glauco Pacheco <glauco@kourier.io>
+// Copyright (C) 2024 Glauco Pacheco <glaucopacheco@gmail.com>
 // SPDX-License-Identifier: AGPL-3.0-only
 //
 // This program is free software: you can redistribute it and/or modify
@@ -12,7 +12,7 @@
 // GNU Affero General Public License for more details.
 //
 // You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
 #include "../../../Core/UnixSignalListener.h"
