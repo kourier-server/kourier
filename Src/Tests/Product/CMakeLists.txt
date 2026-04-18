@@ -46,6 +46,8 @@ qt_add_executable(ProductTests)
 target_sources(ProductTests PRIVATE
     main.cpp
     Product.spec.cpp
+    ../Resources/TestHostNamesFetcher.cpp
+    ../Resources/TestHostNamesFetcher.h
     ../Resources/TlsTestCertificates.cpp
     ../Resources/TlsTestCertificates.h)
 find_package(Qt6 COMPONENTS Core Concurrent Network REQUIRED)

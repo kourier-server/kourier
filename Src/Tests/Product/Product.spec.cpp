@@ -19,6 +19,7 @@
 #include "EmitterLibrary/Emitter.h"
 #include "ReceiverLibrary/Receiver.h"
 #include "../Resources/TlsTestCertificates.h"
+#include "../Resources/TestHostNamesFetcher.h"
 #include <Spectator>
 #include <QSemaphore>
 #include <QDeadlineTimer>
@@ -36,6 +37,7 @@ using Kourier::ErrorHandler;
 using Kourier::HttpServer;
 using Kourier::Signal;
 using Kourier::TestResources::TlsTestCertificates;
+using Kourier::TestResources::TestHostNamesFetcher;
 using namespace std::chrono_literals;
 
 
@@ -231,7 +233,7 @@ SCENARIO("Kourier library supports TcpServer, TlsServer and HttpServer and Error
         QObject::connect(&server, &HttpServer::stopped, [&](){serverStoppedSemaphore.release();});
         QObject::connect(&server, &HttpServer::failed, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
         REQUIRE(!server.isRunning());
-        server.start(QHostAddress("127.10.20.50"), 0);
+        server.start(QHostAddress("127.127.127.50"), 0);
         REQUIRE(TRY_ACQUIRE(serverStartedSemaphore, 10));
         REQUIRE(server.isRunning());
 
@@ -247,7 +249,8 @@ SCENARIO("Kourier library supports TcpServer, TlsServer and HttpServer and Error
             QSemaphore clientDisconnectedSemaphore;
             Object::connect(&clientSocket, &TlsSocket::disconnected, [&](){clientDisconnectedSemaphore.release();});
             Object::connect(&clientSocket, &TlsSocket::error, [](){Spectator::FAIL("This code is supposed to be unreachable.");});
-            clientSocket.connect("test.onlocalhost.com", server.serverPort());
+            auto [hostName, hostAddresses] = TestHostNamesFetcher::hostNameWithIpv4Addresses();
+            clientSocket.connect(hostName, server.serverPort());
 
             THEN("client establishes encrypted connection")
             {
