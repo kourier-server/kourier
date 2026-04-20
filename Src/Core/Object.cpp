@@ -16,6 +16,7 @@
 //
 
 #include "Object.h"
+#include <qlogging.h>
 
 
 namespace Kourier
@@ -39,7 +40,11 @@ Destroys the Object. All connections having this object as sender, receiver, or 
 Object::~Object()
 {
     if (m_isEmitting)
-        qFatal("Failed to delete Object. Object is emitting a signal. Use Object::scheduleForDeletion instead.");
+    {
+        assert(m_pIsDestroyed);
+        *m_pIsDestroyed = true;
+        qWarning("Deleting connected Object while emitting. This is supported by Kourier, but may not be what you want. You can use Object::scheduleForDeletion to postpone emitter deletion instead.");
+    }
     while (!m_pConnectedEmitters.empty())
     {
         auto * const pObject = m_pConnectedEmitters.begin()->first;

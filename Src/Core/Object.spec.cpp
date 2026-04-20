@@ -4669,3 +4669,119 @@ SCENARIO("Objects can be scheduled for deletion")
         }
     }
 }
+
+namespace Test::Object
+{
+
+class EmitterToBeDeleted : public Kourier::Object
+{
+    KOURIER_OBJECT(Test::Object::EmitterToBeDeleted);
+public:
+    Kourier::Signal signal();
+};
+
+class DeleterReceiver : public Kourier::Object
+{
+    KOURIER_OBJECT(Test::Object::DeleterReceiver);
+public:
+    void deleteEmitterIfRequired()
+    {
+        m_wasCalled = true;
+        if (m_currentIdx++ == m_deleterReceiverIdx)
+            delete m_pEmitter;
+    }
+    inline bool wasCalled() const {return m_wasCalled;}
+    inline void setEmitter(Kourier::Object *pEmitter) {m_pEmitter = pEmitter;}
+    inline static void setDeleterReceiverIdx(size_t deleterReceiverIdx) {m_currentIdx = 0; m_deleterReceiverIdx = deleterReceiverIdx;}
+
+private:
+    bool m_wasCalled = false;
+    Kourier::Object *m_pEmitter = nullptr;
+    static size_t m_deleterReceiverIdx;
+    static size_t m_currentIdx;
+};
+
+Kourier::Signal Test::Object::EmitterToBeDeleted::signal() KOURIER_SIGNAL(&Test::Object::EmitterToBeDeleted::signal)
+size_t DeleterReceiver::m_deleterReceiverIdx = 0;
+size_t DeleterReceiver::m_currentIdx = 0;
+
+}
+
+using namespace Test::Object;
+
+SCENARIO("Object supports emitter deletion in connected slot")
+{
+    GIVEN("an emitter connected to three receivers")
+    {
+        static constexpr size_t receiverCount = 3;
+        const auto deleterReceiverIdx = GENERATE_RANGE(AS(size_t), 0, receiverCount - 1);
+        EmitterToBeDeleted *pEmitter = new EmitterToBeDeleted;
+        DeleterReceiver receivers[3];
+        DeleterReceiver::setDeleterReceiverIdx(deleterReceiverIdx);
+        for (auto &receiver : receivers)
+        {
+            receiver.setEmitter(pEmitter);
+            Object::connect(pEmitter, &EmitterToBeDeleted::signal, &receiver, &DeleterReceiver::deleteEmitterIfRequired);
+        }
+
+        WHEN("emitter emits the connected signal and one of the receivers deletes the emitter on it's connected slot")
+        {
+            pEmitter->signal();
+
+            THEN("other pending receivers's slot is not called")
+            {
+                const size_t expectedCalledSlotsCount = deleterReceiverIdx + 1;
+                size_t calledSlotsCount = 0;
+                for (const auto &receiver : receivers)
+                    calledSlotsCount += receiver.wasCalled() ? 1 : 0;
+                REQUIRE(calledSlotsCount == expectedCalledSlotsCount);
+            }
+        }
+    }
+}
+
+SCENARIO("Object supports emitter deletion in connected lambda")
+{
+    GIVEN("an emitter connected to three lambdas")
+    {
+        static constexpr size_t lambdaCount = 3;
+        const auto deleterLambdaIdx = GENERATE_RANGE(AS(size_t), 0, lambdaCount - 1);
+        EmitterToBeDeleted *pEmitter = new EmitterToBeDeleted;
+        static size_t currentLambdaIdx = 0;
+        currentLambdaIdx = 0;
+        static size_t calledLambdasCount = 0;
+        calledLambdasCount = 0;
+        const auto sameLambda = GENERATE(AS(bool), true, false);
+        auto lambda = [&]()
+        {
+            ++calledLambdasCount;
+            if (currentLambdaIdx++ == deleterLambdaIdx)
+                delete pEmitter;
+        };
+        for (auto i = 0; i < lambdaCount; ++i)
+        {
+            if (sameLambda)
+                Object::connect(pEmitter, &EmitterToBeDeleted::signal, lambda);
+            else
+            {
+                Object::connect(pEmitter, &EmitterToBeDeleted::signal, [&]()
+                {
+                    ++calledLambdasCount;
+                    if (currentLambdaIdx++ == deleterLambdaIdx)
+                        delete pEmitter;
+                });
+            }
+        }
+
+        WHEN("emitter emits the connected signal and one of the lambdas deletes the emitter")
+        {
+            pEmitter->signal();
+
+            THEN("other lambdas are not called")
+            {
+                const size_t expectedCalledLambdasCount = deleterLambdaIdx + 1;
+                REQUIRE(calledLambdasCount == expectedCalledLambdasCount);
+            }
+        }
+    }
+}

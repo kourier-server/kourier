@@ -184,17 +184,23 @@ protected:
     template <class...SignalArgs>
     inline void emitSignal(quint64 signalId, SignalArgs&&...args)
     {
+        bool isDestroyed = false;
+        bool * pIsDestroyed = !m_isEmitting ? &isDestroyed : m_pIsDestroyed;
         bool isFirstToEmit = !m_isEmitting;
+        m_pIsDestroyed = !m_isEmitting ? pIsDestroyed : m_pIsDestroyed;
         m_isEmitting = true;
         auto packedArgs = std::forward_as_tuple(args...);
         for (auto it = m_pSignalSlotConnections.begin(); it != m_pSignalSlotConnections.end(); ++it)
         {
             if (it->pMetaConnection && it->pMetaConnection->signalId() == signalId)
                 it->pMetaConnection->callSlot(static_cast<Object*>(it->pReceiver), &packedArgs);
+            if (*pIsDestroyed) [[unlikely]]
+                return;
         }
         if (isFirstToEmit)
         {
             m_isEmitting = false;
+            m_pIsDestroyed = nullptr;
             if (m_hasToCleanupConnections)
             {
                 m_hasToCleanupConnections = false;
@@ -221,6 +227,7 @@ private:
         MetaSignalSlotConnection *pMetaConnection = nullptr;
     };
     std::forward_list<SignalSlotConnectionData> m_pSignalSlotConnections;
+    bool * m_pIsDestroyed = nullptr;
     bool m_isEmitting = false;
     bool m_hasToCleanupConnections = false;
     bool m_hasBeenScheduledForDeletion = false;
