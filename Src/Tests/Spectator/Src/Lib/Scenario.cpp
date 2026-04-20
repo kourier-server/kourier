@@ -5,7 +5,11 @@
 #include "ScenarioRepository.h"
 #include "ScenarioRunner.h"
 #include "SpectatorException.h"
+#include <QString>
 #include <QCoreApplication>
+#include <QDebug>
+#include <Qt>
+#include <cstdlib>
 
 using namespace Qt::StringLiterals;
 
@@ -36,6 +40,12 @@ void Scenario::INFO(QString message)
 void Scenario::FAIL(QString message, const std::source_location location)
 {
     throw SpectatorException(message, QString::fromUtf8(location.file_name()), location.line());
+}
+
+[[noreturn]] void Scenario::FATAL(QString message, const std::source_location location)
+{
+    qFatal() << u"Spectator FATAL message: "_s << SpectatorException(message, QString::fromUtf8(location.file_name()), location.line()).message() << Qt::endl;
+    std::exit(-1);
 }
 
 static void processEvents(int timeInMSecs = -1)

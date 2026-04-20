@@ -5,6 +5,7 @@
 #include "ScenarioRunner.h"
 #include "GlobalScopeData.h"
 #include "SpectatorException.h"
+#include <QString>
 #include <QtTypes>
 #include <QtLogging>
 #include <QDebug>
@@ -44,10 +45,15 @@ SPECTATOR_EXPORT void INFO(QString message)
         GlobalScopeData::recordInfoMessage(message);
 }
 
-[[noreturn]] SPECTATOR_EXPORT void FAIL(QString message, const std::source_location location)
+SPECTATOR_EXPORT void FAIL(QString message, const std::source_location location)
 {
     throw SpectatorException(message, QString::fromUtf8(location.file_name()), location.line());
 }
 
+[[noreturn]] SPECTATOR_EXPORT void FATAL(QString message, const std::source_location location)
+{
+    qFatal() << u"Spectator FATAL message: "_s << SpectatorException(message, QString::fromUtf8(location.file_name()), location.line()).message() << Qt::endl;
+    std::exit(-1);
+}
 
 }
